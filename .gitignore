@@ -104,7 +104,7 @@ venv.bak/
 .mypy_cache/
 
 # private settings
-settings/private.py
+deftcore/settings/private.py
 
 # IDE
 .idea/

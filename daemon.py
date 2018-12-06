@@ -16,7 +16,7 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 ch.setFormatter(ch_formatter)
 
-fh = logging.handlers.RotatingFileHandler('../logs/deftcore_daemon.log', maxBytes=16 * 1024 * 1024, backupCount=5)
+fh = logging.handlers.RotatingFileHandler('../logs/deftcore-daemon.log', maxBytes=16 * 1024 * 1024, backupCount=5)
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 
@@ -31,7 +31,7 @@ keep_fds = [fh.stream.fileno()]
 def main():
     from messaging.manager import Manager
 
-    messaging_manager = Manager(no_db_log=args.nodb)
+    messaging_manager = Manager(logger, no_db_log=args.nodb)
     messaging_manager.start()
 
     while True:

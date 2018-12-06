@@ -4,15 +4,12 @@ import stomp
 import json
 import re
 from taskengine.models import TProject, ProductionDataset
-from deftcore.settings import MessagingConfig
-from deftcore.log import Logger
 from django.utils import timezone
-
-logger = Logger.get()
 
 
 class Listener(stomp.ConnectionListener):
-    def __init__(self, no_db_log=False):
+    def __init__(self, logger, no_db_log=False):
+        self._logger = logger
         self._scopes = [e.project for e in TProject.objects.all()]
         self._no_db_log = no_db_log
         super(Listener, self).__init__()
@@ -49,7 +46,9 @@ class Listener(stomp.ConnectionListener):
         if event_type in ('ERASE'.lower()):
             if self.is_dataset_ignored(name):
                 return
-            logger.info('[DELETION ({0})]: scope={1}, name={2}, account={3}'.format(event_type, scope, name, account))
+            self._logger.info(
+                '[DELETION ({0})]: scope={1}, name={2}, account={3}'.format(event_type, scope, name, account)
+            )
             if not self._no_db_log:
                 dataset = ProductionDataset.objects.get(name=name.split(':')[-1])
                 if dataset:

@@ -46,11 +46,16 @@ class RucioClient(object):
 
     def extract_scope(self, dsn):
         if dsn.find(':') > -1:
-            return dsn.split(':')[0], dsn.split(':')[1]
+            scope, name = dsn.split(':')[0], dsn.split(':')[1]
+            if name.endswith('/'):
+                name = name[:-1]
+            return scope, name
         else:
             scope = dsn.split('.')[0]
             if dsn.startswith('user') or dsn.startswith('group'):
                 scope = '.'.join(dsn.split('.')[0:2])
+            if dsn.endswith('/'):
+                dsn = dsn[:-1]
             return scope, dsn
 
     def list_datasets(self, pattern):
@@ -250,7 +255,8 @@ class RucioClient(object):
                 for name in self.list_datasets("{0}*".format(input_data_name)):
                     # FIXME
                     is_sub_dataset = \
-                        re.match(r"%s.*_(sub|dis)\d*" % input_data_name.split(':')[-1], name.split(':')[-1], re.IGNORECASE)
+                        re.match(r"%s.*_(sub|dis)\d*" % input_data_name.split(':')[-1], name.split(':')[-1],
+                                 re.IGNORECASE)
                     is_o10_dataset = \
                         re.match(r"%s.*.o10$" % input_data_name.split(':')[-1], name.split(':')[-1], re.IGNORECASE)
                     if not self.is_dsn_container(name) and not is_sub_dataset and not is_o10_dataset:

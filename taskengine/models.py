@@ -11,6 +11,7 @@ from django.dispatch import receiver
 from django.db.models.signals import post_init
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
+from deftcore.helpers import OracleClob
 
 models.options.DEFAULT_NAMES += ('db_name',)
 
@@ -363,7 +364,7 @@ class HashTagToTask(models.Model):
         raise NotImplementedError()
 
     def create_relation(self):
-        print self._meta.db_table
+        pass
 
     class Meta:
         db_name = u'deft_adcr'
@@ -393,6 +394,8 @@ class TTask(models.Model):
     def save(self, *args, **kwargs):
         if not self.id:
             self.id = self.get_id()
+        if self.jedi_task_param:
+            self.jedi_task_param = OracleClob(self.jedi_task_param)
         super(TTask, self).save(*args, **kwargs)
 
     def _get_task_params(self):

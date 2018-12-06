@@ -2,6 +2,7 @@ __author__ = 'Dmitry Golubkov'
 
 import threading
 import requests
+import cx_Oracle
 from django.contrib import admin
 from deftcore.settings import DEBUG
 
@@ -84,3 +85,10 @@ class MetaProxy(type):
             if 'db_table' in attrs:
                 del attrs['db_table']
         return type.__new__(cls, class_name, parents, attrs)
+
+
+class OracleClob(unicode):
+    def __new__(cls, *args, **kwargs):
+        obj = unicode.__new__(cls, *args, **kwargs)
+        obj.input_size = cx_Oracle.CLOB
+        return obj

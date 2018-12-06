@@ -14,7 +14,7 @@ class Command(BaseCommand):
             '--types',
             action='store',
             dest='request_types',
-            type=lambda option, opt, value, p: setattr(p.values, option.dest, value.split(',')),
+            type=str,
             default=None,
             help=''
         )
@@ -22,6 +22,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         request_types = None
         if 'request_types' in options.keys():
-            request_types = options['request_types']
+            request_types = options['request_types'].split(',')
         engine = TaskDefinition()
         engine.process_requests(restart=False, no_wait=True, debug_only=True, request_types=request_types)

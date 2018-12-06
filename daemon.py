@@ -16,7 +16,7 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 ch.setFormatter(ch_formatter)
 
-fh = logging.handlers.RotatingFileHandler('../deftcore_daemon.log', maxBytes=16 * 1024 * 1024, backupCount=5)
+fh = logging.handlers.RotatingFileHandler('../logs/deftcore_daemon.log', maxBytes=16 * 1024 * 1024, backupCount=5)
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 

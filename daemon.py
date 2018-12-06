@@ -38,6 +38,14 @@ if __name__ == "__main__":
         default=False,
         help='disable writing logs into database'
     )
+    parser.add_argument(
+        '-f',
+        '--foreground',
+        action='store_true',
+        dest='foreground',
+        default=False,
+        help='running daemon in foreground'
+    )
     args = parser.parse_args()
 
     logger.info('Starting the daemon (args={0})'.format(args))
@@ -49,7 +57,7 @@ if __name__ == "__main__":
         keep_fds=keep_fds,
         verbose=True,
         logger=logger,
-        foreground=False
+        foreground=args.foreground
     )
 
     daemon.start()

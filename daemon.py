@@ -49,7 +49,7 @@ if __name__ == "__main__":
         keep_fds=keep_fds,
         verbose=True,
         logger=logger,
-        foreground=True
+        foreground=False
     )
 
     daemon.start()

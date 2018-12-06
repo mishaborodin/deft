@@ -1,6 +1,6 @@
 #!/bin/sh
 # PRODSYS_BASE_DIR=/data/prodsys
-# */10 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR MC > /tmp/$USER.process_requests.sh.log 2>&1
+# */5 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR MC > /tmp/$USER.process_requests.sh.log 2>&1
 # vim /etc/security/limits.conf
 # atlswing - priority -20
 

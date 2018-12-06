@@ -3,10 +3,6 @@ __author__ = 'Dmitry Golubkov'
 import sys
 import traceback
 import logging
-import json
-import time
-from helpers import Singleton, AsyncRequest
-from django.conf import settings
 
 
 def get_exception_string():

@@ -13,7 +13,7 @@ logger = Logger.get()
 class Client(object):
     _id = 0
 
-    def __init__(self, hostname, port):
+    def __init__(self, hostname, port, no_db_log=False):
         self.id = Client._id
         Client._id += 1
 
@@ -26,7 +26,7 @@ class Client(object):
             ssl_key_file=key_file,
             ssl_cert_file=cert_file)
 
-        self.connection.set_listener('messaging_listener', Listener())
+        self.connection.set_listener('messaging_listener', Listener(no_db_log=no_db_log))
 
     def connect(self):
         self.connection.start()

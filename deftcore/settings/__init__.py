@@ -233,7 +233,6 @@ class MessagingConfig:
     HOSTNAME = 'atlas-mb.cern.ch'
     PORT = 61023
     QUEUE = '/topic/rucio.events'
-    NO_DB_LOG = True
 
     def __init__(self):
         pass

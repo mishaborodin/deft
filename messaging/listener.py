@@ -12,8 +12,9 @@ logger = Logger.get()
 
 
 class Listener(stomp.ConnectionListener):
-    def __init__(self):
+    def __init__(self, no_db_log=False):
         self._scopes = [e.project for e in TProject.objects.all()]
+        self._no_db_log = no_db_log
         super(Listener, self).__init__()
 
     @staticmethod
@@ -49,7 +50,7 @@ class Listener(stomp.ConnectionListener):
             if self.is_dataset_ignored(name):
                 return
             logger.info('[DELETION ({0})]: scope={1}, name={2}, account={3}'.format(event_type, scope, name, account))
-            if not MessagingConfig.NO_DB_LOG:
+            if not self._no_db_log:
                 dataset = ProductionDataset.objects.get(name=name.split(':')[-1])
                 if dataset:
                     dataset.ddm_timestamp = timezone.now()

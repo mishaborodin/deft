@@ -7,7 +7,7 @@ from daemonize import Daemonize
 import logging
 import logging.handlers
 
-pid = '../deftcore_daemon.pid'
+pid = '../deftcore-daemon.pid'
 
 formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(module)s] [%(funcName)s:%(lineno)d] - %(message)s')
 ch_formatter = logging.Formatter('%(message)s')
@@ -20,7 +20,7 @@ fh = logging.handlers.RotatingFileHandler('../logs/deftcore-daemon.log', maxByte
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 
-logger = logging.getLogger('deftcore_daemon')
+logger = logging.getLogger('deftcore-daemon')
 logger.setLevel(logging.DEBUG)
 logger.addHandler(ch)
 logger.addHandler(fh)

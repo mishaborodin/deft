@@ -4,7 +4,28 @@ import os
 import argparse
 import time
 from daemonize import Daemonize
-from deftcore.log import Logger
+import logging
+import logging.handlers
+
+pid = '../deftcore_daemon.pid'
+
+formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(module)s] [%(funcName)s:%(lineno)d] - %(message)s')
+ch_formatter = logging.Formatter('%(message)s')
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(ch_formatter)
+
+fh = logging.handlers.RotatingFileHandler('../deftcore_daemon.log', maxBytes=16 * 1024 * 1024, backupCount=5)
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(formatter)
+
+logger = logging.getLogger('deftcore_daemon')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(ch)
+logger.addHandler(fh)
+
+keep_fds = [fh.stream.fileno()]
 
 
 def main():
@@ -22,12 +43,6 @@ if __name__ == "__main__":
     import django
 
     django.setup()
-
-    from deftcore.settings import BASE_DIR
-
-    logger = Logger.get()
-    pid = os.path.join(BASE_DIR, '../../deftcore_daemon.pid')
-    keep_fds = []
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

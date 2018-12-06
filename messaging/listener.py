@@ -54,3 +54,4 @@ class Listener(stomp.ConnectionListener):
                 if dataset:
                     dataset.ddm_timestamp = timezone.now()
                     dataset.ddm_status = 'erase'
+                    dataset.save()

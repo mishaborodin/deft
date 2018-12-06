@@ -22,6 +22,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         request_types = None
         if 'request_types' in options.keys():
-            request_types = options['request_types'].split(',')
+            if options['request_types']:
+                request_types = options['request_types'].split(',')
         engine = TaskDefinition()
         engine.process_requests(restart=False, no_wait=True, debug_only=True, request_types=request_types)

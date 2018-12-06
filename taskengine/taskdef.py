@@ -4496,6 +4496,7 @@ class TaskDefinition(object):
             logger.info('Only the following types of requests will be processed: {0}'.format(request_types))
             requests = requests.filter(request_type__in=request_types)
         # lock requests
+        requests = requests[:1]
         for request in requests:
             request.locked = True
             request.save()

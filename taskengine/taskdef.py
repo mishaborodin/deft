@@ -4490,12 +4490,10 @@ class TaskDefinition(object):
                                                description__contains='_debug',
                                                id__gt=800,
                                                status=request_status).order_by('id')
+        if request_types and requests:
+            requests = requests.filter(request_type__in=request_types)
         if not requests:
             return
-        if request_types:
-            logger.info('Only the following types of requests will be processed: {0}'.format(request_types))
-            requests = requests.filter(request_type__in=request_types)
-        # lock requests
         requests = requests[:1]
         for request in requests:
             request.locked = True

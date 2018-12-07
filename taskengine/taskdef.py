@@ -1969,7 +1969,7 @@ class TaskDefinition(object):
                     use_evnt_filter = True
 
             use_lhe_filter = None
-            if prod_step.lower() == 'evgen'.lower() and 'nFilesPerJob' in task_config.keys():
+            if prod_step.lower() == 'evgen'.lower():
                 input_types = list()
                 for key in input_params.keys():
                     result = re.match(r'^(--)?input(?P<intype>.*)File', key, re.IGNORECASE)
@@ -1980,13 +1980,13 @@ class TaskDefinition(object):
                             input_name_dict = self.parse_data_name(input_name)
                             if input_name_dict['prod_step'] == 'evgen':
                                 input_types.append(input_name_dict['data_type'])
-                        except Exception:
-                            pass
+                        except Exception as ex:
+                            logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = input_params['nEventsPerJob']
                     project_mode['nEventsPerInputFile'.lower()] = min_events
 
-                    number_files_per_job = int(task_config['nFilesPerJob'])
+                    number_files_per_job = int(task_config.get('nFilesPerJob', 1))
                     number_files = number_of_events * number_files_per_job / min_events
                     task_config['nFiles'] = number_files
 

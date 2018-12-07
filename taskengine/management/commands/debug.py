@@ -12,10 +12,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '-t',
             '--types',
-            action='store',
-            dest='request_types',
             type=str,
-            default=None,
+            dest='request_types',
             help=''
         )
 

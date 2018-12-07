@@ -13,25 +13,20 @@ class Command(BaseCommand):
         parser.add_argument(
             '-n',
             '--name',
-            type='choice',
-            action='store',
             dest='worker_name',
             choices=['process_requests',
                      'sync_ami_projects',
                      'sync_ami_types',
                      'sync_ami_phys_containers',
                      'sync_ami_tags'],
-            default=None,
             help=''
         )
 
         parser.add_argument(
             '-t',
             '--types',
-            action='store',
+            type=str,
             dest='request_types',
-            type=lambda option, opt, value, p: setattr(p.values, option.dest, value.split(',')),
-            default=None,
             help=''
         )
 
@@ -39,7 +34,8 @@ class Command(BaseCommand):
         if options['worker_name'] == 'process_requests':
             request_types = None
             if 'request_types' in options.keys():
-                request_types = options['request_types']
+                if options['request_types']:
+                    request_types = options['request_types'].split(',')
             engine = TaskDefinition()
             engine.process_requests(restart=False, no_wait=False, request_types=request_types)
         elif options['worker_name'] == 'sync_ami_projects':

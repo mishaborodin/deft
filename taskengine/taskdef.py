@@ -2483,7 +2483,7 @@ class TaskDefinition(object):
                                 self.protocol.render_param(TaskParamName.SKIP_EVENTS, param_dict)
                             )
                         else:
-                            logger.warning("skipEvents parameter is omitted" % step.id)
+                            logger.warning('skipEvents parameter is omitted (step={0})'.format(step.id))
                         continue
                     param_dict = {'name': name, 'value': param_value}
                     param_dict.update(trf_options)
@@ -2526,7 +2526,7 @@ class TaskDefinition(object):
                                 self.protocol.render_param(TaskParamName.MAX_EVENTS, param_dict)
                             )
                         else:
-                            logger.warning("maxEvents parameter is omitted" % step.id)
+                            logger.warning('maxEvents parameter is omitted (step={0})'.format(step.id))
                         continue
                     param_dict = {'name': name, 'value': param_value}
                     param_dict.update(trf_options)

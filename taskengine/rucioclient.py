@@ -64,8 +64,7 @@ class RucioClient(object):
         if not match:
             scope, dataset = self.extract_scope(pattern)
             collection = 'dataset'
-            if dataset.endswith('/'):
-                dataset = dataset[:-1]
+            if pattern.endswith('/'):
                 collection = 'container'
             filters = {'name': dataset}
             # FIXME: use type='collection'

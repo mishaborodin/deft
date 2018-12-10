@@ -8,6 +8,11 @@ import gridproxy.voms
 from deftcore.settings import VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH, X509_PROXY_PATH
 
 
+class NoProxyException(Exception):
+    def __init__(self):
+        super(NoProxyException, self).__init__('Unable to initialize the valid VOMS proxy')
+
+
 class VOMSClient(object):
     def __init__(self):
         self.lifetime = 43200
@@ -29,6 +34,9 @@ class VOMSClient(object):
                 process.communicate()
             except Exception as ex:
                 raise Exception('voms-proxy-init process failed: {0}'.format(str(ex)))
+
+            if not self._is_proxy_valid():
+                raise NoProxyException()
         return self.proxy_file_path
 
     def remove(self):

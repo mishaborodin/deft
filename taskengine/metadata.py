@@ -27,8 +27,8 @@ class AMIClient(object):
         try:
             self.client = pyAMI.client.Client(
                 AMI_ENDPOINTS,
-                # key_file=self._get_proxy(),
-                # cert_file=self._get_proxy(),
+                key_file=self._get_proxy(),
+                cert_file=self._get_proxy(),
                 ignore_proxy=True
             )
         except Exception as ex:
@@ -405,9 +405,12 @@ class AMIClient(object):
                                            description=description,
                                            timestamp=timestamp)
                     new_project.save()
-                    logger.info("The project \"%s\" is registered (timestamp = %d)" % (new_project.project, timestamp))
+                    logger.info('The project \"{0}\" is registered (timestamp={1})'.format(
+                        new_project.project,
+                        timestamp)
+                    )
         except Exception as ex:
-            logger.exception("Exception: %s" % str(ex))
+            logger.exception('sync_ami_projects, exception occurred: {0}'.format(str(ex)))
 
     def sync_ami_types(self):
         try:
@@ -424,9 +427,9 @@ class AMIClient(object):
                     new_format = TDataFormat(name=ami_type['name'],
                                              description=description)
                     new_format.save()
-                    logger.info("The data format \"%s\" is registered" % new_format.name)
+                    logger.info('The data format \"{0}\" is registered'.format(new_format.name))
         except Exception as ex:
-            logger.exception("Exception: %s" % str(ex))
+            logger.exception('sync_ami_types, exception occurred: {0}'.format(str(ex)))
 
     def sync_ami_phys_containers(self):
         try:
@@ -451,7 +454,7 @@ class AMIClient(object):
                         phys_cont.prod_step = dataset['prodStep']
                         phys_cont.save()
         except Exception as ex:
-            logger.exception("Exception: %s" % str(ex))
+            logger.exception('sync_ami_phys_containers, exception occurred: {0}'.format(str(ex)))
 
     def sync_ami_tags(self):
         try:
@@ -489,4 +492,4 @@ class AMIClient(object):
                     tag.tag_parameters = json.dumps(ami_tag)
                     tag.save()
         except Exception as ex:
-            logger.exception("Exception [2]: %s" % str(ex))
+            logger.exception('sync_ami_tags, exception occurred: {0}'.format(str(ex)))

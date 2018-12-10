@@ -2,6 +2,7 @@ __author__ = 'Dmitry Golubkov'
 
 import json
 import re
+import socket
 from django.core.exceptions import ObjectDoesNotExist
 from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution
 from taskengine.protocol import Protocol, TaskStatus, TaskDefConstants
@@ -50,12 +51,13 @@ class TaskRegistration(object):
 
                 ticket_summary = 'Request {0}'.format(request.id)
                 ticket_description = \
-                    'Request Id: {0}\nDescription: {1}\nReference link: {2}\nManager: {3}\nLink to the request: {4}'.format(
+                    'Request Id: {0}\nDescription: {1}\nReference link: {2}\nManager: {3}\nLink to the request: {4}\nInstance: {5}'.format(
                         request.id,
                         request.description,
                         request.ref_link,
                         request.manager,
-                        link_to_request
+                        link_to_request,
+                        socket.gethostname()
                     )
 
                 client = JIRAClient()

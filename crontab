@@ -9,4 +9,3 @@ PYTHON_PATH=/usr/local/bin/python2.7
 30 * * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_types > /tmp/$USER.sync_ami_types.log 2>&1
 0 1 * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_phys_containers > /tmp/$USER.sync_ami_phys_containers.log 2>&1
 0 2 * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_tags > /tmp/$USER.sync_ami_tags.log 2>&1
-

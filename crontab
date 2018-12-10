@@ -1,0 +1,11 @@
+PRODSYS_BASE_DIR=/data/prodsys
+PYTHON_PATH=/usr/local/bin/python2.7
+
+*/5 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR MC > /tmp/$USER.process_requests.sh.log 2>&1
+*/5 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR GROUP > /tmp/$USER.process_requests.sh.log 2>&1
+*/5 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR ANALYSIS,TIER0,REPROCESSING,HLT > /tmp/$USER.process_requests.sh.log 2>&1
+*/10 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR EVENTINDEX > /tmp/$USER.process_requests.sh.log 2>&1
+15 * * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_projects > /tmp/$USER.sync_ami_projects.log 2>&1
+30 * * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_types > /tmp/$USER.sync_ami_types.log 2>&1
+0 1 * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_phys_containers > /tmp/$USER.sync_ami_phys_containers.log 2>&1
+0 2 * * * cd $PRODSYS_BASE_DIR/deftcore && $PYTHON_PATH manage.py runworker -n sync_ami_tags > /tmp/$USER.sync_ami_tags.log 2>&1

@@ -140,12 +140,23 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'default'
+        },
+        'default_worker': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'formatter': 'default',
+            'filename': os.path.join(LOGGING_BASE_DIR, 'deftcore-worker.log'),
+            'maxBytes': 16 * 1024 * 1024
         }
     },
     'loggers': {
         'deftcore.log': {
             'handlers': ['default', 'console'],
             'level': DEFAULT_LOGGING_LEVEL
+        },
+        'deftcore.worker': {
+            'handlers': ['default_worker', 'console'],
+            'level': 'DEBUG'
         }
     }
 }

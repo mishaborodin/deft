@@ -52,13 +52,19 @@ class ParentTaskInvalid(Exception):
         super(ParentTaskInvalid, self).__init__(message)
 
 
-class DDMNumberOfFilesUnavailable(Exception):
+class InputLostFiles(Exception):
+    def __init__(self, dsn):
+        message = 'Input {0} has lost files'.format(dsn)
+        super(InputLostFiles, self).__init__(message)
+
+
+class NumberOfFilesUnavailable(Exception):
     def __init__(self, dataset, ex_message=None):
         message = \
             '[Check duplicates] The task is rejected. Number of files is unavailable (dataset = {0})'.format(dataset)
         if ex_message:
             message = '{0}. {1}'.format(message, ex_message)
-        super(DDMNumberOfFilesUnavailable, self).__init__(message)
+        super(NumberOfFilesUnavailable, self).__init__(message)
 
 
 class UniformDataException(Exception):
@@ -1081,6 +1087,8 @@ class TaskDefinition(object):
             if prod_task:
                 if prod_task.status in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
                     raise ParentTaskInvalid(prod_task.id, prod_task.status)
+            if prod_dataset.ddm_status and prod_dataset.ddm_status == TaskDefConstants.DDM_LOST_STATUS:
+                raise InputLostFiles(prod_dataset.name)
 
         if not 'nEventsPerInputFile' in task_config.keys():
             nevents_per_files = self.get_events_per_file(primary_input['dataset'])
@@ -1102,7 +1110,7 @@ class TaskDefinition(object):
             # FIXME: move input name to protocol
             task_output_name_suffix = '_tid{0}_00'.format(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % parent_task_id)
             if not str(primary_input['dataset']).endswith(task_output_name_suffix):
-                raise DDMNumberOfFilesUnavailable(primary_input['dataset'], get_exception_string())
+                raise NumberOfFilesUnavailable(primary_input['dataset'], get_exception_string())
 
         logger.info("primary_input_total_files={0} ({1})".format(primary_input_total_files, primary_input['dataset']))
 

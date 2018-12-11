@@ -206,6 +206,13 @@ class RucioClient(object):
         metadata = self.client.get_metadata(scope=scope, name=dataset)
         return bool(metadata['did_type'] == 'DATASET')
 
+    def is_dsn_exist(self, dsn):
+        scope, dataset = self.extract_scope(dsn)
+        try:
+            return bool(self.client.get_metadata(scope=scope, name=dataset))
+        except DataIdentifierNotFound:
+            return False
+
     def get_campaign(self, dsn):
         scope, dataset = self.extract_scope(dsn)
         metadata = self.client.get_metadata(scope=scope, name=dataset)

@@ -484,3 +484,8 @@ class TaskDefConstants(object):
         'MC16e': ['MC16:MC16e']
     }
     DEFAULT_SC_HASHTAG_SUFFIX = '_sc_102017_mixed_cont'
+
+    DDM_ERASE_EVENT_TYPE = 'ERASE'
+    DDM_ERASE_STATUS = 'erase'
+    DDM_LOST_EVENT_TYPE = 'LOST'
+    DDM_LOST_STATUS = 'lost'

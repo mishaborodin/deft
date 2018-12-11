@@ -4,6 +4,7 @@ import stomp
 import json
 import re
 from taskengine.models import TProject, ProductionDataset
+from taskengine.protocol import TaskDefConstants
 from django.utils import timezone
 
 
@@ -36,14 +37,7 @@ class Listener(stomp.ConnectionListener):
         if not scope in self._scopes:
             return
 
-        # ERASE - erase dataset
-        # ERASE_CNT - erase container
-        # CREATE_DTS - create dataset
-        # CREATE_CNT - create container
-        # deletion-done - delete file
-        # LOST - lost file
-
-        if event_type in ('ERASE'.lower()):
+        if event_type in (TaskDefConstants.DDM_ERASE_EVENT_TYPE.lower()):
             if self.is_dataset_ignored(name):
                 return
             self._logger.info(
@@ -53,5 +47,21 @@ class Listener(stomp.ConnectionListener):
                 dataset = ProductionDataset.objects.get(name=name.split(':')[-1])
                 if dataset:
                     dataset.ddm_timestamp = timezone.now()
-                    dataset.ddm_status = 'erase'
+                    dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                    dataset.save()
+        elif event_type in (TaskDefConstants.DDM_LOST_EVENT_TYPE.lower()):
+            dataset_name = payload.get('dataset_name', None)
+            dataset_scope = payload.get('dataset_scope', None)
+            if self.is_dataset_ignored(dataset_name):
+                return
+            self._logger.info(
+                '[LOST ({0})]: scope={1}, name={2}, dataset={3}, account={4}'.format(
+                    event_type, dataset_scope, name, dataset_name, account
+                )
+            )
+            if not self._no_db_log:
+                dataset = ProductionDataset.objects.get(name=dataset_name.split(':')[-1])
+                if dataset:
+                    dataset.ddm_timestamp = timezone.now()
+                    dataset.ddm_status = TaskDefConstants.DDM_LOST_STATUS
                     dataset.save()

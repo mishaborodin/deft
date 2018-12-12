@@ -1081,14 +1081,29 @@ class TaskDefinition(object):
                 if is_merge_1_to_1:
                     raise InvalidMergeException(dsn, tag_name)
 
-        prod_dataset = ProductionDataset.objects.filter(name__endswith=primary_input['dataset'].split(':')[-1]).first()
-        if prod_dataset:
-            prod_task = ProductionTask.objects.filter(id=prod_dataset.task_id).first()
-            if prod_task:
-                if prod_task.status in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
-                    raise ParentTaskInvalid(prod_task.id, prod_task.status)
-            if prod_dataset.ddm_status and prod_dataset.ddm_status == TaskDefConstants.DDM_LOST_STATUS:
-                raise InputLostFiles(prod_dataset.name)
+        lost_files_exception = None
+
+        try:
+            prod_dataset = ProductionDataset.objects.filter(
+                name__endswith=primary_input['dataset'].split(':')[-1]).first()
+            if prod_dataset:
+                prod_task = ProductionTask.objects.filter(id=prod_dataset.task_id).first()
+                if prod_task:
+                    if prod_task.status in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
+                        raise ParentTaskInvalid(prod_task.id, prod_task.status)
+                if prod_dataset.ddm_status and prod_dataset.ddm_status == TaskDefConstants.DDM_LOST_STATUS:
+                    raise InputLostFiles(prod_dataset.name)
+        except InputLostFiles as ex:
+            lost_files_exception = ex
+
+        try:
+            if lost_files_exception:
+                if step.request.reference:
+                    jira_client = JIRAClient()
+                    jira_client.authorize()
+                    jira_client.log_exception(step.request.reference, lost_files_exception)
+        except Exception as ex:
+            logger.exception('Exception occurred: {0}'.format(ex))
 
         if not 'nEventsPerInputFile' in task_config.keys():
             nevents_per_files = self.get_events_per_file(primary_input['dataset'])

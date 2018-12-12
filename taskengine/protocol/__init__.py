@@ -489,3 +489,5 @@ class TaskDefConstants(object):
     DDM_ERASE_STATUS = 'erase'
     DDM_LOST_EVENT_TYPE = 'LOST'
     DDM_LOST_STATUS = 'lost'
+
+    DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT = '_tco_{0}'

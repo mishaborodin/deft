@@ -316,6 +316,22 @@ class ProductionTask(models.Model):
         hashtags = [HashTag.objects.get(id=e[0]) for e in hashtags_id]
         return hashtags
 
+    @staticmethod
+    def get_tasks_by_hashtag(hashtag):
+        hashtag_id = HashTag.objects.get(hashtag=hashtag).id
+        cursor = None
+        try:
+            cursor = connections[ProductionTask._meta.db_name].cursor()
+            cursor.execute('select TASKID from {0} where HT_ID={1} order by TASKID desc'.format(
+                HashTagToTask._meta.db_table,
+                hashtag_id)
+            )
+            tasks = cursor.fetchall()
+        finally:
+            if cursor:
+                cursor.close()
+        return [ProductionTask.objects.get(id=x[0]) for x in tasks]
+
     def _get_datetime_utc(self, field_name, task_id):
         cursor = None
         try:

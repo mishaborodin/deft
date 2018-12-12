@@ -3,7 +3,7 @@ __author__ = 'Dmitry Golubkov'
 import json
 import re
 from django.core.exceptions import ObjectDoesNotExist
-from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution
+from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution, HashTag
 from taskengine.protocol import Protocol, TaskStatus, TaskDefConstants
 from django.utils import timezone
 from deftcore.settings import MONITORING_REQUEST_LINK_FORMAT
@@ -71,7 +71,8 @@ class TaskRegistration(object):
             return None
 
     def register_task(self, task, step, task_id, parent_task_id, chain_id, project, input_data_name, number_of_events,
-                      campaign, subcampaign, bunchspacing, ttcr_timestamp, truncate_output_formats=None):
+                      campaign, subcampaign, bunchspacing, ttcr_timestamp, truncate_output_formats=None,
+                      task_common_offset=None):
         protocol = Protocol()
 
         issue_key = self._register_task_reference(step)
@@ -154,6 +155,17 @@ class TaskRegistration(object):
 
         prod_task.save()
         jedi_task.save()
+
+        if task_common_offset:
+            task_common_offset_hashtag = TaskDefConstants.DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT.format(
+                task_common_offset
+            )
+            try:
+                hashtag = HashTag.objects.get(hashtag=task_common_offset_hashtag)
+            except ObjectDoesNotExist:
+                hashtag = HashTag(hashtag=task_common_offset_hashtag, type='UD')
+                hashtag.save()
+            prod_task.set_hashtag(hashtag.hashtag)
 
         logger.debug('Task {0} is registered'.format(task_id))
 

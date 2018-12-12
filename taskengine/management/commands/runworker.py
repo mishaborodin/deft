@@ -1,11 +1,14 @@
 __author__ = 'Dmitry Golubkov'
 
+import re
 from django.core.management.base import BaseCommand
 from taskengine.taskdef import TaskDefinition
 from taskengine.metadata import AMIClient
 from taskengine.models import ProductionDataset
 from taskengine.rucioclient import RucioClient
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
+from taskengine.protocol import TaskDefConstants
 import logging
 
 logger = logging.getLogger('deftcore.worker')
@@ -22,7 +25,8 @@ class Command(BaseCommand):
                      'sync_ami_types',
                      'sync_ami_phys_containers',
                      'sync_ami_tags',
-                     'check_datasets'],
+                     'check_datasets',
+                     'analyze_lost_files_report'],
             help=''
         )
 
@@ -31,6 +35,14 @@ class Command(BaseCommand):
             '--types',
             type=str,
             dest='request_types',
+            help=''
+        )
+
+        parser.add_argument(
+            '-e',
+            '--extra',
+            type=str,
+            dest='extra_param',
             help=''
         )
 
@@ -61,8 +73,38 @@ class Command(BaseCommand):
                     dataset.ddm_timestamp = timezone.now()
                     dataset.ddm_status = 'erase'
                     dataset.save()
-                    logger.info('updated dataset {0} with ddm_status="{1}" and ddm_timestamp="{2}"'.format(
-                        dataset.name,
-                        dataset.ddm_status,
-                        dataset.ddm_timestamp)
+                    logger.info(
+                        'check_datasets, updated dataset {0} with ddm_status="{1}" and ddm_timestamp="{2}"'.format(
+                            dataset.name,
+                            dataset.ddm_status,
+                            dataset.ddm_timestamp)
                     )
+        elif options['worker_name'] == 'analyze_lost_files_report':
+            path = options['extra_param']
+            report = None
+            with open(path, 'r') as fp:
+                report = fp.readlines()
+            if report:
+                for line in report:
+                    result = re.match(r'^.+_tid(?P<tid>\d+)_00.+$', line)
+                    if result:
+                        dsn_name = line.split(' ')[3]
+                        task_id = int(result.groupdict()['tid'])
+                        try:
+                            dataset = ProductionDataset.objects.get(
+                                name=dsn_name,
+                                task_id=task_id,
+                                ddm_status=None,
+                                ddm_timestamp=None
+                            )
+                            dataset.ddm_timestamp = timezone.now()
+                            dataset.ddm_status = TaskDefConstants.DDM_LOST_STATUS
+                            dataset.save()
+                            logger.info(
+                                'analyze_lost_files_report, updated dataset {0} with ddm_status="{1}" and ddm_timestamp="{2}"'.format(
+                                    dataset.name,
+                                    dataset.ddm_status,
+                                    dataset.ddm_timestamp)
+                            )
+                        except ObjectDoesNotExist:
+                            continue

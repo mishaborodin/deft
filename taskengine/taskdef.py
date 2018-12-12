@@ -1055,7 +1055,8 @@ class TaskDefinition(object):
                 raise WrongCacheVersionUsedException(trf_release, previous_task_trf_release)
 
     def _check_task_input(self, task, task_id, number_of_events, task_config, parent_task_id, input_data_name, step,
-                          primary_input_offset=0, prod_step=None, reuse_input=None, evgen_params=None):
+                          primary_input_offset=0, prod_step=None, reuse_input=None, evgen_params=None,
+                          task_common_offset=None):
         primary_input = self._get_primary_input(task['jobParameters'])
         if not primary_input:
             logger.info("Task Id = %d, No primary input. Checking of input is skipped" % task_id)
@@ -1132,11 +1133,6 @@ class TaskDefinition(object):
         if primary_input_total_files > 0:
             self.verify_data_uniform(step, primary_input['dataset'])
 
-        # if number_of_events > 0:
-        #     number_input_files_requested = number_of_events / int(task_config['nEventsPerInputFile'])
-        # else:
-        #     number_input_files_requested = primary_input_total_files
-
         number_of_jobs = 0
         if number_of_events > 0 and 'nEventsPerJob' in task_config.keys():
             number_of_jobs = number_of_events / int(task_config['nEventsPerJob'])
@@ -1147,6 +1143,27 @@ class TaskDefinition(object):
 
         if number_of_jobs > TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK:
             raise MaxJobsPerTaskLimitExceededException(number_of_jobs)
+
+        if task_common_offset:
+            task_common_offset_hashtag = TaskDefConstants.DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT.format(
+                task_common_offset
+            )
+            try:
+                hashtag = HashTag.objects.get(hashtag=task_common_offset_hashtag)
+            except ObjectDoesNotExist:
+                hashtag = HashTag(hashtag=task_common_offset_hashtag, type='UD')
+                hashtag.save()
+            dsn_no_scope = primary_input['dataset'].split(':')[-1]
+            for task_same_hashtag in ProductionTask.get_tasks_by_hashtag(hashtag.hashtag):
+                if task_same_hashtag.status in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
+                    continue
+                task_params = json.loads(TTask.objects.get(id=task_same_hashtag.id).jedi_task_param)
+                task_input = self._get_primary_input(task_params['jobParameters'])
+                task_dsn_no_scope = task_input['dataset'].split(':')[-1]
+                if task_dsn_no_scope == dsn_no_scope:
+                    current_offset = int(task_input['offset']) + int(task_params['nFiles'])
+                    primary_input_offset = current_offset
+                    break
 
         number_of_input_files_used = 0
         previous_tasks = list()
@@ -1883,6 +1900,10 @@ class TaskDefinition(object):
                 option_value = str(project_mode['useDirectIo'.lower()])
                 if option_value.lower() == 'yes'.lower():
                     use_direct_io = True
+
+            task_common_offset = None
+            # if 'commonOffset'.lower() in project_mode.keys():
+            #     task_common_offset = project_mode['commonOffset'.lower()]
 
             env_params_dict = dict()
             try:
@@ -3796,7 +3817,8 @@ class TaskDefinition(object):
                 if not skip_check_input:
                     self._check_task_input(task, task_id, number_of_events, task_config, parent_task_id,
                                            input_data_name, step, primary_input_offset, prod_step,
-                                           reuse_input=reuse_input, evgen_params=evgen_params)
+                                           reuse_input=reuse_input, evgen_params=evgen_params,
+                                           task_common_offset=task_common_offset)
 
                 if step == first_step:
                     chain_id = task_id
@@ -3812,7 +3834,8 @@ class TaskDefinition(object):
                 self.task_reg.register_task(task, step, task_id, parent_task_id, chain_id, project, input_data_name,
                                             number_of_events, step.request.campaign, step.request.subcampaign,
                                             bunchspacing, ttcr_timestamp,
-                                            truncate_output_formats=truncate_output_formats)
+                                            truncate_output_formats=truncate_output_formats,
+                                            task_common_offset=task_common_offset)
 
                 self.task_reg.register_task_output(output_params,
                                                    task_proto_id,

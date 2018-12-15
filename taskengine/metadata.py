@@ -27,8 +27,8 @@ class AMIClient(object):
         try:
             self.client = pyAMI.client.Client(
                 AMI_ENDPOINTS,
-                key_file=self._get_proxy(),
-                cert_file=self._get_proxy(),
+                # key_file=self._get_proxy(),
+                # cert_file=self._get_proxy(),
                 ignore_proxy=True
             )
         except Exception as ex:

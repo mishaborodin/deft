@@ -4351,6 +4351,9 @@ class TaskDefinition(object):
                 container_name = input_params[key][0]
                 break
 
+        if not container_name:
+            raise Exception('No input container found')
+
         if 'nFilesPerJob' in input_params.keys() and not 'nFilesPerJob' in task_config.keys():
             task_config.update({'nFilesPerJob': int(input_params['nFilesPerJob'])})
 

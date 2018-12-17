@@ -4543,7 +4543,19 @@ class TaskDefinition(object):
             requests = requests.filter(request_type__in=request_types)
         if not requests:
             return
-        requests = requests[:1]
+        ready_request_list = list()
+        for request in requests:
+            is_fast = request.is_fast or False
+            last_access_timestamp = \
+                TRequestStatus.objects.filter(request=request, status=request_status).order_by('-id')[0].timestamp
+            now = timezone.now()
+            time_offset = (now - last_access_timestamp).seconds
+            if (time_offset // 3600) < REQUEST_GRACE_PERIOD:
+                if (not no_wait) and (not is_fast):
+                    logger.info("Request %d is skipped, approved at %s" % (request.id, last_access_timestamp))
+                    continue
+            ready_request_list.append(request)
+        requests = ready_request_list[:1]
         for request in requests:
             request.locked = True
             request.save()
@@ -4551,20 +4563,9 @@ class TaskDefinition(object):
         logger.info("Processing production requests")
         logger.info("Requests to process: %s" % str([int(req.id) for req in requests]))
         for request in requests:
-            skipped = False
             try:
                 logger.info("Processing request %d" % request.id)
-                is_fast = request.is_fast or False
                 exception = False
-                last_access_timestamp = \
-                    TRequestStatus.objects.filter(request=request, status=request_status).order_by('-id')[0].timestamp
-                now = timezone.now()
-                time_offset = (now - last_access_timestamp).seconds
-                if (time_offset // 3600) < REQUEST_GRACE_PERIOD:
-                    if (not no_wait) and (not is_fast):
-                        logger.info("Request %d is skipped, approved at %s" % (request.id, last_access_timestamp))
-                        skipped = True
-                        continue
                 first_steps = list()
                 for input_slice in InputRequestList.objects.filter(request=request).order_by('slice'):
                     steps_in_slice = StepExecution.objects.filter(request=request,
@@ -4577,9 +4578,6 @@ class TaskDefinition(object):
                         logger.exception("_build_linked_step_list failed: %s" % str(ex))
 
                     if steps_in_slice:
-                        # step = steps_in_slice[0]
-                        # if not self.task_reg.get_step_output(step.id, exclude_failed=False) or restart:
-                        #     first_steps.append(step)
                         for step in steps_in_slice:
                             if not self.task_reg.get_step_output(step.id, exclude_failed=False) or restart:
                                 first_steps.append(step)
@@ -4654,7 +4652,6 @@ class TaskDefinition(object):
                             except NoRequestedCampaignInput:
                                 raise Exception('No input for specified campaign')
                             except:
-                                # logger.debug("Exception occurred: %s" % get_exception_string())
                                 raise
                             if not step.id in splitting_dict.keys():
                                 if use_parent_output:
@@ -4687,7 +4684,6 @@ class TaskDefinition(object):
                                         continue
                                     except Exception as ex:
                                         raise ex
-                    # except Exception as ex:
                     except KeyboardInterrupt:
                         pass
                     except:

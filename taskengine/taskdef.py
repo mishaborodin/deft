@@ -2145,7 +2145,7 @@ class TaskDefinition(object):
                             output_types.remove('TXT')
                 if 'aMcAtNlo' in input_data_name:
                     if int(ctag_name[1:]) >= 6000 and \
-                            project in ('mc15_13TeV', 'mc16_13TeV', 'mc15_valid', 'mc16_valid'):
+                            project in ('mc15_13TeV', 'mc16_13TeV', 'mc15_valid', 'mc16_valid', 'mc15_5TeV'):
                         if 'inputGenConfFile' in input_params.keys():
                             use_evnt_txt = True
                         elif not 'inputGenConfFile' in input_params.keys() and \

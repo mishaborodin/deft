@@ -408,7 +408,7 @@ class TaskDefinition(object):
 
         evgen_input_dict = self._get_evgen_input_dict(evgen_input_content)
         if not evgen_input_dict:
-            use_evgen_otf = True
+            raise Exception('evgeninputfiles.csv file is corrupted')
 
         params = dict()
 
@@ -2027,14 +2027,15 @@ class TaskDefinition(object):
                         except Exception as ex:
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
-                    min_events = input_params['nEventsPerJob']
-                    project_mode['nEventsPerInputFile'.lower()] = min_events
+                    min_events = input_params.get('nEventsPerJob', None)
+                    if min_events:
+                        project_mode['nEventsPerInputFile'.lower()] = min_events
 
-                    number_files_per_job = int(task_config.get('nFilesPerJob', 1))
-                    number_files = number_of_events * number_files_per_job / min_events
-                    task_config['nFiles'] = number_files
+                        number_files_per_job = int(task_config.get('nFilesPerJob', 1))
+                        number_files = number_of_events * number_files_per_job / min_events
+                        task_config['nFiles'] = number_files
 
-                    use_lhe_filter = True
+                        use_lhe_filter = True
 
             # proto_fix
             if trf_name.lower() == 'Trig_reco_tf.py'.lower():

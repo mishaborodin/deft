@@ -31,8 +31,17 @@ class AMIClient(object):
                 # cert_file=self._get_proxy(),
                 ignore_proxy=True
             )
+            logger.info('AMIClient, currentUser={0}'.format(self._get_current_user()))
         except Exception as ex:
             logger.critical('AMI initialization failed: {0}'.format(str(ex)))
+
+    def _get_current_user(self):
+        command = ['GetSessionInfo']
+        result = self.client.execute(command, format='dom_object').get_rows('user')
+        if len(result) > 0:
+            return result[0].get('AMIUser', None)
+        else:
+            return None
 
     def _ami_get_tag(self, tag_name):
         command = [

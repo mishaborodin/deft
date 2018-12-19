@@ -131,8 +131,8 @@ class AMIClient(object):
     def ami_get_params(self, cache, release, trf_name):
         command = [
             'GetParamsForTransform',
-            "-releaseName=%s_%s" % (cache, release),
-            "-transformName=%s" % trf_name
+            '-releaseName="{0}_{1}"'.format(cache, release),
+            '-transformName={0}'.format(trf_name)
         ]
 
         result = self.client.execute(command, format='dom_object').get_rows('params')

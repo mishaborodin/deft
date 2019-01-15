@@ -4793,6 +4793,4 @@ class TaskDefinition(object):
                     continue
             ready_request_list.append(request)
         requests = ready_request_list[:1]
-        self._define_tasks_for_requests(requests, restart, jira_client)
-
-
+        self._define_tasks_for_requests(requests, jira_client, restart)

@@ -3907,6 +3907,60 @@ class TaskDefinition(object):
 
         return number_events_processed
 
+    def _get_processed_datasets(self, step, requested_datasets=None):
+        processed_datasets = []
+        input_data_name = self.get_step_input_data_name(step)
+        #Drop ps1
+        # ps1_task_list = TTaskRequest.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete']),
+        #                                             project=step.request.project,
+        #                                             inputdataset=input_data_name,
+        #                                             ctag=step.step_template.ctag,
+        #                                             formats=step.step_template.output_formats)
+        # for ps1_task in ps1_task_list:
+        #     number_events_processed += int(ps1_task.total_events or 0)
+
+        split_slice = self._get_task_config(step).get('split_slice')
+
+        if split_slice:
+            ps2_task_list = \
+                ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
+                                              (Q(step__slice__input_dataset=input_data_name) |
+                                               Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
+                                               Q(step__slice__input_data=input_data_name) |
+                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
+                                              project=step.request.project,
+                                              step__step_template__ctag=step.step_template.ctag)
+        else:
+            ps2_task_list = \
+                ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
+                                              (Q(step__slice__input_dataset=input_data_name) |
+                                               Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
+                                               Q(step__slice__input_data=input_data_name) |
+                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
+                                              project=step.request.project,
+                                              step__step_template__ctag=step.step_template.ctag,
+                                              step__step_template__output_formats=step.step_template.output_formats)
+
+        for ps2_task in ps2_task_list:
+
+            if split_slice:
+                # comparing output formats
+                requested_output_types = step.step_template.output_formats.split('.')
+                previous_output_types = ps2_task.step.step_template.output_formats.split('.')
+                processed_output_types = [e for e in requested_output_types if e in previous_output_types]
+                if not processed_output_types:
+                    continue
+            jedi_task_existing = TTask.objects.get(id=ps2_task.id)
+            task_existing = json.loads(jedi_task_existing.jedi_task_param)
+            previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
+            requested_datasets_no_scope = [e.split(':')[-1] for e in requested_datasets]
+            previous_dsn_no_scope = previous_dsn.split(':')[-1]
+            if requested_datasets:
+                if not previous_dsn_no_scope in requested_datasets_no_scope:
+                    continue
+            processed_datasets.append(previous_dsn_no_scope)
+        return processed_datasets
+
     def get_events_per_file(self, input_name):
         nevents_per_file = 0
         try:
@@ -4301,7 +4355,26 @@ class TaskDefinition(object):
                     number_events_requested = number_events_available
                 else:
                     raise NotEnoughEvents()
-
+            if (step.input_events <= 0) and (step.request.request_type.lower() in [ 'GROUP'.lower()]):
+                processed_datasets = self._get_processed_datasets(step, result['datasets'])
+                for dataset_name in result['datasets']:
+                        if dataset_name.split(':')[-1] not in processed_datasets:
+                            events_per_file = self.get_events_per_input_file(step, dataset_name,
+                                                                             use_real_events=use_real_events)
+                            if not events_per_file:
+                                logger.info(
+                                    "Step = %d, nEventsPerInputFile for dataset %s is missing, skipping this dataset" %
+                                    (step.id, dataset_name))
+                                return splitting_dict
+                            number_events = events_per_file * self.rucio_client.get_number_files(
+                                dataset_name)
+                            if number_events:
+                                if not step.id in splitting_dict.keys():
+                                    splitting_dict[step.id] = list()
+                                splitting_dict[step.id].append({'dataset': dataset_name, 'offset': 0,
+                                                            'number_events': number_events,
+                                                            'container': input_data_name})
+                return splitting_dict
             start_offset = 0
             for dataset_name in result['datasets']:
                 offset = 0
@@ -4524,45 +4597,14 @@ class TaskDefinition(object):
                 else:
                     return status
 
-    def process_requests(self, restart=False, no_wait=False, debug_only=False, request_types=None):
-        jira_client = JIRAClient()
-        try:
-            jira_client.authorize()
-        except Exception as ex:
-            logger.exception('JIRAClient::authorize failed: {0}'.format(str(ex)))
-        request_status = self.protocol.REQUEST_STATUS[RequestStatus.APPROVED]
-        if not debug_only:
-            requests = TRequest.objects.filter(~Q(locked=True) & ~Q(description__contains='_debug'),
-                                               id__gt=800,
-                                               status=request_status).order_by('id')
-        else:
-            requests = TRequest.objects.filter(~Q(locked=True),
-                                               description__contains='_debug',
-                                               id__gt=800,
-                                               status=request_status).order_by('id')
-        if request_types and requests:
-            requests = requests.filter(request_type__in=request_types)
-        if not requests:
-            return
-        ready_request_list = list()
-        for request in requests:
-            is_fast = request.is_fast or False
-            last_access_timestamp = \
-                TRequestStatus.objects.filter(request=request, status=request_status).order_by('-id')[0].timestamp
-            now = timezone.now()
-            time_offset = (now - last_access_timestamp).seconds
-            if (time_offset // 3600) < REQUEST_GRACE_PERIOD:
-                if (not no_wait) and (not is_fast):
-                    logger.info("Request %d is skipped, approved at %s" % (request.id, last_access_timestamp))
-                    continue
-            ready_request_list.append(request)
-        requests = ready_request_list[:1]
+    def _define_tasks_for_requests(self, requests, jira_client, restart=False):
         for request in requests:
             request.locked = True
             request.save()
             logger.info("Request %d is locked" % request.id)
         logger.info("Processing production requests")
         logger.info("Requests to process: %s" % str([int(req.id) for req in requests]))
+
         for request in requests:
             try:
                 logger.info("Processing request %d" % request.id)
@@ -4708,3 +4750,49 @@ class TaskDefinition(object):
                 request.locked = False
                 request.save()
                 logger.info("Request %s is unlocked" % request.id)
+
+    def force_process_requests(self, requests_ids, restart=False):
+        jira_client = JIRAClient()
+        try:
+            jira_client.authorize()
+        except Exception as ex:
+            logger.exception('JIRAClient::authorize failed: {0}'.format(str(ex)))
+        requests = TRequest.objects.filter(id__in=requests_ids)
+        self._define_tasks_for_requests(requests, jira_client, restart)
+
+    def process_requests(self, restart=False, no_wait=False, debug_only=False, request_types=None):
+        jira_client = JIRAClient()
+        try:
+            jira_client.authorize()
+        except Exception as ex:
+            logger.exception('JIRAClient::authorize failed: {0}'.format(str(ex)))
+        request_status = self.protocol.REQUEST_STATUS[RequestStatus.APPROVED]
+        if not debug_only:
+            requests = TRequest.objects.filter(~Q(locked=True) & ~Q(description__contains='_debug'),
+                                               id__gt=800,
+                                               status=request_status).order_by('id')
+        else:
+            requests = TRequest.objects.filter(~Q(locked=True),
+                                               description__contains='_debug',
+                                               id__gt=800,
+                                               status=request_status).order_by('id')
+        if request_types and requests:
+            requests = requests.filter(request_type__in=request_types)
+        if not requests:
+            return
+        ready_request_list = list()
+        for request in requests:
+            is_fast = request.is_fast or False
+            last_access_timestamp = \
+                TRequestStatus.objects.filter(request=request, status=request_status).order_by('-id')[0].timestamp
+            now = timezone.now()
+            time_offset = (now - last_access_timestamp).seconds
+            if (time_offset // 3600) < REQUEST_GRACE_PERIOD:
+                if (not no_wait) and (not is_fast):
+                    logger.info("Request %d is skipped, approved at %s" % (request.id, last_access_timestamp))
+                    continue
+            ready_request_list.append(request)
+        requests = ready_request_list[:1]
+        self._define_tasks_for_requests(requests, restart, jira_client)
+
+

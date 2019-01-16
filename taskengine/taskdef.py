@@ -4628,6 +4628,9 @@ class TaskDefinition(object):
                 logger.info("Request = %d, chains: %s" % (request.id, str([int(st.id) for st in first_steps])))
                 TaskRegistration.register_request_reference(request)
                 for step in first_steps:
+                    step_parent = StepExecution.objects.get(id=step.step_parent_id)
+                    if step_parent.status == self.protocol.STEP_STATUS[StepStatus.WAITING]:
+                        continue
                     try:
                         phys_cont_list = list()
                         evgen_input_list = list()

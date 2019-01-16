@@ -105,7 +105,8 @@ class TaskStatus(Enum):
 
 class StepStatus(Enum):
     values = ['APPROVED',
-              'NOTCHECKED']
+              'NOTCHECKED',
+              'WAITING']
 
 
 class RequestStatus(Enum):
@@ -311,7 +312,8 @@ class Protocol(object):
 
     STEP_STATUS = {
         StepStatus.APPROVED: 'Approved',
-        StepStatus.NOTCHECKED: 'NotChecked'
+        StepStatus.NOTCHECKED: 'NotChecked',
+        StepStatus.WAITING: 'Waiting'
     }
 
     REQUEST_STATUS = {

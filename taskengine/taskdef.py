@@ -1902,8 +1902,8 @@ class TaskDefinition(object):
                     use_direct_io = True
 
             task_common_offset = None
-            # if 'commonOffset'.lower() in project_mode.keys():
-            #     task_common_offset = project_mode['commonOffset'.lower()]
+            if 'commonOffset'.lower() in project_mode.keys():
+                task_common_offset = project_mode['commonOffset'.lower()]
 
             env_params_dict = dict()
             try:

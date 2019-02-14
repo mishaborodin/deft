@@ -3061,17 +3061,10 @@ class TaskDefinition(object):
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
 
-            if 'reprocessing' in project_mode.keys() or (step.request.phys_group.lower() == 'REPR'.lower()):
-                task_type = 'reprocessing'
-            # elif step.request.phys_group.lower() == 'VALI'.lower():
-            #     task_type = 'validation'
-            # elif step.request.phys_group.lower() == 'THLT'.lower():
-            #     task_type = 'urgent'
-            else:
-                task_type = prod_step
-                if is_pile_task:
-                    task_type = 'pile'
-
+            task_type = prod_step
+            if is_pile_task:
+                task_type = 'pile'
+                
             campaign = ':'.join(filter(None, (step.request.campaign, step.request.subcampaign, bunchspacing,)))
 
             task_request_type = None

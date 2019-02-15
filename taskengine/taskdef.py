@@ -3061,10 +3061,15 @@ class TaskDefinition(object):
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
 
-            task_type = prod_step
-            if is_pile_task:
-                task_type = 'pile'
-                
+            if 'reprocessing' in project_mode.keys() or (step.request.phys_group.lower() == 'REPR'.lower()):
+                task_type = 'reprocessing'
+            else:
+                task_type = prod_step
+                if is_pile_task:
+                    task_type = 'pile'
+            if prod_step.lower() == 'archive'.lower():
+                task_type = prod_step
+
             campaign = ':'.join(filter(None, (step.request.campaign, step.request.subcampaign, bunchspacing,)))
 
             task_request_type = None

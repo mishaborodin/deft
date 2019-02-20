@@ -150,6 +150,10 @@ class WrongCacheVersionUsedException(Exception):
         super(WrongCacheVersionUsedException, self).__init__(message)
 
 
+class EmptyDataset(Exception):
+    pass
+
+
 class TaskDefinition(object):
     def __init__(self):
         self.protocol = Protocol()
@@ -910,6 +914,8 @@ class TaskDefinition(object):
             total_nevents = 0
             try:
                 total_nevents = self.rucio_client.get_number_events(dsn)
+                if not total_nevents:
+                    raise EmptyDataset()
             except:
                 chain_input_events = self._extract_chain_input_events(step)
                 if chain_input_events > 0:

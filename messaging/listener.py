@@ -9,7 +9,8 @@ from django.utils import timezone
 
 
 class Listener(stomp.ConnectionListener):
-    def __init__(self, logger, no_db_log=False):
+    def __init__(self, client, logger, no_db_log=False):
+        self._client = client
         self._logger = logger
         self._scopes = [e.project for e in TProject.objects.all()]
         self._no_db_log = no_db_log
@@ -22,7 +23,11 @@ class Listener(stomp.ConnectionListener):
         return is_sub_dataset or is_o10_dataset
 
     def on_error(self, headers, message):
-        pass
+        self._logger.error('received an error: {0}'.format(message))
+
+    def on_disconnected(self):
+        self._logger.warning('disconnected')
+        self._client.connect()
 
     def on_message(self, headers, message_s):
         message = json.loads(message_s)

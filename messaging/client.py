@@ -25,9 +25,12 @@ class Client(object):
             keepalive=True
         )
 
-        self.connection.set_listener('messaging_listener', Listener(logger, no_db_log=no_db_log))
+        self.connection.set_listener('messaging_listener', Listener(self, logger, no_db_log=no_db_log))
 
     def connect(self):
+        if self.connection.is_connected():
+            self.disconnect()
+
         self.connection.start()
         self.connection.connect(wait=True)
         self.connection.subscribe(destination=MessagingConfig.QUEUE, id=str(self.id), ack='auto')

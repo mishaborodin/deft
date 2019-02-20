@@ -21,7 +21,9 @@ class Client(object):
             host_and_ports=[(hostname, port)],
             use_ssl=True, ssl_version=ssl.PROTOCOL_TLSv1,
             ssl_key_file=key_file,
-            ssl_cert_file=cert_file)
+            ssl_cert_file=cert_file,
+            keepalive=True
+        )
 
         self.connection.set_listener('messaging_listener', Listener(logger, no_db_log=no_db_log))
 

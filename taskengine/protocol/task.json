@@ -96,5 +96,6 @@
   "maxWalltime": "{{max_walltime}}",
   "notDiscardEvents": "{{not_discard_events}}",
   "scoutSuccessRate": "{{scout_success_rate}}",
-  "orderByLB": "{{order_by_lb}}"
+  "orderByLB": "{{order_by_lb}}",
+  "useZipToPin": "{{use_zip_to_pin}}"
 }

@@ -3558,6 +3558,13 @@ class TaskDefinition(object):
                 elif option_value.lower() == 'no'.lower():
                     truncate_output_formats = False
 
+            if 'useZipToPin'.lower() in project_mode.keys():
+                option_value = str(project_mode['useZipToPin'.lower()])
+                if option_value.lower() == 'yes'.lower():
+                    task_proto_dict.update({'use_zip_to_pin': True})
+                elif option_value.lower() == 'no'.lower():
+                    task_proto_dict.update({'use_zip_to_pin': None})
+
             # FIXME
             # task_proto_dict.update({'put_log_to_os': True})
 

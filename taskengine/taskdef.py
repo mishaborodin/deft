@@ -3834,6 +3834,7 @@ class TaskDefinition(object):
 
                 if step == first_step:
                     chain_id = task_id
+                    primary_input_offset = 0
                     if first_parent_task_id:
                         parent_task_id = first_parent_task_id
                     else:

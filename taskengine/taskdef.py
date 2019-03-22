@@ -1697,14 +1697,22 @@ class TaskDefinition(object):
                     raise Exception('productionStep in the tag ({0}) differs from the step name in the request ({1})'
                                     .format(prod_step, step.step_template.step))
 
-            ami_types = self.ami_client.get_types()
-            # FIXME: support for EventIndex pseudo format
-            ami_types.append('EI')
-            # FIXME: OverlayTest
-            ami_types.append('BS_TRIGSKIM')
-            for output_type in output_types:
-                if not output_type in ami_types:
-                    raise Exception("The output format \"%s\" is not registered in AMI" % output_type)
+            ami_types = None
+            try:
+                ami_types = self.ami_client.get_types()
+            except Exception as ex:
+                logger.exception('Getting AMI types failed: {0}'.format(str(ex)))
+
+            if ami_types:
+                # FIXME: support for EventIndex pseudo format
+                ami_types.append('EI')
+                # FIXME: OverlayTest
+                ami_types.append('BS_TRIGSKIM')
+                for output_type in output_types:
+                    if not output_type in ami_types:
+                        raise Exception("The output format \"%s\" is not registered in AMI" % output_type)
+            else:
+                logger.warning('AMI type list is empty')
 
             trf_dict = dict()
             trf_dict.update({trf_name: [trf_cache, trf_release, trf_release_base]})
@@ -3368,11 +3376,14 @@ class TaskDefinition(object):
             if 'nMaxFilesPerJob'.lower() in project_mode.keys():
                 task_proto_dict.update({'number_of_max_files_per_job': int(project_mode['nMaxFilesPerJob'.lower()])})
 
-            ttcr_timestamp = None
-            ttcr = TConfig.get_ttcr(project, prod_step, usergroup)
-            if ttcr > 0:
-                ttcr_timestamp = timezone.now() + datetime.timedelta(seconds=ttcr)
-                task_proto_dict.update({'ttcr_timestamp': str(ttcr_timestamp)})
+            try:
+                ttcr_timestamp = None
+                ttcr = TConfig.get_ttcr(project, prod_step, usergroup)
+                if ttcr > 0:
+                    ttcr_timestamp = timezone.now() + datetime.timedelta(seconds=ttcr)
+                    task_proto_dict.update({'ttcr_timestamp': str(ttcr_timestamp)})
+            except Exception as ex:
+                logger.exception('Getting TTC failed: {0}'.format(str(ex)))
 
             if 'useJobCloning'.lower() in project_mode.keys():
                 task_proto_dict.update({'use_job_cloning': str(project_mode['useJobCloning'.lower()])})
@@ -3922,7 +3933,7 @@ class TaskDefinition(object):
     def _get_processed_datasets(self, step, requested_datasets=None):
         processed_datasets = []
         input_data_name = self.get_step_input_data_name(step)
-        #Drop ps1
+        # Drop ps1
         # ps1_task_list = TTaskRequest.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete']),
         #                                             project=step.request.project,
         #                                             inputdataset=input_data_name,
@@ -4367,23 +4378,23 @@ class TaskDefinition(object):
                     number_events_requested = number_events_available
                 else:
                     raise NotEnoughEvents()
-            if (step.input_events <= 0) and (step.request.request_type.lower() in [ 'GROUP'.lower()]):
+            if (step.input_events <= 0) and (step.request.request_type.lower() in ['GROUP'.lower()]):
                 processed_datasets = self._get_processed_datasets(step, result['datasets'])
                 for dataset_name in result['datasets']:
-                        if dataset_name.split(':')[-1] not in processed_datasets:
-                            events_per_file = self.get_events_per_input_file(step, dataset_name,
-                                                                             use_real_events=use_real_events)
-                            if not events_per_file:
-                                logger.info(
-                                    "Step = %d, nEventsPerInputFile for dataset %s is missing, skipping this dataset" %
-                                    (step.id, dataset_name))
-                                return splitting_dict
-                            number_events = events_per_file * self.rucio_client.get_number_files(
-                                dataset_name)
-                            if number_events:
-                                if not step.id in splitting_dict.keys():
-                                    splitting_dict[step.id] = list()
-                                splitting_dict[step.id].append({'dataset': dataset_name, 'offset': 0,
+                    if dataset_name.split(':')[-1] not in processed_datasets:
+                        events_per_file = self.get_events_per_input_file(step, dataset_name,
+                                                                         use_real_events=use_real_events)
+                        if not events_per_file:
+                            logger.info(
+                                "Step = %d, nEventsPerInputFile for dataset %s is missing, skipping this dataset" %
+                                (step.id, dataset_name))
+                            return splitting_dict
+                        number_events = events_per_file * self.rucio_client.get_number_files(
+                            dataset_name)
+                        if number_events:
+                            if not step.id in splitting_dict.keys():
+                                splitting_dict[step.id] = list()
+                            splitting_dict[step.id].append({'dataset': dataset_name, 'offset': 0,
                                                             'number_events': number_events,
                                                             'container': input_data_name})
                 return splitting_dict

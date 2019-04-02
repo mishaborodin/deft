@@ -468,7 +468,7 @@ class TaskDefConstants(object):
     NO_ES_MIN_NUMBER_OF_EVENTS = Constant(50000)
 
     LEAVE_LOG_TOKEN = Constant('ddd:.*DATADISK')
-    LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\(dontkeeplog=1)')
+    LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\(dontkeeplog=True)')
     LEAVE_LOG_TRANSIENT_FLAG = Constant(False)
 
     DEFAULT_CLOUD = Constant('WORLD')

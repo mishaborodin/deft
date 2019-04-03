@@ -73,8 +73,8 @@ class Listener(stomp.ConnectionListener):
         elif event_type in (TaskDefConstants.DDM_PROGRESS_EVENT_TYPE.lower()):
             rule_id = payload.get('rule_id', None)
             progress = payload.get('progress', None)
-            if self.is_dataset_ignored(name):
-                return
+            # if self.is_dataset_ignored(name):
+            #     return
             self._logger.info(
                 '[PROGRESS ({0})]: scope={1}, name={2}, rule_id={3}, progress={4}'.format(
                     event_type,

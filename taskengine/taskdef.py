@@ -4682,7 +4682,8 @@ class TaskDefinition(object):
                             for input_dataset in phys_cont_list:
                                 try:
                                     self.create_task_chain(step.id, input_dataset=input_dataset)
-                                except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid) as ex:
+                                except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
+                                        UnmergedInputProcessedException) as ex:
                                     jira_client.log_exception(request.reference, ex)
                                     exception = True
                                     continue
@@ -4694,7 +4695,8 @@ class TaskDefinition(object):
                                     self.create_task_chain(step.id,
                                                            first_step_number_of_events=input_params['nevents'],
                                                            evgen_params=input_params)
-                                except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid) as ex:
+                                except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
+                                        UnmergedInputProcessedException) as ex:
                                     jira_client.log_exception(request.reference, ex)
                                     exception = True
                                     continue
@@ -4730,7 +4732,8 @@ class TaskDefinition(object):
                                             self.create_task_chain(step.id, restart=use_parent_output,
                                                                    first_step_number_of_events=-1,
                                                                    first_parent_task_id=task_id)
-                                        except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid) as ex:
+                                        except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
+                                                UnmergedInputProcessedException) as ex:
                                             jira_client.log_exception(request.reference, ex)
                                             exception = True
                                             continue
@@ -4747,7 +4750,7 @@ class TaskDefinition(object):
                                                                primary_input_offset=step_input['offset'],
                                                                container_name=step_input['container'])
                                     except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
-                                            UniformDataException) as ex:
+                                            UnmergedInputProcessedException, UniformDataException) as ex:
                                         jira_client.log_exception(request.reference, ex)
                                         exception = True
                                         continue

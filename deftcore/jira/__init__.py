@@ -92,9 +92,10 @@ class JIRAClient(object):
 
         return result['key']
 
-    def log_exception(self, issue_key, exception):
+    def log_exception(self, issue_key, exception, log_msg=None):
         try:
-            log_msg = '{0}: {1}'.format(type(exception).__name__, str(exception))
+            if not log_msg:
+                log_msg = '{0}: {1}'.format(type(exception).__name__, str(exception))
             logger.exception(log_msg)
             self.add_issue_comment(issue_key, log_msg)
         except Exception as ex:

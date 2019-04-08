@@ -4684,7 +4684,11 @@ class TaskDefinition(object):
                                     self.create_task_chain(step.id, input_dataset=input_dataset)
                                 except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                         UnmergedInputProcessedException) as ex:
-                                    jira_client.log_exception(request.reference, ex)
+                                    log_msg = \
+                                        'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
+                                            request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
+                                            get_exception_string())
+                                    jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     exception = True
                                     continue
                                 except Exception as ex:
@@ -4697,7 +4701,11 @@ class TaskDefinition(object):
                                                            evgen_params=input_params)
                                 except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                         UnmergedInputProcessedException) as ex:
-                                    jira_client.log_exception(request.reference, ex)
+                                    log_msg = \
+                                        'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
+                                            request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
+                                            get_exception_string())
+                                    jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     exception = True
                                     continue
                                 except Exception as ex:
@@ -4734,7 +4742,12 @@ class TaskDefinition(object):
                                                                    first_parent_task_id=task_id)
                                         except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                                 UnmergedInputProcessedException) as ex:
-                                            jira_client.log_exception(request.reference, ex)
+                                            log_msg = \
+                                                'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
+                                                    request.id, step.slice.slice, step.id,
+                                                    self.get_step_input_data_name(step),
+                                                    get_exception_string())
+                                            jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                             exception = True
                                             continue
                                         except Exception as ex:
@@ -4751,7 +4764,11 @@ class TaskDefinition(object):
                                                                container_name=step_input['container'])
                                     except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                             UnmergedInputProcessedException, UniformDataException) as ex:
-                                        jira_client.log_exception(request.reference, ex)
+                                        log_msg = \
+                                            'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
+                                                request.id, step.slice.slice, step.id,
+                                                self.get_step_input_data_name(step), get_exception_string())
+                                        jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                         exception = True
                                         continue
                                     except Exception as ex:

@@ -3187,6 +3187,8 @@ class TaskDefinition(object):
                 task_proto_dict.update({'ram_count': int(project_mode['ramCount'.lower()])})
             if 'baseRamCount'.lower() in project_mode.keys():
                 task_proto_dict.update({'base_ram_count': int(project_mode['baseRamCount'.lower()])})
+            if 'baseWalltime'.lower() in project_mode.keys():
+                task_proto_dict.update({'base_wall_time': int(project_mode['baseWalltime'.lower()])})
 
             # if 'cloud'.lower() in project_mode.keys():
             #     task_proto_dict.update({'cloud': str(project_mode['cloud'.lower()])})

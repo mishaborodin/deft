@@ -3167,6 +3167,7 @@ class TaskDefinition(object):
             elif step.request.request_type.lower() == 'GROUP'.lower():
                 task_proto_dict.update({'cpu_time': 0})
                 task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
+                task_proto_dict.update({'base_wall_time': 60})
                 if project.lower().startswith('data'):
                     task_proto_dict.update({'goal': str(100.0)})
                     task_proto_dict.update({'use_exhausted': True})

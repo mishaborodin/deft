@@ -101,8 +101,8 @@ class TaskActionHandler(object):
         result = jedi_client.resumeTask(task_id, verbose=False)
         return self.parse_jedi_result(result)
 
-    def reassign_task_to_share(self, task_id, share):
-        result = jedi_client.reassignShare([task_id, ], share)
+    def reassign_task_to_share(self, task_id, share, reassign_running=False):
+        result = jedi_client.reassignShare([task_id, ], share, reassign_running=reassign_running)
         return self.parse_jedi_result(result)
 
     def trigger_task_brokerage(self, task_id):

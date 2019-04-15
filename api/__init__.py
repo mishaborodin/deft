@@ -171,7 +171,8 @@ class ApiServer(object):
                 body = json.loads(request.body)
                 task_id = int(body['task_id'])
                 share = body.get('share', '')
-                handler_status = handler.reassign_task_to_share(task_id, share)
+                reassign_running = bool(body.get('reassign_running', None))
+                handler_status = handler.reassign_task_to_share(task_id, share, reassign_running=reassign_running)
                 request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
                 handler.add_task_comment(task_id, request.create_default_task_comment(body))
             elif request.action == request.ACTION_TRIGGER_TASK_BROKERAGE:

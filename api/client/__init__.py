@@ -6,7 +6,7 @@ import urllib
 
 
 class Client(object):
-    def __init__(self, base_url, auth_user, auth_key, verify_ssl_cert=False):
+    def __init__(self, auth_user, auth_key, verify_ssl_cert=False, base_url='https://aipanda015.cern.ch'):
         self.base_url = base_url
         self.verify_ssl_cert = verify_ssl_cert
         self.api_url = '/api/v1/request/'

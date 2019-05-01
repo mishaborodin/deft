@@ -53,7 +53,7 @@ class Listener(stomp.ConnectionListener):
                 if dataset:
                     dataset.ddm_timestamp = timezone.now()
                     dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
-                    dataset.status = TaskDefConstants.DATASET_DELETE_STATUS
+                    dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
                     dataset.timestamp = timezone.now()
                     dataset.save()
         elif event_type in (TaskDefConstants.DDM_LOST_EVENT_TYPE.lower()):

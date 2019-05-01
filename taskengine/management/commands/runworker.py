@@ -7,6 +7,7 @@ from taskengine.metadata import AMIClient
 from taskengine.models import ProductionDataset
 from taskengine.rucioclient import RucioClient
 from django.utils import timezone
+from django.db.models import Q
 from django.core.exceptions import ObjectDoesNotExist
 from taskengine.protocol import TaskDefConstants
 import logging
@@ -68,17 +69,15 @@ class Command(BaseCommand):
             client.sync_ami_tags()
         elif options['worker_name'] == 'check_datasets':
             client = RucioClient()
-            for dataset in ProductionDataset.objects.filter(ddm_status=None, ddm_timestamp=None).iterator():
+            for dataset in ProductionDataset.objects.filter(~Q(status=None)).order_by('-timestamp').iterator():
                 if not client.is_dsn_exist(dataset.name):
-                    dataset.ddm_timestamp = timezone.now()
-                    dataset.ddm_status = 'erase'
-                    dataset.save()
-                    logger.info(
-                        'check_datasets, updated dataset {0} with ddm_status="{1}" and ddm_timestamp="{2}"'.format(
-                            dataset.name,
-                            dataset.ddm_status,
-                            dataset.ddm_timestamp)
-                    )
+                    if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
+                        dataset.ddm_timestamp = timezone.now()
+                        dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                    dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
+                    dataset.timestamp = timezone.now()
+                    # dataset.save()
+                    logger.info('check_datasets, updated dataset %s', dataset.name)
         elif options['worker_name'] == 'analyze_lost_files_report':
             path = options['extra_param']
             report = None

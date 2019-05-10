@@ -230,7 +230,7 @@ SESSION_ENGINE = 'taskengine.sessions'
 
 RUCIO_ACCOUNT_NAME = 'prodsys'
 
-AMI_ENDPOINTS = ['atlas-replica', 'atlas']
+AMI_ENDPOINTS = ['atlas', 'atlas-replica']
 
 AGIS_API_BASE_URI = 'http://atlas-agis-api.cern.ch'
 

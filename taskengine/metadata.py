@@ -378,7 +378,7 @@ class AMIClient(object):
             # old way from PS1
             if trf_transform.lower() in [e.lower() for e in ['AtlasG4_tf.py', 'Sim_tf.py', 'StoppedParticleG4_tf.py',
                                                              'TrigFTKMergeReco_tf.py', 'Reco_tf.py',
-                                                             'FullChain_tf.py', 'Trig_reco_tf.py',
+                                                             'FullChain_tf.py', 'Trig_reco_tf.py', 'TrigMT_reco_tf.py',
                                                              'OverlayChain_tf.py', 'TrigFTKTM64SM1Un_tf.py',
                                                              'TrigFTKSMUn_Tower22_tf.py', 'Digi_tf.py']]:
                 default_sub_steps = ['AODtoRED', 'FTKRecoRDOtoESD', 'all', 'n2n', 'AODtoHIST', 'DQHistogramMerge',

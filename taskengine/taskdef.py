@@ -2052,7 +2052,7 @@ class TaskDefinition(object):
                         use_lhe_filter = True
 
             # proto_fix
-            if trf_name.lower() == 'Trig_reco_tf.py'.lower():
+            if trf_name.lower() == 'Trig_reco_tf.py'.lower() or trf_name.lower() == 'TrigMT_reco_tf.py'.lower():
                 trf_options.update({'separator': ' '})
                 for name in trf_params:
                     if re.match(r'^(--)?inputBS_RDOFile$', name, re.IGNORECASE) and 'RAW'.lower() in ','.join(
@@ -2387,7 +2387,8 @@ class TaskDefinition(object):
 
             output_trf_params = list()
             for output_type in output_types:
-                if trf_name.lower() == 'Trig_reco_tf.py'.lower() and output_type == 'RAW':
+                if (trf_name.lower() == 'Trig_reco_tf.py'.lower() or trf_name.lower() == 'TrigMT_reco_tf.py'.lower()) \
+                        and output_type == 'RAW':
                     output_type = 'BS'
                 if trf_name.lower().startswith('TrigFTK'.lower()) and output_type == 'RAW':
                     output_type = 'BS'
@@ -3040,7 +3041,7 @@ class TaskDefinition(object):
                     job_parameters.append(
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
-            elif trf_name.lower() == 'Trig_reco_tf.py'.lower():
+            elif trf_name.lower() == 'Trig_reco_tf.py'.lower() or trf_name.lower() == 'TrigMT_reco_tf.py'.lower():
                 # FIXME: support for HLT reprocessing
                 # if not 'RAW' in [e.lower() for e in output_params.keys()]:
                 # if not 'RAW' in output_types:

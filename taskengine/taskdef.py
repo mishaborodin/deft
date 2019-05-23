@@ -3663,20 +3663,20 @@ class TaskDefinition(object):
             io_intensity = None
 
             if prod_step.lower() == 'merge'.lower():
-                if usergroup.lower() == 'AP_REPR'.lower():
-                    if trf_name.lower() == 'ESDMerge_tf.py'.lower():
-                        io_intensity = 3000
-                    elif trf_name.lower() == 'HISTMerge_tf.py'.lower():
-                        io_intensity = 2000
-                if re.match('^AP_(?!SOFT|REPR|UPG|THLT|VALI).*$', usergroup, re.IGNORECASE):
-                    if trf_name.lower() == 'EVNTMerge_tf.py'.lower():
-                        io_intensity = 4000
-                    if trf_name.lower() == 'HITSMerge_tf.py'.lower():
-                        io_intensity = 3000
-                    if trf_name.lower() == 'AODMerge_tf.py'.lower():
-                        io_intensity = 2000
-                    if trf_name.lower() == 'NTUPMerge_tf.py'.lower():
-                        io_intensity = 2000
+                if trf_name.lower() == 'ESDMerge_tf.py'.lower():
+                    io_intensity = 3000
+                elif trf_name.lower() == 'HISTMerge_tf.py'.lower():
+                    io_intensity = 2000
+                elif trf_name.lower() == 'EVNTMerge_tf.py'.lower():
+                    io_intensity = 4000
+                elif trf_name.lower() == 'HITSMerge_tf.py'.lower():
+                    io_intensity = 3000
+                elif trf_name.lower() == 'AODMerge_tf.py'.lower():
+                    io_intensity = 2000
+                elif trf_name.lower() == 'NTUPMerge_tf.py'.lower():
+                    io_intensity = 2000
+                elif trf_name.lower() == 'DAODMerge_tf.py'.lower():
+                    io_intensity = 2000
             elif prod_step.lower() == 'deriv'.lower():
                 if step.request.provenance.lower() == 'GP'.lower():
                     if trf_name.lower() == 'Reco_tf.py'.lower():
@@ -3686,7 +3686,9 @@ class TaskDefinition(object):
                         io_intensity = 5000
                     if trf_name.lower() == 'PRWConfig_tf.py'.lower():
                         io_intensity = 5000
-                        
+            if trf_name.lower() == 'Archive_tf.py'.lower():
+                io_intensity = 5000
+                
             if io_intensity:
                 task_proto_dict.update({'io_intensity': int(io_intensity)})
                 task_proto_dict.update({'io_intensity_unit': 'kBPerS'})

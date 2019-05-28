@@ -25,3 +25,7 @@ class Manager(object):
     def stop(self):
         for client in self._client_list:
             client.disconnect()
+
+    @property
+    def client_list(self):
+        return self._client_list

@@ -22,13 +22,14 @@ class Client(object):
             use_ssl=True, ssl_version=ssl.PROTOCOL_TLSv1,
             ssl_key_file=key_file,
             ssl_cert_file=cert_file,
-            keepalive=True
+            keepalive=True,
+            heartbeats=(10000,10000)
         )
 
         self.connection.set_listener('messaging_listener', Listener(self, logger, no_db_log=no_db_log))
 
     def connect(self):
-        if self.connection.is_connected():
+        if self.is_connected():
             self.disconnect()
 
         self.connection.start()
@@ -38,3 +39,6 @@ class Client(object):
 
     def disconnect(self):
         self.connection.disconnect()
+
+    def is_connected(self):
+        return self.connection.is_connected()

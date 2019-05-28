@@ -30,9 +30,13 @@ keep_fds = [fh.stream.fileno()]
 
 def main():
     from messaging.manager import Manager
+    from messaging.watchdog import Watchdog
 
     messaging_manager = Manager(logger, no_db_log=args.nodb)
     messaging_manager.start()
+
+    watchdog = Watchdog(logger, messaging_manager.client_list)
+    watchdog.start()
 
     while True:
         time.sleep(5)

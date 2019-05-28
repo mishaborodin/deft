@@ -70,14 +70,21 @@ class Command(BaseCommand):
         elif options['worker_name'] == 'check_datasets':
             client = RucioClient()
             for dataset in ProductionDataset.objects.filter(~Q(status=None)).order_by('-timestamp').iterator():
+                if dataset.status == TaskDefConstants.DATASET_DELETED_STATUS:
+                    if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
+                        dataset.ddm_timestamp = timezone.now()
+                        dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                        dataset.save()
+                        logger.info('check_datasets, updated dataset DDM_* info: %s', dataset.name)
+                    continue
                 if not client.is_dsn_exist(dataset.name):
                     if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
                         dataset.ddm_timestamp = timezone.now()
                         dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
                     dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
                     dataset.timestamp = timezone.now()
-                    # dataset.save()
-                    logger.info('check_datasets, updated dataset %s', dataset.name)
+                    dataset.save()
+                    logger.info('check_datasets, updated dataset STATUS: %s', dataset.name)
         elif options['worker_name'] == 'analyze_lost_files_report':
             path = options['extra_param']
             report = None

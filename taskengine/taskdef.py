@@ -3152,7 +3152,7 @@ class TaskDefinition(object):
                         base_memory = 1000
                 elif prod_step.lower() == 'recon'.lower() or is_pile_task:
                     if core_count > 1:
-                        memory = 2000
+                        memory = 1750
                         base_memory = 2000
             elif step.request.request_type.lower() == 'HLT'.lower():
                 if prod_step.lower() == 'recon'.lower():
@@ -3688,7 +3688,7 @@ class TaskDefinition(object):
                         io_intensity = 5000
             if trf_name.lower() == 'Archive_tf.py'.lower():
                 io_intensity = 5000
-                
+
             if io_intensity:
                 task_proto_dict.update({'io_intensity': int(io_intensity)})
                 task_proto_dict.update({'io_intensity_unit': 'kBPerS'})

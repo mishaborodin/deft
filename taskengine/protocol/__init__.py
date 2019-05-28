@@ -371,13 +371,12 @@ class Protocol(object):
 
     def get_simulation_type(self, step):
         if step.request.request_type.lower() == 'MC'.lower():
-            comment = step.slice.comment.encode('ascii', 'ignore').decode('ascii')
             if step.step_template.step.lower() == 'evgen'.lower():
                 return 'notMC'
-            if '(Fullsim)' in comment:
-                return 'full'
-            elif '(Atlfast)' in comment:
+            if str(step.step_template.ctag).lower().startswith('a'):
                 return 'fast'
+            else:
+                return 'full'
         return 'notMC'
 
     def get_primary_input(self, task):

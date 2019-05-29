@@ -68,23 +68,28 @@ class Command(BaseCommand):
             client = AMIClient()
             client.sync_ami_tags()
         elif options['worker_name'] == 'check_datasets':
-            client = RucioClient()
-            for dataset in ProductionDataset.objects.filter(~Q(status=None)).order_by('-timestamp').iterator():
-                if dataset.status == TaskDefConstants.DATASET_DELETED_STATUS:
-                    if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
-                        dataset.ddm_timestamp = timezone.now()
-                        dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+            try:
+                client = RucioClient()
+                for dataset in ProductionDataset.objects.filter(~Q(status=None)).order_by('-timestamp').iterator():
+                    if dataset.status == TaskDefConstants.DATASET_DELETED_STATUS:
+                        if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
+                            dataset.ddm_timestamp = timezone.now()
+                            dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                            dataset.save()
+                            logger.info('check_datasets, updated dataset DDM_* info: %s (task_id=%d)',
+                                        dataset.name, dataset.task_id)
+                        continue
+                    if not client.is_dsn_exist(dataset.name):
+                        if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
+                            dataset.ddm_timestamp = timezone.now()
+                            dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                        dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
+                        dataset.timestamp = timezone.now()
                         dataset.save()
-                        logger.info('check_datasets, updated dataset DDM_* info: %s', dataset.name)
-                    continue
-                if not client.is_dsn_exist(dataset.name):
-                    if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
-                        dataset.ddm_timestamp = timezone.now()
-                        dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
-                    dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
-                    dataset.timestamp = timezone.now()
-                    dataset.save()
-                    logger.info('check_datasets, updated dataset STATUS: %s', dataset.name)
+                        logger.info('check_datasets, updated dataset STATUS: %s (task_id=%d)',
+                                    dataset.name, dataset.task_id)
+            except Exception as ex:
+                logger.exception('check_datasets failed: {0}'.format(str(ex)))
         elif options['worker_name'] == 'analyze_lost_files_report':
             path = options['extra_param']
             report = None

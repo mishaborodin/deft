@@ -490,6 +490,7 @@ class TaskDefConstants(object):
     DDM_ERASE_STATUS = 'erase'
     DDM_LOST_EVENT_TYPE = 'LOST'
     DDM_LOST_STATUS = 'lost'
+    DDM_STAGING_STATUS = 'staging'
     DDM_PROGRESS_EVENT_TYPE = 'RULE_PROGRESS'
     DATASET_DELETED_STATUS = 'Deleted'
 

@@ -3,8 +3,9 @@ __author__ = 'Dmitry Golubkov'
 import stomp
 import json
 import re
-from taskengine.models import TProject, ProductionDataset
+from taskengine.models import TProject, ProductionDataset, DatasetStaging
 from taskengine.protocol import TaskDefConstants
+from taskengine.rucioclient import RucioClient
 from django.utils import timezone
 
 
@@ -74,9 +75,7 @@ class Listener(stomp.ConnectionListener):
                     dataset.save()
         elif event_type in (TaskDefConstants.DDM_PROGRESS_EVENT_TYPE.lower()):
             rule_id = payload.get('rule_id', None)
-            progress = payload.get('progress', None)
-            # if self.is_dataset_ignored(name):
-            #     return
+            progress = int(payload.get('progress', 0))
             self._logger.info(
                 '[PROGRESS ({0})]: scope={1}, name={2}, rule_id={3}, progress={4}'.format(
                     event_type,
@@ -86,3 +85,32 @@ class Listener(stomp.ConnectionListener):
                     progress
                 )
             )
+            if not self._no_db_log:
+                dsn = name.split(':')[-1]
+                dataset_staging = DatasetStaging.objects.get(dataset=dsn)
+                if dataset_staging:
+                    dataset_staging.update_time = timezone.now()
+                    if progress == 100:
+                        dataset_staging.end_time = timezone.now()
+                    dataset_staging.status = TaskDefConstants.DDM_STAGING_STATUS
+                    dataset_staging.staged_files = int(progress * dataset_staging.total_files / 100)
+                    dataset_staging.save()
+                else:
+                    total_files = 0
+
+                    try:
+                        rucio_client = RucioClient()
+                        total_files = rucio_client.get_number_files(dsn)
+                    except Exception as ex:
+                        self._logger.exception(
+                            'Rucio related problem detected (during getting total_files of dsn): {0}'.format(str(ex))
+                        )
+
+                    dataset_staging = DatasetStaging(dataset=dsn,
+                                                     status=TaskDefConstants.DDM_STAGING_STATUS,
+                                                     start_time=timezone.now(),
+                                                     update_time=timezone.now(),
+                                                     rse=rule_id,
+                                                     total_files=total_files,
+                                                     staged_files=int(progress * total_files / 100))
+                    dataset_staging.save()

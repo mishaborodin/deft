@@ -859,3 +859,20 @@ class User(AbstractUser):
     class Meta:
         db_name = u'deft_intr'
         db_table = u'"ATLAS_DEFT"."AUTH_USER"'
+
+
+class DatasetStaging(models.Model):
+    id = models.DecimalField(decimal_places=0, max_digits=12, db_column='DATASET_STAGING_ID', primary_key=True)
+    dataset = models.CharField(max_length=256, db_column='DATASET', null=False)
+    status = models.CharField(max_length=20, db_column='STATUS', null=True)
+    tape_status_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='TAPE_STATUS_ID', null=True)
+    staged_files = models.DecimalField(decimal_places=0, max_digits=12, db_column='STAGED_FILES', null=True)
+    start_time = models.DateTimeField(db_column='START_TIME', null=True)
+    end_time = models.DateTimeField(db_column='END_TIME', null=True)
+    rse = models.CharField(max_length=100, db_column='RSE', null=True)
+    total_files = models.DecimalField(decimal_places=0, max_digits=12, db_column='TOTAL_FILES', null=True)
+    update_time = models.DateTimeField(db_column='UPDATE_TIME', null=True)
+
+    class Meta:
+        db_name = u'deft_intr'
+        db_table = u'"ATLAS_DEFT"."T_DATASET_STAGING"'

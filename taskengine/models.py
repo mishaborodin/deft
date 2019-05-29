@@ -873,6 +873,11 @@ class DatasetStaging(models.Model):
     total_files = models.DecimalField(decimal_places=0, max_digits=12, db_column='TOTAL_FILES', null=True)
     update_time = models.DateTimeField(db_column='UPDATE_TIME', null=True)
 
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_DATASET_STAGING_SEQ')
+        super(DatasetStaging, self).save(*args, **kwargs)
+
     class Meta:
         db_name = u'deft_intr'
         db_table = u'"ATLAS_DEFT"."T_DATASET_STAGING"'

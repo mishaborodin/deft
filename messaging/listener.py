@@ -50,7 +50,7 @@ class Listener(stomp.ConnectionListener):
                 '[DELETION ({0})]: scope={1}, name={2}, account={3}'.format(event_type, scope, name, account)
             )
             if not self._no_db_log:
-                dataset = ProductionDataset.objects.get(name=name.split(':')[-1])
+                dataset = ProductionDataset.objects.filter(name=name.split(':')[-1]).first()
                 if dataset:
                     dataset.ddm_timestamp = timezone.now()
                     dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
@@ -68,7 +68,7 @@ class Listener(stomp.ConnectionListener):
                 )
             )
             if not self._no_db_log:
-                dataset = ProductionDataset.objects.get(name=dataset_name.split(':')[-1])
+                dataset = ProductionDataset.objects.filter(name=dataset_name.split(':')[-1]).first()
                 if dataset:
                     dataset.ddm_timestamp = timezone.now()
                     dataset.ddm_status = TaskDefConstants.DDM_LOST_STATUS
@@ -87,7 +87,7 @@ class Listener(stomp.ConnectionListener):
             )
             if not self._no_db_log:
                 dsn = name.split(':')[-1]
-                dataset_staging = DatasetStaging.objects.get(dataset=dsn)
+                dataset_staging = DatasetStaging.objects.filter(dataset=dsn).first()
                 if dataset_staging:
                     dataset_staging.update_time = timezone.now()
                     if progress == 100:
@@ -113,4 +113,6 @@ class Listener(stomp.ConnectionListener):
                                                      rse=rule_id,
                                                      total_files=total_files,
                                                      staged_files=int(progress * total_files / 100))
+                    if progress == 100:
+                        dataset_staging.end_time = timezone.now()
                     dataset_staging.save()

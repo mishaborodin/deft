@@ -3580,6 +3580,13 @@ class TaskDefinition(object):
                 elif option_value.lower() == 'no'.lower():
                     task_proto_dict.update({'use_zip_to_pin': None})
 
+            if 'toStaging'.lower() in project_mode.keys():
+                option_value = str(project_mode['toStaging'.lower()])
+                if option_value.lower() == 'yes'.lower():
+                    task_proto_dict.update({'to_staging': True})
+                elif option_value.lower() == 'no'.lower():
+                    task_proto_dict.update({'to_staging': None})
+
             # FIXME
             # task_proto_dict.update({'put_log_to_os': True})
 

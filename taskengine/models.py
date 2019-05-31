@@ -153,20 +153,20 @@ class StepExecution(models.Model):
 
 
 class ProductionDataset(models.Model):
-    name = models.CharField(max_length=255, db_column='NAME', primary_key=True)
+    name = models.CharField(max_length=255, db_column='name', primary_key=True)
     task_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='TASKID', null=True)
     parent_task_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='PARENT_TID', null=True)
     phys_group = models.CharField(max_length=20, db_column='PHYS_GROUP', null=True)
     events = models.DecimalField(decimal_places=0, max_digits=12, db_column='EVENTS', null=True)
     files = models.DecimalField(decimal_places=0, max_digits=12, db_column='FILES', null=False)
-    status = models.CharField(max_length=12, db_column='STATUS', null=True)
+    status = models.CharField(max_length=12, db_column='status', null=True)
     timestamp = models.DateTimeField(db_column='TIMESTAMP', null=False)
     campaign = models.CharField(max_length=32, db_column='CAMPAIGN', null=True)
     container_flag = \
         models.DecimalField(decimal_places=0, max_digits=3, db_column='CONTAINER_FLAG', default=0, null=True)
     container_time = models.DateTimeField(db_column='CONTAINER_TIME', null=True)
-    ddm_timestamp = models.DateTimeField(db_column='DDM_TIMESTAMP', null=True)
-    ddm_status = models.CharField(max_length=32, db_column='DDM_STATUS', null=True)
+    ddm_timestamp = models.DateTimeField(db_column='ddm_timestamp', null=True)
+    ddm_status = models.CharField(max_length=32, db_column='ddm_status', null=True)
 
     class Meta:
         db_name = u'deft_adcr'

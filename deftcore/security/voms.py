@@ -55,3 +55,7 @@ class VOMSClient(object):
                 return False
         not_after = voms_client.not_after.replace(tzinfo=None)
         return not_after >= datetime.datetime.now()
+
+    @property
+    def valid(self):
+        return self._is_proxy_valid()

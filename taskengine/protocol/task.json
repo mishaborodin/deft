@@ -98,5 +98,6 @@
   "scoutSuccessRate": "{{scout_success_rate}}",
   "orderByLB": "{{order_by_lb}}",
   "useZipToPin": "{{use_zip_to_pin}}",
-  "baseWalltime": "{{base_wall_time}}"
+  "baseWalltime": "{{base_wall_time}}",
+  "toStaging": "{{to_staging}}"
 }

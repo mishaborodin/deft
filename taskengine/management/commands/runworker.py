@@ -10,6 +10,8 @@ from django.utils import timezone
 from django.db.models import Q
 from django.core.exceptions import ObjectDoesNotExist
 from taskengine.protocol import TaskDefConstants
+from rucio.common.exception import CannotAuthenticate
+from deftcore.security.voms import VOMSClient
 import logging
 
 logger = logging.getLogger('deftcore.worker')
@@ -70,7 +72,9 @@ class Command(BaseCommand):
         elif options['worker_name'] == 'check_datasets':
             try:
                 client = RucioClient()
-                for dataset in ProductionDataset.objects.filter(~Q(status=None)).order_by('-timestamp').iterator():
+                query = 'SELECT name, status, ddm_status, ddm_timestamp FROM t_production_dataset ' + \
+                        'where status is not NULL ORDER BY taskid DESC'
+                for dataset in ProductionDataset.objects.raw(query):
                     if dataset.status == TaskDefConstants.DATASET_DELETED_STATUS:
                         if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
                             dataset.ddm_timestamp = timezone.now()
@@ -79,12 +83,21 @@ class Command(BaseCommand):
                             logger.info('check_datasets, updated dataset DDM_* info: %s (task_id=%d)',
                                         dataset.name, dataset.task_id)
                         continue
-                    if not client.is_dsn_exist(dataset.name):
+                    try:
+                        status = client.is_dsn_exist(dataset.name)
+                    except CannotAuthenticate:
+                        voms_client = VOMSClient().get()
+                        if not voms_client.valid:
+                            raise Exception('check_datasets, cannot initialize VOMS proxy')
+                        status = client.is_dsn_exist(dataset.name)
+                    except Exception as ex:
+                        status = False
+                        logger.warning('check_datasets, is_dsn_exist (%s) failed: %s', dataset.name, str(ex))
+                    if not status:
                         if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
                             dataset.ddm_timestamp = timezone.now()
                             dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
                         dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
-                        dataset.timestamp = timezone.now()
                         dataset.save()
                         logger.info('check_datasets, updated dataset STATUS: %s (task_id=%d)',
                                     dataset.name, dataset.task_id)

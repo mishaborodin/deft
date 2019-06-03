@@ -86,7 +86,8 @@ class Command(BaseCommand):
                     try:
                         status = client.is_dsn_exist(dataset.name)
                     except CannotAuthenticate:
-                        voms_client = VOMSClient().get()
+                        voms_client = VOMSClient()
+                        voms_client.get()
                         if not voms_client.valid:
                             raise Exception('check_datasets, cannot initialize VOMS proxy')
                         status = client.is_dsn_exist(dataset.name)

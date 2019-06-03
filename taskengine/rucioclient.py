@@ -270,3 +270,9 @@ class RucioClient(object):
                         data_dict['datasets'].append(name)
 
         return data_dict
+
+    def get_dataset_rses(self, dsn):
+        if not self.is_dsn_dataset(dsn):
+            raise Exception('{0} is not dataset'.format(dsn))
+        scope, dataset = self.extract_scope(dsn)
+        return [replica['rse'] for replica in self.client.list_dataset_replicas(scope, dataset)]

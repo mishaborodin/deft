@@ -154,6 +154,14 @@ class EmptyDataset(Exception):
     pass
 
 
+class BlacklistedInputException(Exception):
+    def __init__(self, rses):
+        message = 'The task is rejected. Input is available only on blacklisted storage ({0})'.format(
+            ', '.join(rses)
+        )
+        super(BlacklistedInputException, self).__init__(message)
+
+
 class TaskDefinition(object):
     def __init__(self):
         self.protocol = Protocol()
@@ -1023,7 +1031,7 @@ class TaskDefinition(object):
 
                 raise UnmergedInputProcessedException(prod_task.id)
 
-    def _check_task_cache_version_consistency(self, task, step, prod_step, trf_release):
+    def _check_task_cache_version_consistency(self, task, step, trf_release):
         if step.request.request_type.lower() != 'GROUP'.lower():
             return
 
@@ -1059,6 +1067,39 @@ class TaskDefinition(object):
             previous_task_trf_release = previous_task_ctag['SWReleaseCache'].split('_')[1]
             if int(trf_release.split('.')[0]) != int(previous_task_trf_release.split('.')[0]):
                 raise WrongCacheVersionUsedException(trf_release, previous_task_trf_release)
+
+    def _check_task_blacklisted_input(self, task, project_mode):
+        enabled = False
+
+        if 'preventBlacklistedInput'.lower() in project_mode.keys():
+            option_value = str(project_mode['preventBlacklistedInput'.lower()])
+            if option_value.lower() == 'yes'.lower():
+                enabled = True
+            elif option_value.lower() == 'no'.lower():
+                enabled = False
+
+        if not enabled:
+            return
+
+        primary_input = self._get_primary_input(task['jobParameters'])
+        if not primary_input:
+            return
+
+        dsn = primary_input['dataset']
+        if not dsn:
+            return
+
+        dataset_rses = self.rucio_client.get_dataset_rses(dsn)
+        blacklisted_rses = self.agis_client.get_blacklisted_rses()
+
+        if len(dataset_rses) == 0 or len(blacklisted_rses) == 0:
+            return
+
+        for rse in dataset_rses:
+            if not rse in blacklisted_rses:
+                return
+
+        raise BlacklistedInputException(dataset_rses)
 
     def _check_task_input(self, task, task_id, number_of_events, task_config, parent_task_id, input_data_name, step,
                           primary_input_offset=0, prod_step=None, reuse_input=None, evgen_params=None,
@@ -3380,8 +3421,9 @@ class TaskDefinition(object):
             if 'nMaxFilesPerJob'.lower() in project_mode.keys():
                 task_proto_dict.update({'number_of_max_files_per_job': int(project_mode['nMaxFilesPerJob'.lower()])})
 
+            ttcr_timestamp = None
+
             try:
-                ttcr_timestamp = None
                 ttcr = TConfig.get_ttcr(project, prod_step, usergroup)
                 if ttcr > 0:
                     ttcr_timestamp = timezone.now() + datetime.timedelta(seconds=ttcr)
@@ -3860,7 +3902,8 @@ class TaskDefinition(object):
 
                 self._check_task_unmerged_input(task, step, prod_step)
                 self._check_task_merged_input(task, step, prod_step)
-                # self._check_task_cache_version_consistency(task, step, prod_step, trf_release)
+                # self._check_task_cache_version_consistency(task, step, trf_release)
+                self._check_task_blacklisted_input(task, project_mode)
 
                 # FIXME
                 if not skip_check_input:

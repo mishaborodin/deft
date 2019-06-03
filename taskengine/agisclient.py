@@ -22,6 +22,15 @@ class AGISClient(object):
         r = requests.get(url)
         return r.json()
 
+    def _list_blacklisted_rses(self):
+        url = urlparse.urljoin(self.base_uri, 'request/ddmendpointstatus/query/list/?json')
+        r = requests.get(url)
+        return r.json()
+
+    def get_blacklisted_rses(self):
+        rses = self._list_blacklisted_rses()
+        return [rse for rse in rses.keys()]
+
     def get_sites(self):
         panda_resources = self._list_panda_resources()
         return [r['name'] for r in panda_resources]

@@ -105,10 +105,11 @@ class RucioClient(object):
 
     def get_number_files(self, dsn):
         number_files = 0
-        scope, dataset = self.extract_scope(dsn)
-        files = self.client.list_files(scope, dataset, long=False)
-        for e in files:
-            number_files += 1
+        if self.is_dsn_container(dsn):
+            for name in self.list_datasets_in_container(dsn):
+                number_files += self.get_number_files_from_metadata(name)
+        else:
+            number_files += self.get_number_files_from_metadata(dsn)
         return number_files
 
     def get_number_events(self, dsn):

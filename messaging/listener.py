@@ -86,15 +86,20 @@ class Listener(stomp.ConnectionListener):
                 )
             )
             if not self._no_db_log:
+                current_timestamp = timezone.now()
                 dsn = name.split(':')[-1]
                 dataset_staging = DatasetStaging.objects.filter(dataset=dsn).first()
                 if dataset_staging:
-                    dataset_staging.update_time = timezone.now()
+                    dataset_staging.update_time = current_timestamp
                     if progress == 100:
-                        dataset_staging.end_time = timezone.now()
+                        dataset_staging.end_time = current_timestamp
                     dataset_staging.status = TaskDefConstants.DDM_STAGING_STATUS
                     dataset_staging.staged_files = int(progress * dataset_staging.total_files / 100)
-                    dataset_staging.save()
+
+                    try:
+                        dataset_staging.save()
+                    except Exception as ex:
+                        self._logger.exception('Database problem: {0} ({1})'.format(str(ex), dsn))
                 else:
                     total_files = 0
 
@@ -108,11 +113,15 @@ class Listener(stomp.ConnectionListener):
 
                     dataset_staging = DatasetStaging(dataset=dsn,
                                                      status=TaskDefConstants.DDM_STAGING_STATUS,
-                                                     start_time=timezone.now(),
-                                                     update_time=timezone.now(),
+                                                     start_time=current_timestamp,
+                                                     update_time=current_timestamp,
                                                      rse=rule_id,
                                                      total_files=total_files,
                                                      staged_files=int(progress * total_files / 100))
                     if progress == 100:
-                        dataset_staging.end_time = timezone.now()
-                    dataset_staging.save()
+                        dataset_staging.end_time = current_timestamp
+
+                    try:
+                        dataset_staging.save()
+                    except Exception as ex:
+                        self._logger.exception('Database problem: {0} ({1})'.format(str(ex), dsn))

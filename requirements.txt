@@ -10,3 +10,4 @@ requests~=2.19.1
 rucio-clients~=1.18.1
 rucio-clients-atlas~=0.0.6
 stomp.py~=4.1.22
+m2crypto~=0.31.0

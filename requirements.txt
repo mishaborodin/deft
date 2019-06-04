@@ -6,7 +6,7 @@ gridproxy==0.2
 pyAMI-core==5.0.7
 pyAMI-atlas==5.0.7
 pycurl~=7.43.0.2
-requests~=2.22.0
+requests~=2.19.1
 rucio-clients~=1.18.1
 rucio-clients-atlas~=0.0.6
 stomp.py~=4.1.22

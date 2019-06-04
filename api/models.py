@@ -7,7 +7,6 @@ from django.dispatch import receiver
 from django.utils import timezone
 from deftcore.log import Logger
 from api import ApiServer
-from deftcore.helpers import MetaProxy
 
 logger = Logger().get()
 
@@ -144,7 +143,6 @@ class Request(models.Model):
         return str(self.id)
 
     class Meta:
-        # __metaclass__ = MetaProxy
         db_name = u'deft_intr'
         db_table = u'"ATLAS_DEFT"."T_API_REQUEST"'
 

@@ -77,16 +77,6 @@ class Enum(object):
             return self.values.index(name)
 
 
-class MetaProxy(type):
-    def __new__(cls, class_name, parents, attrs):
-        if DEBUG:
-            if 'db_name' in attrs:
-                del attrs['db_name']
-            if 'db_table' in attrs:
-                del attrs['db_table']
-        return type.__new__(cls, class_name, parents, attrs)
-
-
 class OracleClob(unicode):
     def __new__(cls, *args, **kwargs):
         obj = unicode.__new__(cls, *args, **kwargs)

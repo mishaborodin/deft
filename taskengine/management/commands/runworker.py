@@ -1,6 +1,7 @@
 __author__ = 'Dmitry Golubkov'
 
 import re
+import os
 from django.core.management.base import BaseCommand
 from taskengine.taskdef import TaskDefinition
 from taskengine.metadata import AMIClient
@@ -74,15 +75,21 @@ class Command(BaseCommand):
                 client = RucioClient()
                 query = 'SELECT name, status, ddm_status, ddm_timestamp FROM t_production_dataset ' + \
                         'where status is not NULL ORDER BY taskid DESC'
+                if options['extra_param']:
+                    if options['extra_param'] == '1':
+                        name = ''
+                        query = "SELECT name, status, ddm_status, ddm_timestamp FROM t_production_dataset " + \
+                                "WHERE name='{0}'".format(name)
+                    elif options['extra_param'] == '2':
+                        query = "SELECT name, status, ddm_status, ddm_timestamp FROM t_production_dataset " + \
+                                "WHERE status is not NULL " + \
+                                "AND timestamp > TO_DATE('01-10-2018', 'DD-MM-YYYY') " + \
+                                "AND timestamp < TO_DATE('01-02-2019', 'DD-MM-YYYY') " + \
+                                "ORDER BY timestamp ASC"
+                        logger.info('check_datasets, pid={0}, query=\"{1}\"'.format(os.getpid(), query))
                 for dataset in ProductionDataset.objects.raw(query):
-                    if dataset.status == TaskDefConstants.DATASET_DELETED_STATUS:
-                        if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
-                            dataset.ddm_timestamp = timezone.now()
-                            dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
-                            dataset.save()
-                            logger.info('check_datasets, updated dataset DDM_* info: %s (task_id=%d)',
-                                        dataset.name, dataset.task_id)
-                        continue
+                    current_timestamp = timezone.now()
+
                     try:
                         status = client.is_dsn_exist(dataset.name)
                     except CannotAuthenticate:
@@ -92,16 +99,34 @@ class Command(BaseCommand):
                             raise Exception('check_datasets, cannot initialize VOMS proxy')
                         status = client.is_dsn_exist(dataset.name)
                     except Exception as ex:
-                        status = False
                         logger.warning('check_datasets, is_dsn_exist (%s) failed: %s', dataset.name, str(ex))
-                    if not status:
-                        if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
-                            dataset.ddm_timestamp = timezone.now()
-                            dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
-                        dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
-                        dataset.save()
-                        logger.info('check_datasets, updated dataset STATUS: %s (task_id=%d)',
-                                    dataset.name, dataset.task_id)
+                        continue
+
+                    if dataset.status == TaskDefConstants.DATASET_DELETED_STATUS:
+                        if status:
+                            dataset.timestamp = current_timestamp
+                            dataset.status = TaskDefConstants.DATASET_TO_BE_DELETED_STATUS
+                            dataset.ddm_timestamp = None
+                            dataset.ddm_status = None
+                            dataset.save()
+                            logger.info('check_datasets, updated dataset STATUS (%s): %s (task_id=%d)',
+                                        TaskDefConstants.DATASET_TO_BE_DELETED_STATUS, dataset.name, dataset.task_id)
+                        else:
+                            if not dataset.ddm_status or not dataset.ddm_timestamp:
+                                dataset.ddm_timestamp = current_timestamp
+                                dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                                dataset.save()
+                                logger.info('check_datasets, updated dataset DDM_* info: %s (task_id=%d)',
+                                            dataset.name, dataset.task_id)
+                    else:
+                        if not status:
+                            if (not dataset.ddm_status) or (not dataset.ddm_timestamp):
+                                dataset.ddm_timestamp = current_timestamp
+                                dataset.ddm_status = TaskDefConstants.DDM_ERASE_STATUS
+                            dataset.status = TaskDefConstants.DATASET_DELETED_STATUS
+                            dataset.save()
+                            logger.info('check_datasets, updated dataset STATUS (%s): %s (task_id=%d)',
+                                        TaskDefConstants.DATASET_DELETED_STATUS, dataset.name, dataset.task_id)
             except Exception as ex:
                 logger.exception('check_datasets failed: {0}'.format(str(ex)))
         elif options['worker_name'] == 'analyze_lost_files_report':

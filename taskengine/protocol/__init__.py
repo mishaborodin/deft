@@ -412,7 +412,7 @@ class Protocol(object):
             return False
 
     def is_evnt_filter_step(self, project_mode, task_config):
-        return 'evntFilterEff'.lower() in project_mode.keys() or 'evntFilterEff' in task_config.keys()
+        return project_mode.evntFilterEff or 'evntFilterEff' in task_config.keys()
 
     def serialize_task(self, task):
         return json.dumps(task, sort_keys=True)
@@ -453,7 +453,7 @@ class TaskDefConstants(object):
                                                  '{{data_type}}.' +
                                                  '{{version}}_tid{{task_id|stringformat:\"%s\"}}_00',
                                                  ('DEFAULT_TASK_ID_FORMAT_BASE',))
-    DEFAULT_OUTPUT_NAME_MAX_LENGTH = 255
+    DEFAULT_OUTPUT_NAME_MAX_LENGTH = Constant(255)
     DEFAULT_DB_RELEASE_DATASET_NAME_BASE = Constant('ddo.000001.Atlas.Ideal.DBRelease.v')
     DEFAULT_MINIBIAS_NPILEUP = Constant(5)
     DEFAULT_MAX_ATTEMPT = Constant(5)
@@ -472,10 +472,23 @@ class TaskDefConstants(object):
 
     DEFAULT_CLOUD = Constant('WORLD')
 
-    DEFAULT_ALLOWED_INPUT_EVENTS_DIFFERENCE = 10
+    DEFAULT_ALLOWED_INPUT_EVENTS_DIFFERENCE = Constant(10)
 
-    DEFAULT_ES_MAX_ATTEMPT = 10
-    DEFAULT_ES_MAX_ATTEMPT_JOB = 10
+    DEFAULT_ES_MAX_ATTEMPT = Constant(10)
+    DEFAULT_ES_MAX_ATTEMPT_JOB = Constant(10)
+
+    DEFAULT_SC_HASHTAG_SUFFIX = Constant('_sc_102017_mixed_cont')
+
+    DDM_ERASE_EVENT_TYPE = Constant('ERASE')
+    DDM_ERASE_STATUS = Constant('erase')
+    DDM_LOST_EVENT_TYPE = Constant('LOST')
+    DDM_LOST_STATUS = Constant('lost')
+    DDM_STAGING_STATUS = Constant('staging')
+    DDM_PROGRESS_EVENT_TYPE = Constant('RULE_PROGRESS')
+    DATASET_DELETED_STATUS = Constant('Deleted')
+    DATASET_TO_BE_DELETED_STATUS = Constant('toBeDeleted')
+
+    DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT = Constant('_tco_{0}')
 
     DEFAULT_SC_HASHTAGS = {
         'MC16a': ['MC16:MC16a', 'MC15:MC15.*', 'None', '.*MC15.*'],
@@ -484,14 +497,3 @@ class TaskDefConstants(object):
         'MC16d': ['MC16:MC16d'],
         'MC16e': ['MC16:MC16e']
     }
-    DEFAULT_SC_HASHTAG_SUFFIX = '_sc_102017_mixed_cont'
-
-    DDM_ERASE_EVENT_TYPE = 'ERASE'
-    DDM_ERASE_STATUS = 'erase'
-    DDM_LOST_EVENT_TYPE = 'LOST'
-    DDM_LOST_STATUS = 'lost'
-    DDM_STAGING_STATUS = 'staging'
-    DDM_PROGRESS_EVENT_TYPE = 'RULE_PROGRESS'
-    DATASET_DELETED_STATUS = 'Deleted'
-
-    DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT = '_tco_{0}'

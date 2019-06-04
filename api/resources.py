@@ -14,12 +14,10 @@ from tastypie.utils import trailing_slash
 from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
 from django.conf.urls import url
-from django.db.models import Q
+from django.db.models import Q, ObjectDoesNotExist
 from api.models import Request
-from taskengine.models import Task, TRequestProxy, TStepProxy
-
-
-# from taskengine.atlas.datamgmt import AMIWrapper
+from taskengine.models import Task, TRequestProxy, TStepProxy, StepExecution
+from taskengine.projectmode import ProjectMode, UnknownProjectModeOption, InvalidProjectModeOptionValue
 
 
 class DefaultSerializer(Serializer):
@@ -141,6 +139,10 @@ class RequestResource(ModelResource):
                 (self._meta.resource_name, trailing_slash()),
                 self.wrap_view('view_tag'),
                 name='view configuration tag'),
+            url(r'^(?P<resource_name>%s)/project_mode/((?P<step_id>\w[\w/-]*)%s|)$' % \
+                (self._meta.resource_name, trailing_slash()),
+                self.wrap_view('check_project_mode'),
+                name='check project_mode of given step'),
         ]
 
     def get_action_list(self, request, **kwargs):
@@ -179,10 +181,33 @@ class RequestResource(ModelResource):
         if not tag_name:
             return self.create_response(request, {'result': "Empty tag name"})
 
-        # ami_wrapper = AMIWrapper()
-        # tag = ami_wrapper.get_ami_tag(tag_name)
         tag = None
         return self.create_response(request, {'name': tag_name, 'body': tag})
+
+    def check_project_mode(self, request, **kwargs):
+        self.method_check(request, allowed=['get'])
+
+        self.is_authenticated(request)
+        self.throttle_check(request)
+
+        step_id = kwargs['step_id']
+        if not step_id:
+            return self.create_response(request, ProjectMode.get_options())
+
+        try:
+            step = StepExecution.objects.get(id=step_id)
+            project_mode = ProjectMode(step)
+            return self.create_response(request, {'project_mode': project_mode.project_mode_dict,
+                                                  'status': True,
+                                                  'result': None})
+        except ObjectDoesNotExist:
+            return self.create_response(request, {'project_mode': None,
+                                                  'status': False,
+                                                  'result': 'step {0} is not found'})
+        except (UnknownProjectModeOption, InvalidProjectModeOptionValue, Exception) as ex:
+            return self.create_response(request, {'project_mode': None,
+                                                  'status': False,
+                                                  'result': ex.message})
 
 
 class TaskResource(ModelResource):

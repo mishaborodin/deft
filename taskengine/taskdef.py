@@ -12,10 +12,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.template import Context, Template
 from django.utils import timezone
-from django.core.mail import send_mail
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JediDataset, InstalledSW, AuthUser, OpenEnded, ProductionDataset, HashTag, TConfig
+    TTaskRequest, JediDataset, InstalledSW, OpenEnded, ProductionDataset, HashTag, TConfig
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -24,6 +23,7 @@ from taskengine.agisclient import AGISClient
 from deftcore.settings import REQUEST_GRACE_PERIOD
 from deftcore.log import Logger, get_exception_string
 from deftcore.jira import JIRAClient
+from taskengine.projectmode import ProjectMode
 
 logger = Logger.get()
 
@@ -170,128 +170,19 @@ class TaskDefinition(object):
         self.rucio_client = RucioClient()
         self.agis_client = AGISClient()
 
-    def _get_usergroup(self, step):
-        return "%s_%s" % (step.request.provenance, step.request.phys_group)
+    @staticmethod
+    def _get_usergroup(step):
+        return '{0}_{1}'.format(step.request.provenance, step.request.phys_group)
 
-    def _get_project(self, step):
+    @staticmethod
+    def _get_project(step):
         project = step.request.project
         if not project:
             project = TaskDefConstants.DEFAULT_DEBUG_PROJECT_NAME
         return project
 
-    def _parse_project_mode(self, project_mode_string):
-        project_mode_dict = dict()
-        for option in project_mode_string.replace(' ', '').split(";"):
-            if not option:
-                continue
-            if not '=' in option:
-                raise Exception('The project_mode option \"{0}\" has invalid format. '.format(option) +
-                                'Expected format is \"optionName=optionValue\"')
-            project_mode_dict.update({option.split("=")[0].lower(): option.split("=")[1]})
-        return project_mode_dict
-
-    def _get_task_config(self, step):
-        task_config = dict()
-        if step.task_config:
-            content = json.loads(step.task_config)
-            for key in content.keys():
-                if content[key] is None or content[key] == '':
-                    continue
-                task_config.update({key: content[key]})
-        return task_config
-
-    def _set_task_config(self, step, task_config):
-        step.task_config = json.dumps(task_config)
-        step.save(update_fields=['task_config'])
-
-    def _is_cmtconfig_exist(self, cache, cmtconfig):
-        installed_cmtconfig_list = \
-            InstalledSW.objects.filter(cache=cache, cmtconfig=cmtconfig).values_list('cmtconfig', flat=True).distinct()
-        if bool(installed_cmtconfig_list):
-            return True
-        else:
-            agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
-            return cmtconfig in agis_cmtconfig_list
-
-    def _get_cmtconfig_list(self, cache):
-        installed_cmtconfig_list = \
-            InstalledSW.objects.filter(cache=cache).values_list('cmtconfig', flat=True).distinct()
-        agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
-        cmtconfig_list = set(list(installed_cmtconfig_list) + agis_cmtconfig_list)
-        return list(cmtconfig_list)
-
-    def _get_project_mode(self, step, cache=None, use_nightly_release=None):
-        """
-        :param step: object of StepExecution
-        :param cache: string in format 'CacheName-CacheRelease', for example, 'AtlasProduction-19.2.1.2'
-        :return: project_mode dict
-        """
-        project_mode = dict()
-
-        task_config = self._get_task_config(step)
-        if 'project_mode' in task_config.keys():
-            project_mode.update(self._parse_project_mode(task_config['project_mode']))
-
-        skip_cmtconfig_check = False
-        if 'skipCMTConfigCheck'.lower() in project_mode.keys():
-            option_value = str(project_mode['skipCMTConfigCheck'.lower()])
-            if option_value.lower() == 'yes'.lower():
-                skip_cmtconfig_check = True
-
-        cmtconfig = ''
-        if 'cmtconfig' in project_mode.keys():
-            cmtconfig = project_mode['cmtconfig']
-            if cache and not skip_cmtconfig_check:
-                if not self._is_cmtconfig_exist(cache, cmtconfig):
-                    available_cmtconfig_list = self._get_cmtconfig_list(cache)
-                    raise Exception(
-                        'cmtconfig \"%s\" specified by user is not exist in cache \"%s\" (available: %s)' %
-                        (cmtconfig, cache, str(','.join(available_cmtconfig_list)))
-                    )
-
-        if not cmtconfig and use_nightly_release:
-            raise Exception('cmtconfig parameter must be specified in project_mode when nightly release is used')
-
-        if not cmtconfig:
-            project_mode['cmtconfig'] = TaskDefConstants.DEFAULT_PROJECT_MODE['cmtconfig']
-            if cache:
-                cmtconfig_list = self._get_cmtconfig_list(cache)
-                if len(cmtconfig_list) == 1:
-                    project_mode['cmtconfig'] = cmtconfig_list[0]
-                else:
-                    if len(cmtconfig_list) > 1:
-                        value = str(','.join(cmtconfig_list))
-                        raise Exception(
-                            'cmtconfig is not specified but more than one cmtconfig is available ({0}).'.format(value) +
-                            ' The task is rejected'
-                        )
-                    # prodsys1
-                    # ver_parts = step.step_template.swrelease.split('.')
-                    release = cache.split('-')[-1]
-                    ver_parts = release.split('.')
-                    ver = int(ver_parts[0]) * 1000 + int(ver_parts[1]) * 100 + int(ver_parts[2])
-                    if int(ver_parts[0]) <= 13:
-                        project_mode['cmtconfig'] = 'i686-slc3-gcc323-opt'
-                    elif ver < 15603:
-                        project_mode['cmtconfig'] = 'i686-slc4-gcc34-opt'
-                    elif ver < 19003:
-                        project_mode['cmtconfig'] = 'i686-slc5-gcc43-opt'
-                    elif ver < 20100:
-                        project_mode['cmtconfig'] = 'x86_64-slc6-gcc47-opt'
-                    else:
-                        project_mode['cmtconfig'] = 'x86_64-slc6-gcc48-opt'
-                    if not project_mode['cmtconfig'] in cmtconfig_list:
-                        if len(cmtconfig_list) > 0:
-                            project_mode['cmtconfig'] = cmtconfig_list[0]
-                        else:
-                            raise Exception(
-                                'Default cmtconfig \"%s\" is not exist in cache \"%s\" (available: %s)' %
-                                (project_mode['cmtconfig'], cache, str(','.join(cmtconfig_list)))
-                            )
-
-        return project_mode
-
-    def _get_energy(self, step, ctag):
+    @staticmethod
+    def _get_energy(step, ctag):
         energy_ctag = None
         for name in ctag.keys():
             if re.match(r'^(--)?ecmEnergy$', name, re.IGNORECASE):
@@ -302,7 +193,8 @@ class TaskDefinition(object):
         else:
             return energy_req
 
-    def get_step_input_data_name(self, step):
+    @staticmethod
+    def get_step_input_data_name(step):
         if step.slice.input_dataset:
             return step.slice.input_dataset
         elif step.slice.input_data:
@@ -310,7 +202,8 @@ class TaskDefinition(object):
         else:
             return None
 
-    def parse_data_name(self, name):
+    @staticmethod
+    def parse_data_name(name):
         result = re.match(TaskDefConstants.DEFAULT_DATA_NAME_PATTERN, name)
         if not result:
             raise Exception('Invalid data name')
@@ -319,13 +212,15 @@ class TaskDefinition(object):
         data_name_dict.update({'name': name})
         return data_name_dict
 
-    def _get_svn_output(self, svn_command):
+    @staticmethod
+    def _get_svn_output(svn_command):
         svn_args = ['svn']
         svn_args.extend(svn_command)
         process = subprocess.Popen(svn_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         return process.communicate()[0]
 
-    def _get_evgen_input_dict(self, content):
+    @staticmethod
+    def _get_evgen_input_dict(content):
         input_db = csv.DictReader(StringIO.StringIO(content))
         input_dict = dict()
 
@@ -359,7 +254,8 @@ class TaskDefinition(object):
 
         return input_dict
 
-    def _parse_jo_file(self, content):
+    @staticmethod
+    def _parse_jo_file(content):
         lines = list()
         for line in content.splitlines():
             if line.startswith('#'):
@@ -380,7 +276,7 @@ class TaskDefinition(object):
             latest_tag = ''
 
             svn_path = "%s%s%s" % (root_path, latest_tag, evgen_input_path)
-            # FIXME
+
             if input_data_dict['project'].lower() == 'mc14'.lower():
                 svn_path = svn_path.replace('MC14JobOptions', 'MC12JobOptions')
                 path_template = Template("share/MC15Val/{{file_name}}")
@@ -399,7 +295,7 @@ class TaskDefinition(object):
                 Context({'campaign': str(input_data_dict['project']).upper()}, autoescape=False))
 
             path = "%s%s" % (root_path, evgen_input_path)
-            # FIXME
+
             if input_data_dict['project'].lower() == 'mc14'.lower():
                 path = path.replace('MC14JobOptions', 'MC12JobOptions')
                 path_template = Template("share/MC15Val/{{file_name}}")
@@ -563,11 +459,11 @@ class TaskDefinition(object):
                 input_params.update(self._get_evgen_input_files(input_data_dict, energy, use_evgen_otf=use_evgen_otf))
                 job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
                 input_params.update({'jobConfig': job_config})
-                project_mode = self._get_project_mode(step)
-                if 'nEventsPerJob'.lower() in project_mode.keys():
-                    events_per_job = int(project_mode['nEventsPerJob'.lower()])
+                project_mode = ProjectMode(step)
+                if project_mode.nEventsPerJob:
+                    events_per_job = project_mode.nEventsPerJob
                     input_params.update({'nEventsPerJob': events_per_job})
-                    logger.info("Using nEventsPerJob from project_mode: nEventsPerJob={0}".format(events_per_job))
+                    logger.info('Using nEventsPerJob from project_mode: nEventsPerJob={0}'.format(events_per_job))
             else:
                 result = self.rucio_client.get_datasets_and_containers(input_data_name, datasets_contained_only=True)
                 if use_containers and result['containers']:
@@ -587,7 +483,7 @@ class TaskDefinition(object):
                     self._add_input_dataset_name(input_dataset_name, input_params)
         else:
             # not first step - internal input, from previous step
-            task_config = self._get_task_config(step)
+            task_config = ProjectMode.get_task_config(step)
             input_formats = list()
             if 'input_format' in task_config.keys():
                 for format_name in task_config['input_format'].split('.'):
@@ -621,7 +517,8 @@ class TaskDefinition(object):
         name_template = Template(TaskDefConstants.DEFAULT_TASK_NAME_TEMPLATE)
         return name_template.render(Context(input_data_dict, autoescape=False))
 
-    def _construct_output(self, input_data_dict, project, prod_step, ctag_name, data_type, task_id):
+    @staticmethod
+    def _construct_output(input_data_dict, project, prod_step, ctag_name, data_type, task_id):
         version_list = list()
         old_version = input_data_dict['version']
         if old_version:
@@ -652,7 +549,8 @@ class TaskDefinition(object):
             self._add_output_dataset_name(output_dataset_name, output_params)
         return output_params
 
-    def _normalize_parameter_value(self, name, value, sub_steps):
+    @staticmethod
+    def _normalize_parameter_value(name, value, sub_steps):
         if not value:
             return value
 
@@ -661,7 +559,6 @@ class TaskDefinition(object):
         value = value.replace('%0B', ' ').replace('%2B', '+').replace('%9B', '; ').replace('%3B', ';')
         value = value.replace('"', '%8B').replace('%2C', ',')
 
-        # FIXME
         if re.match('^(--)?asetup$', name, re.IGNORECASE) or re.match('^(--)?triggerConfig$', name, re.IGNORECASE):
             return value.replace('%8B', '"').replace('%8C', '"')
 
@@ -691,16 +588,6 @@ class TaskDefinition(object):
                     # remove \\ from end if enclosed string
                     value = '%s"' % value[:-2]
 
-        # if re.match('^(--)?reductionConf', name, re.IGNORECASE):
-        #     enclosed_value = True
-        # elif re.match('^(--)?validationFlags', name, re.IGNORECASE):
-        #     enclosed_value = True
-        # elif re.match('^(--)?athenaopts', name, re.IGNORECASE):
-        #     value = value.decode('string-escape')
-
-        # if re.match('^(--)?asetup', name, re.IGNORECASE):
-        #     enclosed_value = True
-
         # escape all Linux spec chars
         if value.find(' ') >= 0 or value.find('(') >= 0 or value.find('=') >= 0 or value.find('*') >= 0 \
                 or value.find(';') >= 0 or value.find('{') >= 0 or value.find('}') >= 0 or re.match(
@@ -718,19 +605,12 @@ class TaskDefinition(object):
             if sub_step_exists:
                 sub_values = list()
                 sep = ' '
-                # if ',' in value:
-                #     sep = ','
                 for sub_value in value.split(sep):
                     if len(sub_value) >= 2:
                         if sub_value[0:2] == '\\"':
                             sub_value = sub_value[1:]
                         if sub_value[-2:] == '\\"':
                             sub_value = '%s"' % sub_value[:-2]
-                            # sub_step_value = sub_value.split(':', 1)[-1]
-                            # if sub_step_value[0:2] == '\\"' and sub_step_value[-2:] == '\\"':
-                            #     sub_step_value = sub_step_value[1:]
-                            #     sub_step_value = '%s"' % sub_step_value[:-2]
-                            # sub_value = sub_value.split(':')[0] + ':' + sub_step_value
                     sub_values.append(sub_value)
                 value = ' '.join(sub_values)
 
@@ -747,9 +627,6 @@ class TaskDefinition(object):
                     and str(source_dict[key]).lower() != 'none'.lower():
                 if not (isinstance(source_dict[key], str) or isinstance(source_dict[key], unicode)):
                     return source_dict[key]
-                # AMI, newStructure tag
-                # if 'notAKTR' in source_dict.keys() and source_dict['notAKTR']:
-                #     return source_dict[key]
                 if self.ami_client.is_new_ami_tag(source_dict):
                     return source_dict[key]
                 value = re.sub(' +', ' ', source_dict[key])
@@ -787,7 +664,8 @@ class TaskDefinition(object):
         dataset_list = sorted(data_dict['datasets'], reverse=True)
         return dataset_list[0]
 
-    def _get_parameter_name(self, name, source_dict):
+    @staticmethod
+    def _get_parameter_name(name, source_dict):
         param_name = None
         name = name.lower()
         for key in source_dict.keys():
@@ -799,7 +677,8 @@ class TaskDefinition(object):
         else:
             raise Exception("%s parameter is not found" % name)
 
-    def _get_input_output_param_name(self, params, input_type, extended_pattern=False):
+    @staticmethod
+    def _get_input_output_param_name(params, input_type, extended_pattern=False):
         if extended_pattern:
             pattern = r'^(--)?(input|output).*%s.*File$' % input_type
         else:
@@ -819,7 +698,8 @@ class TaskDefinition(object):
                     count += 1
         return order_dict
 
-    def _get_primary_input(self, job_parameters):
+    @staticmethod
+    def _get_primary_input(job_parameters):
         for job_param in job_parameters:
             if not 'param_type' in job_param.keys() or job_param['param_type'].lower() != 'input'.lower():
                 continue
@@ -828,13 +708,13 @@ class TaskDefinition(object):
                 if not result:
                     continue
                 in_type = result.groupdict()['intype']
-                # FIXME: replace to the method of Protocol
                 if in_type.lower() == 'logs'.lower() or re.match(r'^(Low|High)PtMinbias.*$', in_type, re.IGNORECASE):
                     continue
                 return job_param
         return None
 
-    def _get_job_parameter(self, name, job_parameters):
+    @staticmethod
+    def _get_job_parameter(name, job_parameters):
         for job_param in job_parameters:
             if re.match(r"^(--)?%s" % name, job_param['value'], re.IGNORECASE):
                 return job_param
@@ -844,9 +724,7 @@ class TaskDefinition(object):
         if step.request.request_type.lower() == 'MC'.lower():
             number_of_events = int(step.input_events)
             project = self._get_project(step)
-            bunchspacing = None
-            if 'bunchspacing'.lower() in project_mode.keys():
-                bunchspacing = str(project_mode['bunchspacing'.lower()])
+            bunchspacing = project_mode.bunchspacing
             campaign = ':'.join(filter(None, (step.request.campaign, step.request.subcampaign, bunchspacing,)))
             if number_of_events > 0:
                 small_events_numbers = dict()
@@ -862,11 +740,7 @@ class TaskDefinition(object):
                         small_events_threshold = small_events_numbers[pattern]
                         break
                 if number_of_events < small_events_threshold:
-                    force_small_events = False
-                    if 'isSmallEvents'.lower() in project_mode.keys():
-                        option_value = str(project_mode['isSmallEvents'.lower()])
-                        if option_value.lower() == 'yes'.lower():
-                            force_small_events = True
+                    force_small_events = project_mode.isSmallEvents or False
                     if not force_small_events:
                         raise TaskSmallEventsException(number_of_events)
 
@@ -1069,14 +943,7 @@ class TaskDefinition(object):
                 raise WrongCacheVersionUsedException(trf_release, previous_task_trf_release)
 
     def _check_task_blacklisted_input(self, task, project_mode):
-        enabled = False
-
-        if 'preventBlacklistedInput'.lower() in project_mode.keys():
-            option_value = str(project_mode['preventBlacklistedInput'.lower()])
-            if option_value.lower() == 'yes'.lower():
-                enabled = True
-            elif option_value.lower() == 'no'.lower():
-                enabled = False
+        enabled = project_mode.preventBlacklistedInput or False
 
         if not enabled:
             return
@@ -1170,7 +1037,6 @@ class TaskDefinition(object):
         except:
             logger.info('_check_task_input, get_number_files for {0} failed (parent_task_id = {2}): {1}'.format(
                 primary_input['dataset'], get_exception_string(), parent_task_id))
-            # FIXME: move input name to protocol
             task_output_name_suffix = '_tid{0}_00'.format(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % parent_task_id)
             if not str(primary_input['dataset']).endswith(task_output_name_suffix):
                 raise NumberOfFilesUnavailable(primary_input['dataset'], get_exception_string())
@@ -1264,13 +1130,8 @@ class TaskDefinition(object):
             if 'use_real_nevents' in task_existing.keys():
                 raise Exception('Extensions are not allowed if useRealNumEvents is specified')
 
-            # if prod_step.lower() == 'merge'.lower():
             previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
             previous_dsn_no_scope = previous_dsn.split(':')[-1]
-            # result = self.ddm_wrapper.get_datasets_and_containers(input_data_name, datasets_contained_only=True)
-            # datasets_no_scope = [e.split(':')[-1] for e in result['datasets']]
-            # if not previous_dsn_no_scope in datasets_no_scope:
-            #     continue
             current_dsn = primary_input['dataset']
             current_dsn_no_scope = current_dsn.split(':')[-1]
 
@@ -1353,22 +1214,6 @@ class TaskDefinition(object):
                       (step.request.id, step.slice.slice, step.id, task_id, prod_task_existing.status,
                        number_of_input_files_used)
             logger.debug(log_msg)
-            # if prod_task_existing.status in ['finished', 'done']:
-            #     number_of_jobs = int(jedi_task_existing.total_done_jobs or 0)
-            # else:
-            #     number_of_jobs = int(jedi_task_existing.total_req_jobs or 0)
-            # if 'nFilesPerJob' in task_existing:
-            #     number_of_input_files_used += int(task_existing['nFilesPerJob']) * number_of_jobs
-            # elif 'nEventsPerJob' in task_existing and 'nEventsPerInputFile' in task_existing:
-            #     number_of_input_files = \
-            #         int(float(task_existing['nEventsPerJob']) / float(task_existing['nEventsPerInputFile']) * number_of_jobs)
-            #     # if 'mergeSpec' in task_existing or 'esmergeSpec' in task_existing:
-            #     #     number_of_input_files /= 2
-            #     if number_of_input_files == 0:
-            #         number_of_input_files = int(prod_task_existing.step.input_events / task_existing['nEventsPerInputFile'])
-            #     number_of_input_files_used += int(number_of_input_files)
-            # else:
-            #     logger.info("Task Id = %d, number of used files is unknown", prod_task_existing.id)
 
         if number_of_events > 0:
             number_input_files_requested = number_of_events / int(task_config['nEventsPerInputFile'])
@@ -1412,23 +1257,21 @@ class TaskDefinition(object):
         if primary_input_offset:
             primary_input['offset'] = primary_input_offset
 
-    def _get_merge_tag_name(self, step):
-        task_config = self._get_task_config(step)
-        project_mode = self._get_project_mode(step)
+    @staticmethod
+    def _get_merge_tag_name(step):
+        task_config = ProjectMode.get_task_config(step)
         merging_tag_name = ''
         if 'merging_tag' in task_config.keys():
             merging_tag_name = task_config['merging_tag']
         if not merging_tag_name:
-            if 'merging' in project_mode.keys():
-                merging_tag_name = project_mode['merging']
+            merging_tag_name = ProjectMode(step).merging
         return merging_tag_name
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
-        task_config = self._get_task_config(step)
+        task_config = ProjectMode.get_task_config(step)
 
         merging_tag_name = ''
 
-        # FIXME: use _get_merge_tag_name
         if 'merging_tag' in task_config.keys():
             merging_tag_name = task_config['merging_tag']
         if 'nFilesPerMergeJob' in task_config.keys():
@@ -1442,16 +1285,13 @@ class TaskDefinition(object):
             task_proto_dict.update({'merging_number_of_max_files_per_job': merging_number_of_max_files_per_job})
 
         if not merging_tag_name:
-            # get project_mode without valid cmtconfig
-            project_mode = self._get_project_mode(step)
-            if 'merging' in project_mode.keys():
-                merging_tag_name = project_mode['merging']
+            merging_tag_name = ProjectMode(step).merging
 
         if not merging_tag_name:
             logger.debug("[merging] Merging tag name is not specified")
             return
 
-        ctag = self._get_ami_tag_cached(merging_tag_name)  # self.ami_wrapper.get_ami_tag(merging_tag_name)
+        ctag = self._get_ami_tag_cached(merging_tag_name)
 
         if ',' in ctag['transformation']:
             raise Exception("[merging] JEDI does not support tags with multiple transformations")
@@ -1463,16 +1303,12 @@ class TaskDefinition(object):
 
         # proto_fix
         if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
-            # if 'HIST' in output_types:
-            # output_types.remove('HIST')
-            # output_types.append('HIST_MRG')
             if not '--inputHISTFile' in trf_params:
                 trf_params.append('--inputHISTFile')
             if not '--outputHIST_MRGFile' in trf_params:
                 trf_params.remove('--outputHISTFile')
                 trf_params.append('--outputHIST_MRGFile')
         elif trf_name.lower() == 'DAODMerge_tf.py'.lower():
-            # FIXME: use dumpArgs
             input_params = ["--input%sFile" % output_format for output_format in
                             step.step_template.output_formats.split('.')]
             for input_param in input_params:
@@ -1519,8 +1355,7 @@ class TaskDefinition(object):
                 order_dict = self._get_output_params_order(task_proto_dict)
                 for output_type in order_dict:
                     output_internal_type = output_type.split('_')[0]
-                    if (merging_input_type in output_internal_type) or (
-                            output_type == merging_input_type):  # or (output_internal_type in merging_input_type):
+                    if merging_input_type in output_internal_type or output_type == merging_input_type:
                         if step.request.request_type.lower() in ['GROUP'.lower()]:
                             param_dict = {'name': name, 'value': "${TRN_OUTPUT%d/L}" % order_dict[output_type]}
                         else:
@@ -1580,7 +1415,8 @@ class TaskDefinition(object):
         task_proto_dict['merge_spec']['transPath'] = trf_name
         task_proto_dict['merge_spec']['jobParameters'] = merging_job_parameters_str
 
-    def _get_prod_step(self, ctag_name, ctag):
+    @staticmethod
+    def _get_prod_step(ctag_name, ctag):
         prod_step = str(ctag['productionStep']).replace(' ', '')
         if ctag_name[0] in ('a',):
             if 'Reco'.lower() in ctag['transformation'].lower():
@@ -1589,7 +1425,6 @@ class TaskDefinition(object):
                 prod_step = 'simul'
         return prod_step
 
-    # FIXME: move to datamgmt
     def _get_ami_tag_cached(self, tag_name):
         try:
             ctag = self._tag_cache.get(tag_name)
@@ -1601,7 +1436,8 @@ class TaskDefinition(object):
             self._tag_cache.update({tag_name: ctag})
         return ctag
 
-    def _check_task_events_consistency(self, task_config):
+    @staticmethod
+    def _check_task_events_consistency(task_config):
         n_events_input_file = int(task_config['nEventsPerInputFile'])
         n_events_job = int(task_config['nEventsPerJob'])
         if (n_events_input_file % n_events_job == 0) or (n_events_job % n_events_input_file == 0):
@@ -1656,7 +1492,7 @@ class TaskDefinition(object):
             ctag = self._get_ami_tag_cached(ctag_name)
             energy_gev = self._get_energy(step, ctag)
             prod_step = self._get_prod_step(ctag_name, ctag)
-            task_config = self._get_task_config(step)
+            task_config = ProjectMode.get_task_config(step)
             memory = TaskDefConstants.DEFAULT_MEMORY
             base_memory = TaskDefConstants.DEFAULT_MEMORY_BASE
 
@@ -1667,7 +1503,6 @@ class TaskDefinition(object):
                 if re.match(key, trf_name, re.IGNORECASE):
                     trf_options.update(Protocol.TRF_OPTIONS[key])
 
-            # FIXME: tzero tags support
             if ctag_name[0] in ('f', 'm', 'v', 'k'):
                 tzero_tag = self.ami_client.get_ami_tag_tzero(ctag_name)
                 if type(tzero_tag) == unicode:
@@ -1675,8 +1510,6 @@ class TaskDefinition(object):
                 tzero_outputs = tzero_tag['transformation']['args']['outputs']
                 if type(tzero_outputs) == unicode:
                     tzero_outputs = ast.literal_eval(tzero_outputs)
-                # FIXME: implement updating of step_template
-                # output_types = [tzero_outputs[key]['dstype'] for key in tzero_outputs.keys()]
                 try:
                     self.ami_client.apply_phconfig_ami_tag(ctag)
                 except SyntaxError:
@@ -1705,33 +1538,26 @@ class TaskDefinition(object):
                 version_timestamp = release_part[release_part.index('-') + 1:]
                 use_nightly_release = True
 
-            project_mode = self._get_project_mode(step,
-                                                  "%s-%s" % (trf_cache, trf_release),
-                                                  use_nightly_release=use_nightly_release)
+            project_mode = ProjectMode(step, '{0}-{1}'.format(trf_cache, trf_release),
+                                       use_nightly_release=use_nightly_release)
 
             change_output_type_dict = dict()
             try:
-                if 'changeType'.lower() in project_mode.keys():
-                    for pair in str(project_mode['changeType'.lower()]).split(','):
+                if project_mode.changeType:
+                    for pair in project_mode.changeType.split(','):
                         change_output_type_dict[pair.split(':')[0]] = pair.split(':')[-1]
             except Exception as ex:
                 raise Exception('changeType has invalid format: {0}'.format(str(ex)))
 
             index_consistent_param_list = list()
             try:
-                if 'indexConsistent'.lower() in project_mode.keys():
-                    for name in str(project_mode['indexConsistent'.lower()]).split(','):
+                if project_mode.indexConsistent:
+                    for name in project_mode.indexConsistent.split(','):
                         index_consistent_param_list.append(name)
             except Exception as ex:
                 raise Exception('indexConsistent has invalid format: {0}'.format(str(ex)))
 
-            skip_prod_step_check = False
-            if 'skipProdStepCheck'.lower() in project_mode.keys():
-                option_value = str(project_mode['skipProdStepCheck'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    skip_prod_step_check = True
-                elif option_value.lower() == 'no'.lower():
-                    skip_prod_step_check = False
+            skip_prod_step_check = project_mode.skipProdStepCheck or False
 
             if 'merge'.lower() in step.step_template.step.lower() and not 'merge' in prod_step.lower():
                 if not skip_prod_step_check:
@@ -1745,9 +1571,7 @@ class TaskDefinition(object):
                 logger.exception('Getting AMI types failed: {0}'.format(str(ex)))
 
             if ami_types:
-                # FIXME: support for EventIndex pseudo format
                 ami_types.append('EI')
-                # FIXME: OverlayTest
                 ami_types.append('BS_TRIGSKIM')
                 for output_type in output_types:
                     if not output_type in ami_types:
@@ -1758,7 +1582,7 @@ class TaskDefinition(object):
             trf_dict = dict()
             trf_dict.update({trf_name: [trf_cache, trf_release, trf_release_base]})
 
-            force_ami = self.ami_client.is_new_ami_tag(ctag)  # False
+            force_ami = self.ami_client.is_new_ami_tag(ctag)
 
             trf_params = list()
             trf_sub_steps = list()
@@ -1769,22 +1593,8 @@ class TaskDefinition(object):
             if not trf_params:
                 raise Exception("AMI: list of transformation parameters is empty")
 
-            skip_evgen_check = False
-            if 'skipEvgenCheck'.lower() in project_mode.keys():
-                option_value = str(project_mode['skipEvgenCheck'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    skip_evgen_check = True
-                elif option_value.lower() == 'no'.lower():
-                    skip_evgen_check = False
-
-            use_real_nevents = None
-            if 'useRealNumEvents'.lower() in project_mode.keys():
-                option_value = str(project_mode['useRealNumEvents'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_real_nevents = True
-                    skip_evgen_check = True
-                elif option_value.lower() == 'no'.lower():
-                    use_real_nevents = None
+            skip_evgen_check = project_mode.skipEvgenCheck or False
+            use_real_nevents = project_mode.useRealNumEvents
 
             use_containers = False
             if step.request.request_type.lower() == 'MC'.lower():
@@ -1804,11 +1614,11 @@ class TaskDefinition(object):
                                                                        use_evgen_otf=True)
                             if 'nEventsPerJob' in evgen_input_params.keys():
                                 evgen_events_per_job = int(evgen_input_params['nEventsPerJob'])
-                                evgen_step_task_config = self._get_task_config(evgen_step)
+                                evgen_step_task_config = ProjectMode.get_task_config(evgen_step)
                                 evgen_step_task_config.update({'nEventsPerJob': evgen_events_per_job})
-                                self._set_task_config(evgen_step, evgen_step_task_config)
+                                ProjectMode.set_task_config(evgen_step, evgen_step_task_config)
                                 task_config.update({'nEventsPerInputFile': evgen_events_per_job})
-                                self._set_task_config(step, task_config)
+                                ProjectMode.set_task_config(step, task_config)
                         except Exception as ex:
                             logger.warning("Checking the parent evgen step failed: %s" % str(ex))
 
@@ -1819,18 +1629,17 @@ class TaskDefinition(object):
                 is_parent_approved = \
                     parent_step.status.lower() == self.protocol.STEP_STATUS[StepStatus.APPROVED].lower()
                 if parent_step.id != step.id and not is_parent_merge and is_parent_approved:
-                    parent_task_config = self._get_task_config(parent_step)
+                    parent_task_config = ProjectMode.get_task_config(parent_step)
                     if 'nEventsPerJob' in parent_task_config.keys():
                         n_events_job_parent = int(parent_task_config['nEventsPerJob'])
                         if n_events_input_file != n_events_job_parent:
-                            if 'nEventsPerInputFile'.lower() in project_mode.keys():
+                            if project_mode.nEventsPerInputFile:
                                 pass
                             else:
                                 raise Exception(
-                                    "The task is rejected because of inconsistency. " +
-                                    "nEventsPerInputFile=%d does not match to nEventsPerJob=%d of the parent" %
-                                    (n_events_input_file, n_events_job_parent)
-                                )
+                                    'The task is rejected because of inconsistency. ' +
+                                    'nEventsPerInputFile=%d does not match to nEventsPerJob=%d of the parent'.format(
+                                        n_events_input_file, n_events_job_parent))
 
             overlay_production = False
             train_production = False
@@ -1841,140 +1650,85 @@ class TaskDefinition(object):
                         train_production = True
                         break
 
-            use_evgen_otf = False
-            if 'isOTF'.lower() in project_mode.keys():
-                option_value = str(project_mode['isOTF'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_evgen_otf = True
-                elif option_value.lower() == 'no'.lower():
-                    use_evgen_otf = False
-
-            use_no_output = False
-            if 'noOutput'.lower() in project_mode.keys():
-                option_value = str(project_mode['noOutput'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_no_output = True
-                elif option_value.lower() == 'no'.lower():
-                    use_no_output = False
-
-            leave_log = True
-            if 'leaveLog'.lower() in project_mode.keys():
-                option_value = str(project_mode['leaveLog'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    leave_log = True
-                elif option_value.lower() == 'no'.lower():
-                    leave_log = None
+            use_evgen_otf = project_mode.isOTF or False
+            use_no_output = project_mode.noOutput or False
+            leave_log = project_mode.leaveLog or True
 
             if step.request.request_type.lower() == 'MC'.lower():
                 if prod_step.lower() == 'simul'.lower():
                     leave_log = True
 
-            if 'mergeCont'.lower() in project_mode.keys():
-                option_value = str(project_mode['mergeCont'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_containers = True
+            if project_mode.mergeCont:
+                use_containers = True
 
-            bunchspacing = None
-            if 'bunchspacing'.lower() in project_mode.keys():
-                bunchspacing = str(project_mode['bunchspacing'.lower()])
+            bunchspacing = project_mode.bunchspacing
+            max_events_forced = project_mode.maxEvents
 
-            max_events_forced = None
-            if 'maxEvents'.lower() in project_mode.keys():
-                max_events_forced = int(project_mode['maxEvents'.lower()])
+            if project_mode.fixedMaxEvents:
+                input_data_name = step.slice.input_data
+                input_data_dict = self.parse_data_name(input_data_name)
+                params = self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)
+                if 'nEventsPerJob' in params:
+                    max_events_forced = params['nEventsPerJob']
+                else:
+                    raise Exception(
+                        'JO file {0} does not contain evgenConfig.minevents definition. '.format(input_data_name) +
+                        'fixedMaxEvents option cannot be used. The task is rejected')
 
-            if 'fixedMaxEvents'.lower() in project_mode.keys():
-                option_value = str(project_mode['fixedMaxEvents'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    input_data_name = step.slice.input_data
-                    input_data_dict = self.parse_data_name(input_data_name)
-                    params = self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)
-                    if 'nEventsPerJob' in params:
-                        max_events_forced = params['nEventsPerJob']
-                    else:
-                        raise Exception(
-                            'JO file {0} does not contain evgenConfig.minevents definition. '.format(input_data_name) +
-                            'fixedMaxEvents option cannot be used. The task is rejected')
+            skip_events_forced = project_mode.skipEvents
 
-            skip_events_forced = None
-            if 'skipEvents'.lower() in project_mode.keys():
-                skip_events_forced = int(project_mode['skipEvents'.lower()])
-
-            if 'nEventsPerRange'.lower() in project_mode.keys():
-                task_config.update({'nEventsPerRange': int(project_mode['nEventsPerRange'.lower()])})
+            if project_mode.nEventsPerRange:
+                task_config.update({'nEventsPerRange': project_mode.nEventsPerRange})
 
             allow_no_output_patterns = list()
             try:
-                if 'allowNoOutput'.lower() in project_mode.keys():
-                    for pattern in str(project_mode['allowNoOutput'.lower()]).split(','):
+                if project_mode.allowNoOutput:
+                    for pattern in project_mode.allowNoOutput.split(','):
                         allow_no_output_patterns.append(pattern)
             except Exception as ex:
                 logger.exception("allowNoOutput has invalid format: %s" % str(ex))
 
             hidden_output_patterns = list()
             try:
-                if 'hiddenOutput'.lower() in project_mode.keys():
-                    for pattern in str(project_mode['hiddenOutput'.lower()]).split(','):
+                if project_mode.hiddenOutput:
+                    for pattern in project_mode.hiddenOutput.split(','):
                         hidden_output_patterns.append(pattern)
             except Exception as ex:
                 logger.exception("hiddenOutput has invalid format: %s" % str(ex))
 
-            output_ratio = 0
-            if 'outputRatio'.lower() in project_mode.keys():
-                output_ratio = int(project_mode['outputRatio'.lower()])
+            output_ratio = project_mode.outputRatio or 0
 
             ignore_trf_params = list()
             try:
-                if 'ignoreTrfParams'.lower() in project_mode.keys():
-                    for param in str(project_mode['ignoreTrfParams'.lower()]).split(','):
+                if project_mode.ignoreTrfParams:
+                    for param in project_mode.ignoreTrfParams.split(','):
                         ignore_trf_params.append(param)
             except Exception as ex:
                 logger.exception("ignoreTrfParams has invalid format: %s" % str(ex))
 
             empty_trf_params = list()
             try:
-                if 'emptyTrfParams'.lower() in project_mode.keys():
-                    for param in str(project_mode['emptyTrfParams'.lower()]).split(','):
+                if project_mode.emptyTrfParams:
+                    for param in project_mode.emptyTrfParams.split(','):
                         empty_trf_params.append(param)
             except Exception as ex:
                 logger.exception("emptyTrfParams has invalid format: %s" % str(ex))
 
-            use_dataset_name = None
-            if 'useDatasetName'.lower() in project_mode.keys():
-                option_value = str(project_mode['useDatasetName'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_dataset_name = True
-
-            use_container_name = None
-            if 'useContainerName'.lower() in project_mode.keys():
-                option_value = str(project_mode['useContainerName'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_container_name = True
-
-            use_direct_io = None
-            if 'useDirectIo'.lower() in project_mode.keys():
-                option_value = str(project_mode['useDirectIo'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_direct_io = True
-
-            task_common_offset = None
-            if 'commonOffset'.lower() in project_mode.keys():
-                task_common_offset = project_mode['commonOffset'.lower()]
+            use_dataset_name = project_mode.useDatasetName
+            use_container_name = project_mode.useContainerName
+            use_direct_io = project_mode.useDirectIo
+            task_common_offset = project_mode.commonOffset
 
             env_params_dict = dict()
             try:
-                if 'env'.lower() in project_mode.keys():
-                    for pair in str(project_mode['env'.lower()]).split(','):
+                if project_mode.env:
+                    for pair in project_mode.env.split(','):
                         env_params_dict[pair.split(':')[0]] = pair.split(':')[-1]
             except Exception as ex:
                 logger.exception("env parameter has invalid format: %s" % str(ex))
 
-            secondary_input_offset = None
-            if 'secondaryInputOffset'.lower() in project_mode.keys():
-                secondary_input_offset = int(project_mode['secondaryInputOffset'.lower()])
-
-            ei_output_filename = None
-            if 'outputEIFile'.lower() in project_mode.keys():
-                ei_output_filename = str(project_mode['outputEIFile'.lower()])
+            secondary_input_offset = project_mode.secondaryInputOffset
+            ei_output_filename = project_mode.outputEIFile
 
             if input_dataset:
                 step.slice.input_dataset = input_dataset
@@ -2033,10 +1787,10 @@ class TaskDefinition(object):
                     safety_factor = 0.1
 
                     efficiency = float(task_config.get('evntFilterEff', efficiency))
-                    efficiency = float(project_mode.get('evntFilterEff'.lower(), efficiency))
+                    efficiency = float(project_mode.evntFilterEff or efficiency)
 
                     safety_factor = float(task_config.get('evntSafetyFactor', safety_factor))
-                    safety_factor = float(project_mode.get('evntSafetyFactor'.lower(), safety_factor))
+                    safety_factor = float(project_mode.evntSafetyFactor or safety_factor)
 
                     input_data_name = step.slice.input_data
                     input_data_dict = self.parse_data_name(input_data_name)
@@ -2051,7 +1805,7 @@ class TaskDefinition(object):
                     ignore_trf_params.append('inputEVNTFile')
 
                     min_events = max_events_forced
-                    project_mode['nEventsPerInputFile'.lower()] = min_events
+                    project_mode.nEventsPerInputFile = min_events
 
                     if not 'nEventsPerInputFile' in task_config.keys():
                         input_name = input_params[input_params.keys()[0]][0]
@@ -2084,7 +1838,7 @@ class TaskDefinition(object):
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = input_params.get('nEventsPerJob', None)
                     if min_events:
-                        project_mode['nEventsPerInputFile'.lower()] = min_events
+                        project_mode.nEventsPerInputFile = min_events
 
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
                         number_files = number_of_events * number_files_per_job / min_events
@@ -2103,25 +1857,18 @@ class TaskDefinition(object):
                             use_bs_rdo = self._get_parameter_value('prodSysBSRDO', ctag)
                             logger.info("use_bs_rdo = %s" % str(use_bs_rdo))
                             if 'RAW' in output_types or use_bs_rdo:
-                                input_params['inputBS_RDOFile'] = input_params[input_param_name]  # ['inputRAWFile']
+                                input_params['inputBS_RDOFile'] = input_params[input_param_name]
                                 trf_params.remove('--inputBSFile')
                             else:
-                                input_params['inputBSFile'] = input_params[input_param_name]  # ['inputRAWFile']
+                                input_params['inputBSFile'] = input_params[input_param_name]
                                 if '--inputBS_RDOFile' in trf_params:
                                     trf_params.remove('--inputBS_RDOFile')
                         break
                 if 'athenaopts' in ctag.keys() and ctag_name == 'r6395':
                     ctag[
                         'athenaopts'] = " -c \"import os;os.unsetenv('FRONTIER_SERVER');rerunLVL1=True\" -J TrigConf::HLTJobOptionsSvc --use-database --db-type Coral --db-server TRIGGERDBREPR --db-smkey 598 --db-hltpskey 401 --db-extra \"{'lvl1key': 82}\" "
-            # FIXME
-            # elif trf_name.lower() in [e.lower() for e in ['OverlayChain_tf.py']]:
-            #     trf_options.update({'separator': ' '})
-            #     for input_tag_key in [e for e in ctag.keys() if re.match(r'^(--)?input.*File$', e, re.IGNORECASE)]:
-            #         input_name = self._get_parameter_value(input_tag_key, ctag)
-            #         self._add_input_dataset_name(input_name, input_params)
             elif trf_name.lower() == 'POOLtoEI_tf.py'.lower():
                 use_no_output = True
-                # FIXME
                 for key in input_params.keys():
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         input_params['inputPOOLFile'] = input_params[key]
@@ -2130,7 +1877,6 @@ class TaskDefinition(object):
                 param_name = 'inputLogsFile'
                 if not param_name in ignore_trf_params:
                     ignore_trf_params.append(param_name)
-            # FIXME: OverlayTest
             elif trf_name.lower() == 'BSOverlayFilter_tf.py'.lower():
                 overlay_production = True
                 for key in input_params.keys():
@@ -2141,8 +1887,6 @@ class TaskDefinition(object):
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         input_params['inputBSCONFIGFile'] = input_params[key]
                         del input_params[key]
-            # elif trf_name.lower() == 'OverlayChain_tf.py'.lower():
-            #     overlay_production = True
 
             input_data_name = None
             skip_check_input = False
@@ -2180,7 +1924,6 @@ class TaskDefinition(object):
                 raise Exception("The project 'data' is invalid for MC inputs")
 
             taskname = self._construct_taskname(input_data_name, project, prod_step, ctag_name)
-            # FIXME
             task_proto_id = self.task_reg.register_task_id()
 
             if 'EVNT' in output_types and prod_step.lower() == 'evgen'.lower():
@@ -2237,7 +1980,7 @@ class TaskDefinition(object):
 
             if 'nEventsPerJob' in input_params.keys():
                 task_config.update({'nEventsPerJob': int(input_params['nEventsPerJob'])})
-                self._set_task_config(step, task_config)
+                ProjectMode.set_task_config(step, task_config)
 
             random_seed_offset = 0
             first_event_offset = 0
@@ -2265,7 +2008,7 @@ class TaskDefinition(object):
                 if evgen_number_input_files == 1:
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
-                    self._set_task_config(step, task_config)
+                    ProjectMode.set_task_config(step, task_config)
                     random_seed_offset = self._get_number_events_processed(step) / events_per_job
                     first_event_offset = random_seed_offset * events_per_job
                     skip_check_input = True
@@ -2286,32 +2029,9 @@ class TaskDefinition(object):
                     skip_check_input_ne = True
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
-                    self._set_task_config(step, task_config)
+                    ProjectMode.set_task_config(step, task_config)
                     random_seed_offset = self._get_number_events_processed(step) / events_per_job
                     first_event_offset = random_seed_offset * events_per_job
-                    # # FIXME: replace by _get_number_events_processed
-                    # offset = 0
-                    # ps1_task_list = TTaskRequest.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete']),
-                    #                                             project=step.request.project,
-                    #                                             inputdataset=input_data_name,
-                    #                                             ctag=step.step_template.ctag,
-                    #                                             formats=step.step_template.output_formats)
-                    # for ps1_task in ps1_task_list:
-                    #     offset += int(ps1_task.total_req_jobs or 0)
-                    #
-                    # ps2_task_list = ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete']),
-                    #                                               project=step.request.project,
-                    #                                               inputdataset=input_data_name,
-                    #                                               step__step_template__ctag=step.step_template.ctag,
-                    #                                               step__step_template__output_formats=step.step_template.output_formats)
-                    # for ps2_task in ps2_task_list:
-                    #     total_req_jobs = int(ps2_task.total_req_jobs or 0)
-                    #     if not total_req_jobs:
-                    #         events_per_job = int(task_config['nEventsPerJob'])
-                    #         total_req_jobs = number_of_events / events_per_job
-                    #     offset += total_req_jobs
-                    #
-                    # random_seed_offset = offset
 
                 if 'nEventsPerJob' in task_config.keys() and number_of_events > 0:
                     evgen_number_jobs = number_of_events / int(task_config['nEventsPerJob'])
@@ -2319,7 +2039,7 @@ class TaskDefinition(object):
                         skip_scout_jobs = True
 
             if 'nEventsPerInputFile' in task_config.keys() and 'nEventsPerJob' in task_config.keys() and \
-                    (not skip_check_input_ne) and not 'nEventsPerInputFile'.lower() in project_mode.keys():
+                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile:
                 self._check_task_events_consistency(task_config)
 
             if train_production:
@@ -2327,10 +2047,6 @@ class TaskDefinition(object):
                 for output_type in output_types[:]:
                     if output_type.lower().startswith('DAOD_'.lower()):
                         reduction_conf.append(output_type.split('_')[-1])
-                        # reversed_output_type = '_'.join(output_type.split('_')[::-1])
-                        # output_types.remove(output_type)
-                        # output_types.append(reversed_output_type)
-                        # output_param_name = "--output{0}File".format(reversed_output_type)
                         output_param_name = "--output{0}File".format(output_type)
                         if not output_param_name in trf_params:
                             trf_params.append(output_param_name)
@@ -2341,9 +2057,6 @@ class TaskDefinition(object):
 
             # proto_fix
             if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
-                # if 'HIST' in output_types:
-                # output_types.remove('HIST')
-                # output_types.append('HIST_MRG')
                 if not '--inputHISTFile' in trf_params:
                     trf_params.append('--inputHISTFile')
                 if not '--outputHIST_MRGFile' in trf_params:
@@ -2404,15 +2117,10 @@ class TaskDefinition(object):
                 except:
                     pass
 
-            # FIXME
-            # primary_input_offset = 0
-            if 'primaryInputOffset'.lower() in project_mode.keys():
-                primary_input_offset = int(project_mode['primaryInputOffset'.lower()])
-            if 'randomSeedOffset'.lower() in project_mode.keys():
-                random_seed_offset = int(project_mode['randomSeedOffset'.lower()])
-
-            # if not len(trf_params):
-            #     raise Exception("List of transformation parameters is empty")
+            if project_mode.primaryInputOffset is not None:
+                primary_input_offset = project_mode.primaryInputOffset
+            if project_mode.randomSeedOffset is not None:
+                random_seed_offset = project_mode.randomSeedOffset
 
             random_seed_proto_key = TaskParamName.RANDOM_SEED
             if step.request.request_type.lower() == 'MC'.lower():
@@ -2458,8 +2166,6 @@ class TaskDefinition(object):
                                     trf_params.append(extra_param)
                     break
 
-            # FIXME
-            # BS (byte stream) - for all *RAW* (DRAW, RAW, DRAW_ZEE, etc.) [1]
             name = self._get_input_output_param_name(input_params, 'RAW')
             if not name:
                 name = self._get_input_output_param_name(input_params, 'DRAW')
@@ -2467,7 +2173,6 @@ class TaskDefinition(object):
                 input_bs_type = 'inputBSFile'
                 if not input_bs_type in input_params.keys():
                     input_params[input_bs_type] = list()
-                # input_params[input_bs_type].extend(input_params[name])
                 for input_param_value in input_params[name]:
                     if not input_param_value in input_params[input_bs_type]:
                         input_params[input_bs_type].append(input_param_value)
@@ -2522,7 +2227,7 @@ class TaskDefinition(object):
                 elif re.match(r'^(--)?DBRelease$', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        project_mode['ipConnectivity'.lower()] = 'http'
+                        project_mode.ipConnectivity = 'http'
                         continue
                     if not re.match(r'^\d+(\.\d+)*$', param_value):
                         if param_value.lower() == 'latest'.lower():
@@ -2576,7 +2281,7 @@ class TaskDefinition(object):
                         param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         if ('nEventsPerJob' in task_config.keys() or 'nEventsPerRange' in task_config.keys() or
-                            'tgtNumEventsPerJob'.lower() in project_mode.keys()) and \
+                            project_mode.tgtNumEventsPerJob) and \
                                 ('nEventsPerInputFile' in task_config.keys() or use_real_nevents):
                             param_dict = {'name': name}
                             param_dict.update(trf_options)
@@ -2619,7 +2324,7 @@ class TaskDefinition(object):
                         param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         if ('nEventsPerJob' in task_config.keys() or 'nEventsPerRange' in task_config.keys() or
-                            'tgtNumEventsPerJob'.lower() in project_mode.keys()) and \
+                            project_mode.tgtNumEventsPerJob) and \
                                 ('nEventsPerInputFile' in task_config.keys() or use_real_nevents):
                             param_dict = {'name': name}
                             param_dict.update(trf_options)
@@ -2638,7 +2343,7 @@ class TaskDefinition(object):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         if ('nEventsPerJob' in task_config.keys() or 'nEventsPerRange' in task_config.keys() or
-                            'tgtNumEventsPerJob'.lower() in project_mode.keys()) and \
+                            project_mode.tgtNumEventsPerJob) and \
                                 ('nEventsPerInputFile' in task_config.keys() or use_real_nevents):
                             param_dict = {'name': name, 'offset': 0}
                             if prod_step.lower() == 'evgen'.lower():
@@ -2657,7 +2362,6 @@ class TaskDefinition(object):
                     )
                 elif re.match('^(--)?extraParameter$', name, re.IGNORECASE):
                     continue
-                # FIXME: OverlayTest
                 elif re.match('^(--)?input(Filter|VertexPos)File$', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
@@ -2694,17 +2398,16 @@ class TaskDefinition(object):
                             param_value = '%s/' % param_value
                     param_dict = {'name': name, 'dataset': param_value}
                     param_dict.update(trf_options)
-                    if 'eventRatio'.lower() in project_mode.keys():
-                        event_ratio = float(project_mode['eventRatio'.lower()]) \
-                            if '.' in str(project_mode['eventRatio'.lower()]) else int(
-                            project_mode['eventRatio'.lower()])
+                    if project_mode.eventRatio:
+                        event_ratio = project_mode.eventRatio \
+                            if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
                         param_dict.update({'event_ratio': event_ratio})
                     second_input_param = \
                         self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
                     n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
-                    if 'npileup' in project_mode.keys():
-                        n_pileup = float(project_mode['npileup']) \
-                            if '.' in str(project_mode['npileup']) else int(project_mode['npileup'])
+                    if project_mode.npileup:
+                        n_pileup = project_mode.npileup \
+                            if '.' in str(project_mode.npileup) else int(project_mode.npileup)
                     second_input_param['ratio'] = n_pileup
                     if secondary_input_offset:
                         second_input_param['offset'] = secondary_input_offset
@@ -2723,30 +2426,25 @@ class TaskDefinition(object):
                     if param_value[-1] != '/' and (not '_tid' in param_value):
                         param_value = '%s/' % param_value
                     postfix = ''
-                    # if name.lower().startswith('Low'.lower()):
                     if 'Low'.lower() in name.lower():
                         postfix = '_LOW'
-                    # elif name.lower().startswith('High'.lower()):
                     elif 'High'.lower() in name.lower():
                         postfix = '_HIGH'
                     param_dict = {'name': param_name, 'dataset': param_value, 'postfix': postfix}
                     param_dict.update(trf_options)
-                    if 'eventRatio'.lower() in project_mode.keys():
-                        event_ratio = float(project_mode['eventRatio'.lower()]) \
-                            if '.' in str(project_mode['eventRatio'.lower()]) else int(
-                            project_mode['eventRatio'.lower()])
+                    if project_mode.eventRatio:
+                        event_ratio = project_mode.eventRatio \
+                            if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
                         param_dict.update({'event_ratio': event_ratio})
                     if postfix == '_LOW':
-                        if 'eventRatioLow'.lower() in project_mode.keys():
-                            event_ratio = float(project_mode['eventRatioLow'.lower()]) \
-                                if '.' in str(project_mode['eventRatioLow'.lower()]) else int(
-                                project_mode['eventRatioLow'.lower()])
+                        if project_mode.eventRatioLow:
+                            event_ratio = project_mode.eventRatioLow \
+                                if '.' in str(project_mode.eventRatioLow) else int(project_mode.eventRatioLow)
                             param_dict.update({'event_ratio': event_ratio})
                     elif postfix == '_HIGH':
-                        if 'eventRatioHigh'.lower() in project_mode.keys():
-                            event_ratio = float(project_mode['eventRatioHigh'.lower()]) \
-                                if '.' in str(project_mode['eventRatioHigh'.lower()]) else int(
-                                project_mode['eventRatioHigh'.lower()])
+                        if project_mode.eventRatioHigh:
+                            event_ratio = project_mode.eventRatioHigh \
+                                if '.' in str(project_mode.eventRatioHigh) else int(project_mode.eventRatioHigh)
                             param_dict.update({'event_ratio': event_ratio})
                     if 'Cavern'.lower() in name.lower():
                         second_input_param = self.protocol.render_param(TaskParamName.SECONDARY_INPUT_CAVERN,
@@ -2755,16 +2453,17 @@ class TaskDefinition(object):
                         second_input_param = self.protocol.render_param(TaskParamName.SECONDARY_INPUT_MINBIAS,
                                                                         param_dict)
                     n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
-                    if 'npileup' in project_mode.keys():
-                        n_pileup = int(project_mode['npileup'])
+                    if project_mode.npileup:
+                        n_pileup = project_mode.npileup \
+                            if '.' in str(project_mode.npileup) else int(project_mode.npileup)
                     if postfix == '_LOW':
-                        if 'npileuplow' in project_mode.keys():
-                            n_pileup = float(project_mode['npileuplow']) \
-                                if '.' in str(project_mode['npileuplow']) else int(project_mode['npileuplow'])
+                        if project_mode.npileuplow:
+                            n_pileup = project_mode.npileuplow \
+                                if '.' in str(project_mode.npileuplow) else int(project_mode.npileuplow)
                     elif postfix == '_HIGH':
-                        if 'npileuphigh' in project_mode.keys():
-                            n_pileup = float(project_mode['npileuphigh']) \
-                                if '.' in str(project_mode['npileuphigh']) else int(project_mode['npileuphigh'])
+                        if project_mode.npileuphigh:
+                            n_pileup = project_mode.npileuphigh \
+                                if '.' in str(project_mode.npileuphigh) else int(project_mode.npileuphigh)
                     second_input_param['ratio'] = n_pileup
                     if secondary_input_offset:
                         second_input_param['offset'] = secondary_input_offset
@@ -2866,9 +2565,6 @@ class TaskDefinition(object):
                         param_name = self._get_input_output_param_name(output_params, 'RAW')
                         if not param_name:
                             continue
-                            # param_name = self._get_input_output_param_name(output_params, 'DRAW')
-                            # if not param_name:
-                            #     continue
                     elif re.match(r'^(--)?outputAODFile$', name, re.IGNORECASE) and 'AOD'.lower() in ','.join(
                             [e.lower() for e in output_params.keys()]):
                         if train_production:
@@ -2909,7 +2605,6 @@ class TaskDefinition(object):
                     proto_key = TaskParamName.OUTPUT
                     if train_production and output_data_type.split('_')[0] == 'DAOD':
                         proto_key = TaskParamName.TRAIN_OUTPUT
-                    # FIXME: OverlayTest
                     elif re.match(r'^(--)?outputTXT_EVENTIDFile$', name, re.IGNORECASE):
                         proto_key = TaskParamName.TXT_EVENTID_OUTPUT
                     elif re.match(r'^(--)?outputTXT.*File$', name, re.IGNORECASE):
@@ -2923,11 +2618,10 @@ class TaskDefinition(object):
                         arch_param = self.protocol.render_param(arch_proto_key, arch_param_dict)
                         job_parameters.append(arch_param)
                     output_param = self.protocol.render_param(proto_key, param_dict)
-                    if 'spacetoken' in project_mode.keys():
-                        output_param['token'] = project_mode['spacetoken']
+                    if project_mode.spacetoken is not None:
+                        output_param['token'] = project_mode.spacetoken
                     if 'token' in task_config.keys():
                         output_param['token'] = task_config['token']
-                    # output_param['destination'] = 'UKI-NORTHGRID-LIV-HEP_SL6'
                     if train_production and output_data_type.split('_')[0] == 'DAOD':
                         output_param['hidden'] = True
                     if is_not_transient_output:
@@ -3083,14 +2777,6 @@ class TaskDefinition(object):
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
             elif trf_name.lower() == 'Trig_reco_tf.py'.lower() or trf_name.lower() == 'TrigMT_reco_tf.py'.lower():
-                # FIXME: support for HLT reprocessing
-                # if not 'RAW' in [e.lower() for e in output_params.keys()]:
-                # if not 'RAW' in output_types:
-                #     param_dict = {'name': '--outputBSFile', 'value': 'temp.BS'}
-                #     param_dict.update(trf_options)
-                #     job_parameters.append(
-                #         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
-                #     )
                 for job_param in job_parameters[:]:
                     if re.match('^(--)?jobNumber$', job_param['value'], re.IGNORECASE):
                         job_parameters.remove(job_param)
@@ -3117,7 +2803,7 @@ class TaskDefinition(object):
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
 
-            if 'reprocessing' in project_mode.keys() or (step.request.phys_group.lower() == 'REPR'.lower()):
+            if project_mode.reprocessing or (step.request.phys_group.lower() == 'REPR'.lower()):
                 task_type = 'reprocessing'
             else:
                 task_type = prod_step
@@ -3147,7 +2833,7 @@ class TaskDefinition(object):
                 'trans_uses_prefix': trans_uses_prefix,
                 'job_params': job_parameters,
                 'log': log_param,
-                'architecture': project_mode['cmtconfig'],
+                'architecture': project_mode.cmtconfig,
                 'type': task_type,
                 'taskname': taskname,
                 'priority': priority,
@@ -3160,7 +2846,7 @@ class TaskDefinition(object):
                 'no_wait_parent': True,
                 'max_attempt': TaskDefConstants.DEFAULT_MAX_ATTEMPT,
                 'skip_scout_jobs': skip_scout_jobs,
-                'campaign': campaign,  # step.request.subcampaign,
+                'campaign': campaign,
                 'req_id': int(step.request.id),
                 'prod_source': TaskDefConstants.DEFAULT_PROD_SOURCE,
                 'use_real_nevents': use_real_nevents,
@@ -3173,19 +2859,14 @@ class TaskDefinition(object):
             }
 
             core_count = 1
-            if 'coreCount'.lower() in project_mode.keys():
-                core_count = int(project_mode['coreCount'.lower()])
+            if project_mode.coreCount is not None:
+                core_count = project_mode.coreCount
                 task_proto_dict.update({'number_of_cpu_cores': core_count})
 
             # https://twiki.cern.ch/twiki/bin/view/AtlasComputing/ProdSys#Default_cpuTime_cpu_TimeUnit_tab
             # https://twiki.cern.ch/twiki/bin/view/AtlasComputing/ProdSys#Default_base_RamCount_ramCount_r
             if step.request.request_type.lower() == 'MC'.lower():
                 if prod_step.lower() == 'simul'.lower():
-                    # simulation_type = self.protocol.get_simulation_type(step)
-                    # if simulation_type == 'fast':
-                    #     task_proto_dict.update({'cpu_time': 300})
-                    # else:
-                    #     task_proto_dict.update({'cpu_time': 3000})
                     task_proto_dict.update({'cpu_time': 3000})
                     task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
                     if core_count > 1:
@@ -3225,18 +2906,15 @@ class TaskDefinition(object):
             if step.request.request_type.lower() == 'GROUP'.lower():
                 task_proto_dict.update({'respect_split_rule': True})
 
-            if 'ramCount'.lower() in project_mode.keys():
-                task_proto_dict.update({'ram_count': int(project_mode['ramCount'.lower()])})
-            if 'baseRamCount'.lower() in project_mode.keys():
-                task_proto_dict.update({'base_ram_count': int(project_mode['baseRamCount'.lower()])})
-            if 'baseWalltime'.lower() in project_mode.keys():
-                task_proto_dict.update({'base_wall_time': int(project_mode['baseWalltime'.lower()])})
+            if project_mode.ramCount is not None:
+                task_proto_dict.update({'ram_count': project_mode.ramCount})
+            if project_mode.baseRamCount is not None:
+                task_proto_dict.update({'base_ram_count': project_mode.baseRamCount})
+            if project_mode.baseWalltime is not None:
+                task_proto_dict.update({'base_wall_time': project_mode.baseWalltime})
 
-            # if 'cloud'.lower() in project_mode.keys():
-            #     task_proto_dict.update({'cloud': str(project_mode['cloud'.lower()])})
-
-            if 'site'.lower() in project_mode.keys():
-                site_value = str(project_mode['site'.lower()])
+            if project_mode.site is not None:
+                site_value = project_mode.site
                 specified_sites = list()
                 if ',' in site_value:
                     specified_sites.extend(site_value.split(','))
@@ -3248,36 +2926,17 @@ class TaskDefinition(object):
                         raise UnknownSiteException(site_name)
                 task_proto_dict.update({'site': site_value})
 
-            # if (not task_proto_dict.get('site', None)) and (not task_proto_dict.get('cloud', None)):
-            #     task_proto_dict.update({'cloud': TaskDefConstants.DEFAULT_CLOUD})
-            #     logger.info("cloud={0}".format(task_proto_dict['cloud']))
+            if project_mode.disableReassign is not None:
+                task_proto_dict.update({'disable_reassign': project_mode.disableReassign or None})
 
-            # if 'maxAttempt'.lower() in project_mode.keys():
-            #     task_proto_dict.update({'max_attempt': int(project_mode['maxAttempt'.lower()])})
+            if project_mode.skipScout is not None:
+                task_proto_dict.update({'skip_scout_jobs': project_mode.skipScout or None})
 
-            if 'disableReassign'.lower() in project_mode.keys():
-                option_value = str(project_mode['disableReassign'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'disable_reassign': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'disable_reassign': None})
+            if project_mode.t1Weight is not None:
+                task_proto_dict.update({'t1_weight': project_mode.t1Weight or None})
 
-            if 'skipScout'.lower() in project_mode.keys():
-                option_value = str(project_mode['skipScout'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'skip_scout_jobs': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'skip_scout_jobs': None})
-
-            if 't1Weight'.lower() in project_mode.keys():
-                task_proto_dict.update({'t1_weight': int(project_mode['t1Weight'.lower()])})
-
-            if 'lumiblock'.lower() in project_mode.keys():
-                option_value = str(project_mode['lumiblock'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'respect_lb': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'respect_lb': None})
+            if project_mode.lumiblock is not None:
+                task_proto_dict.update({'respect_lb': project_mode.lumiblock or None})
 
             if project.lower() == 'mc14_ruciotest'.lower():
                 task_proto_dict.update({'ddm_back_end': 'rucio'})
@@ -3364,62 +3023,54 @@ class TaskDefinition(object):
             if step.request.request_type.lower() == 'EVENTINDEX'.lower():
                 task_proto_dict.update(({'ip_connectivity': "'full'"}))
 
-            if 'ipConnectivity'.lower() in project_mode.keys():
-                task_proto_dict.update({'ip_connectivity': "'%s'" % str(project_mode['ipConnectivity'.lower()])})
+            if project_mode.ipConnectivity is not None:
+                task_proto_dict.update({'ip_connectivity': "'%s'" % project_mode.ipConnectivity})
 
-            if 'tgtNumEventsPerJob'.lower() in project_mode.keys():
-                task_proto_dict.update({'tgt_num_events_per_job': int(project_mode['tgtNumEventsPerJob'.lower()])})
+            if project_mode.tgtNumEventsPerJob:
+                task_proto_dict.update({'tgt_num_events_per_job': project_mode.tgtNumEventsPerJob})
 
-            if 'cpuTime'.lower() in project_mode.keys():
-                task_proto_dict.update({'cpu_time': int(project_mode['cpuTime'.lower()])})
+            if project_mode.cpuTime is not None:
+                task_proto_dict.update({'cpu_time': project_mode.cpuTime})
 
-            if 'cpuTimeUnit'.lower() in project_mode.keys():
-                task_proto_dict.update({'cpu_time_unit': str(project_mode['cpuTimeUnit'.lower()])})
+            if project_mode.cpuTimeUnit is not None:
+                task_proto_dict.update({'cpu_time_unit': project_mode.cpuTimeUnit})
 
-            if 'workDiskCount'.lower() in project_mode.keys():
-                task_proto_dict.update({'work_disk_count': int(project_mode['workDiskCount'.lower()])})
+            if project_mode.workDiskCount is not None:
+                task_proto_dict.update({'work_disk_count': project_mode.workDiskCount})
 
-            if 'workDiskUnit'.lower() in project_mode.keys():
-                task_proto_dict.update({'work_disk_unit': str(project_mode['workDiskUnit'.lower()])})
+            if project_mode.workDiskUnit is not None:
+                task_proto_dict.update({'work_disk_unit': project_mode.workDiskUnit})
 
-            if 'goal'.lower() in project_mode.keys():
-                task_proto_dict.update({'goal': str(project_mode['goal'.lower()])})
+            if project_mode.goal is not None:
+                task_proto_dict.update({'goal': project_mode.goal})
 
-            if 'skipFilesUsedBy'.lower() in project_mode.keys():
-                task_proto_dict.update({'skip_files_used_by': int(project_mode['skipFilesUsedBy'.lower()])})
+            if project_mode.skipFilesUsedBy:
+                task_proto_dict.update({'skip_files_used_by': project_mode.skipFilesUsedBy})
                 skip_check_input = True
 
-            if 'noThrottle'.lower() in project_mode.keys():
-                option_value = str(project_mode['noThrottle'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'no_throttle': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'no_throttle': None})
+            if project_mode.noThrottle is not None:
+                task_proto_dict.update({'no_throttle': project_mode.noThrottle or None})
 
-            if 'ramUnit'.lower() in project_mode.keys():
-                task_proto_dict.update({'ram_unit': str(project_mode['ramUnit'.lower()])})
+            if project_mode.ramUnit is not None:
+                task_proto_dict.update({'ram_unit': project_mode.ramUnit})
 
-            if 'baseRamCount'.lower() in project_mode.keys():
-                task_proto_dict.update({'base_ram_count': int(project_mode['baseRamCount'.lower()])})
+            if project_mode.baseRamCount is not None:
+                task_proto_dict.update({'base_ram_count': project_mode.baseRamCount})
 
-            if 'nucleus'.lower() in project_mode.keys():
-                task_proto_dict.update({'nucleus': str(project_mode['nucleus'.lower()])})
+            if project_mode.nucleus is not None:
+                task_proto_dict.update({'nucleus': project_mode.nucleus})
 
-            if 'workQueueName'.lower() in project_mode.keys():
-                task_proto_dict.update({'work_queue_name': str(project_mode['workQueueName'.lower()])})
+            if project_mode.workQueueName is not None:
+                task_proto_dict.update({'work_queue_name': project_mode.workQueueName})
 
-            if 'allowInputWAN'.lower() in project_mode.keys():
-                option_value = str(project_mode['allowInputWAN'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'allow_input_wan': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'allow_input_wan': None})
+            if project_mode.allowInputWAN is not None:
+                task_proto_dict.update({'allow_input_wan': project_mode.allowInputWAN})
 
-            if 'allowInputLAN'.lower() in project_mode.keys():
-                task_proto_dict.update({'allow_input_lan': "'{0}'".format(str(project_mode['allowInputLAN'.lower()]))})
+            if project_mode.allowInputLAN is not None:
+                task_proto_dict.update({'allow_input_lan': "'{0}'".format(project_mode.allowInputLAN)})
 
-            if 'nMaxFilesPerJob'.lower() in project_mode.keys():
-                task_proto_dict.update({'number_of_max_files_per_job': int(project_mode['nMaxFilesPerJob'.lower()])})
+            if project_mode.nMaxFilesPerJob:
+                task_proto_dict.update({'number_of_max_files_per_job': project_mode.nMaxFilesPerJob})
 
             ttcr_timestamp = None
 
@@ -3431,65 +3082,47 @@ class TaskDefinition(object):
             except Exception as ex:
                 logger.exception('Getting TTC failed: {0}'.format(str(ex)))
 
-            if 'useJobCloning'.lower() in project_mode.keys():
-                task_proto_dict.update({'use_job_cloning': str(project_mode['useJobCloning'.lower()])})
+            if project_mode.useJobCloning is not None:
+                task_proto_dict.update({'use_job_cloning': project_mode.useJobCloning})
 
-            if 'nSitesPerJob'.lower() in project_mode.keys():
-                task_proto_dict.update({'number_of_sites_per_job': int(project_mode['nSitesPerJob'.lower()])})
+            if project_mode.nSitesPerJob:
+                task_proto_dict.update({'number_of_sites_per_job': project_mode.nSitesPerJob})
 
-            if 'altStageOut'.lower() in project_mode.keys():
-                task_proto_dict.update({'alt_stage_out': str(project_mode['altStageOut'.lower()])})
+            if project_mode.altStageOut is not None:
+                task_proto_dict.update({'alt_stage_out': project_mode.altStageOut})
 
-            if 'cpuEfficiency'.lower() in project_mode.keys():
-                task_proto_dict.update({'cpu_efficiency': int(project_mode['cpuEfficiency'.lower()])})
+            if project_mode.cpuEfficiency is not None:
+                task_proto_dict.update({'cpu_efficiency': project_mode.cpuEfficiency})
 
-            if 'minGranularity'.lower() in project_mode.keys():
-                task_proto_dict.update({'min_granularity': int(project_mode['minGranularity'.lower()])})
+            if project_mode.minGranularity is not None:
+                task_proto_dict.update({'min_granularity': project_mode.minGranularity})
 
-            if 'respectSplitRule'.lower() in project_mode.keys():
-                option_value = str(project_mode['respectSplitRule'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'respect_split_rule': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'respect_split_rule': None})
+            if project_mode.respectSplitRule is not None:
+                task_proto_dict.update({'respect_split_rule': project_mode.respectSplitRule or None})
 
             if step.request.request_type.lower() == 'MC'.lower():
                 if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21:
-                    if not 'esConvertible'.lower() in project_mode.keys():
-                        project_mode['esConvertible'.lower()] = 'yes'
+                    if project_mode.esConvertible is None:
+                        project_mode.esConvertible = True
 
-            if 'esFraction'.lower() in project_mode.keys():
-                es_fraction = float(project_mode['esFraction'.lower()])
-                if es_fraction > 0:
-                    task_proto_dict.update({'es_fraction': es_fraction})
+            if project_mode.esFraction is not None:
+                if project_mode.esFraction > 0:
+                    task_proto_dict.update({'es_fraction': project_mode.esFraction})
                     task_proto_dict.update({'es_convertible': True})
-                    project_mode['esMerging'.lower()] = 'yes'
-                    # task_proto_dict['max_attempt_es'] = TaskDefConstants.DEFAULT_ES_MAX_ATTEMPT
-                    # task_proto_dict['max_attempt_es_job'] = TaskDefConstants.DEFAULT_ES_MAX_ATTEMPT_JOB
+                    project_mode.esMerging = True
 
-            if 'esConvertible'.lower() in project_mode.keys():
-                option_value = str(project_mode['esConvertible'.lower()])
-                if option_value.lower() == 'yes'.lower():
+            if project_mode.esConvertible is not None:
+                if project_mode.esConvertible:
                     task_proto_dict.update({'es_convertible': True})
-                    project_mode['esMerging'.lower()] = 'yes'
-                    # task_proto_dict['max_attempt_es'] = TaskDefConstants.DEFAULT_ES_MAX_ATTEMPT
-                    # task_proto_dict['max_attempt_es_job'] = TaskDefConstants.DEFAULT_ES_MAX_ATTEMPT_JOB
+                    project_mode.esMerging = True
                     task_proto_dict['not_discard_events'] = True
-                elif option_value.lower() == 'no'.lower():
+                else:
                     task_proto_dict.update({'es_convertible': None})
 
-            if 'esMerging'.lower() in project_mode.keys():
-                option_value = str(project_mode['esMerging'.lower()])
-                if option_value.lower() == 'yes'.lower():
+            if project_mode.esMerging is not None:
+                if project_mode.esMerging:
                     es_merging_tag_name = ctag_name
                     es_merging_trf_name = 'HITSMerge_tf.py'
-                    # es_merging_tag_name = str(project_mode['esMerging'.lower()])
-                    # es_merging_tag = self._get_ami_tag_cached(es_merging_tag_name)
-                    # es_merging_trf_name = es_merging_tag['transformation']
-                    # if es_merging_trf_name.lower() != 'HITSMerge_tf.py'.lower():
-                    #     raise Exception(
-                    #         'Only HITSMerge_tf.py is allowed for ES merging. But \"{0}\" was provided (AMI tag: {1})'.format(
-                    #             es_merging_trf_name, es_merging_tag_name))
                     task_proto_dict['es_merge_spec'] = {}
                     task_proto_dict['es_merge_spec']['transPath'] = es_merging_trf_name
                     name_postfix = ''
@@ -3499,159 +3132,85 @@ class TaskDefinition(object):
                         '--AMITag {0} --DBRelease=current --autoConfiguration=everything '.format(es_merging_tag_name) + \
                         '--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}' + name_postfix
 
-            if 'esConsumers'.lower() in project_mode.keys():
-                task_proto_dict['number_of_es_consumers'] = int(project_mode['esConsumers'.lower()])
+            if project_mode.esConsumers is not None:
+                task_proto_dict['number_of_es_consumers'] = project_mode.esConsumers
 
-            if 'esMaxAttempt'.lower() in project_mode.keys():
-                task_proto_dict['max_attempt_es'] = int(project_mode['esMaxAttempt'.lower()])
+            if project_mode.esMaxAttempt is not None:
+                task_proto_dict['max_attempt_es'] = project_mode.esMaxAttempt
 
-            if 'esMaxAttemptJob'.lower() in project_mode.keys():
-                task_proto_dict['max_attempt_es_job'] = int(project_mode['esMaxAttemptJob'.lower()])
+            if project_mode.esMaxAttemptJob is not None:
+                task_proto_dict['max_attempt_es_job'] = project_mode.esMaxAttemptJob
 
-            if 'nJumboJobs'.lower() in project_mode.keys():
-                task_proto_dict['number_of_jumbo_jobs'] = int(project_mode['nJumboJobs'.lower()])
+            if project_mode.nJumboJobs is not None:
+                task_proto_dict['number_of_jumbo_jobs'] = project_mode.nJumboJobs
 
-            if 'nEventsPerWorker'.lower() in project_mode.keys():
-                task_proto_dict['number_of_events_per_worker'] = int(project_mode['nEventsPerWorker'.lower()])
+            if project_mode.nEventsPerWorker:
+                task_proto_dict['number_of_events_per_worker'] = project_mode.nEventsPerWorker
 
-            if 'processingType'.lower() in project_mode.keys():
-                task_proto_dict.update({'type': str(project_mode['processingType'.lower()])})
+            if project_mode.processingType is not None:
+                task_proto_dict.update({'type': project_mode.processingType})
 
-            if 'prodSourceLabel'.lower() in project_mode.keys():
-                task_proto_dict.update({'prod_source': str(project_mode['prodSourceLabel'.lower()])})
+            if project_mode.prodSourceLabel is not None:
+                task_proto_dict.update({'prod_source': project_mode.prodSourceLabel})
 
-            if 'skipShortInput'.lower() in project_mode.keys():
-                option_value = str(project_mode['skipShortInput'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'skip_short_input': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'skip_short_input': None})
+            if project_mode.skipShortInput is not None:
+                task_proto_dict.update({'skip_short_input': project_mode.skipShortInput or None})
 
-            if 'registerEsFiles'.lower() in project_mode.keys():
-                option_value = str(project_mode['registerEsFiles'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'register_es_files': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'register_es_files': None})
+            if project_mode.registerEsFiles is not None:
+                task_proto_dict.update({'register_es_files': project_mode.registerEsFiles or None})
 
-            if 'transUsesPrefix'.lower() in project_mode.keys():
-                trans_uses_prefix = str(project_mode['transUsesPrefix'.lower()])
-                if trans_uses_prefix:
-                    task_proto_dict.update({'trans_uses_prefix': trans_uses_prefix})
+            if project_mode.transUsesPrefix:
+                task_proto_dict.update({'trans_uses_prefix': project_mode.transUsesPrefix})
 
-            if 'noWaitParent'.lower() in project_mode.keys():
-                option_value = str(project_mode['noWaitParent'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'no_wait_parent': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'no_wait_parent': None})
+            if project_mode.noWaitParent is not None:
+                task_proto_dict.update({'no_wait_parent': project_mode.noWaitParent or None})
 
-            if 'usePrefetcher'.lower() in project_mode.keys():
-                option_value = str(project_mode['usePrefetcher'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'use_prefetcher': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'use_prefetcher': None})
+            if project_mode.usePrefetcher is not None:
+                task_proto_dict.update({'use_prefetcher': project_mode.usePrefetcher or None})
 
-            if 'disableAutoFinish'.lower() in project_mode.keys():
-                option_value = str(project_mode['disableAutoFinish'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'disable_auto_finish': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'disable_auto_finish': None})
+            if project_mode.disableAutoFinish is not None:
+                task_proto_dict.update({'disable_auto_finish': project_mode.disableAutoFinish or None})
 
-            if 'isMergeTask'.lower() in project_mode.keys():
-                option_value = str(project_mode['isMergeTask'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'use_exhausted': True})
-                    task_proto_dict.update({'goal': str(100.0)})
-                    task_proto_dict.update({'fail_when_goal_unreached': False})
-                    task_proto_dict.update({'disable_auto_finish': True})
+            if project_mode.isMergeTask:
+                task_proto_dict.update({'use_exhausted': True})
+                task_proto_dict.update({'goal': str(100.0)})
+                task_proto_dict.update({'fail_when_goal_unreached': False})
+                task_proto_dict.update({'disable_auto_finish': True})
 
-            if 'outDiskCount'.lower() in project_mode.keys():
-                task_proto_dict['out_disk_count'] = int(project_mode['outDiskCount'.lower()])
+            if project_mode.outDiskCount is not None:
+                task_proto_dict['out_disk_count'] = project_mode.outDiskCount
                 task_proto_dict['out_disk_unit'] = 'kB'
 
-            if 'inFilePosEvtNum'.lower() in project_mode.keys():
-                option_value = str(project_mode['inFilePosEvtNum'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'in_file_pos_evt_num': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'in_file_pos_evt_num': None})
+            if project_mode.inFilePosEvtNum is not None:
+                task_proto_dict.update({'in_file_pos_evt_num': project_mode.inFilePosEvtNum or None})
 
-            if 'tgtMaxOutputForNG'.lower() in project_mode.keys():
-                task_proto_dict.update({'tgt_max_output_for_ng': int(project_mode['tgtMaxOutputForNG'.lower()])})
-            if 'maxWalltime'.lower() in project_mode.keys():
-                task_proto_dict.update({'max_walltime': int(project_mode['maxWalltime'.lower()])})
+            if project_mode.tgtMaxOutputForNG is not None:
+                task_proto_dict.update({'tgt_max_output_for_ng': project_mode.tgtMaxOutputForNG})
 
-            if 'notDiscardEvents'.lower() in project_mode.keys():
-                option_value = str(project_mode['notDiscardEvents'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'not_discard_events': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'not_discard_events': None})
+            if project_mode.maxWalltime is not None:
+                task_proto_dict.update({'max_walltime': project_mode.maxWalltime})
 
-            if 'scoutSuccessRate'.lower() in project_mode.keys():
-                task_proto_dict.update({'scout_success_rate': int(project_mode['scoutSuccessRate'.lower()])})
+            if project_mode.notDiscardEvents is not None:
+                task_proto_dict.update({'not_discard_events': project_mode.notDiscardEvents or None})
+
+            if project_mode.scoutSuccessRate is not None:
+                task_proto_dict.update({'scout_success_rate': project_mode.scoutSuccessRate})
 
             reuse_input = None
-            if 'reuseInput'.lower() in project_mode.keys():
-                option_value = int(project_mode['reuseInput'.lower()])
-                if option_value > 0:
-                    reuse_input = option_value
+            if project_mode.reuseInput is not None:
+                if project_mode.reuseInput > 0:
+                    reuse_input = project_mode.reuseInput
 
-            if 'orderByLB'.lower() in project_mode.keys():
-                option_value = str(project_mode['orderByLB'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'order_by_lb': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'order_by_lb': None})
+            if project_mode.orderByLB is not None:
+                task_proto_dict.update({'order_by_lb': project_mode.orderByLB or None})
 
-            truncate_output_formats = None
-            if 'truncateOutputFormats'.lower() in project_mode.keys():
-                option_value = str(project_mode['truncateOutputFormats'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    truncate_output_formats = True
-                elif option_value.lower() == 'no'.lower():
-                    truncate_output_formats = False
+            truncate_output_formats = project_mode.truncateOutputFormats
 
-            if 'useZipToPin'.lower() in project_mode.keys():
-                option_value = str(project_mode['useZipToPin'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'use_zip_to_pin': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'use_zip_to_pin': None})
+            if project_mode.useZipToPin is not None:
+                task_proto_dict.update({'use_zip_to_pin': project_mode.useZipToPin or None})
 
-            if 'toStaging'.lower() in project_mode.keys():
-                option_value = str(project_mode['toStaging'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'to_staging': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'to_staging': None})
-
-            # FIXME
-            # task_proto_dict.update({'put_log_to_os': True})
-
-            # FIXME
-            # if 'nEventsPerJob'.lower() in project_mode.keys():
-            #     task_proto_dict.update({'number_of_events_per_job': int(project_mode['nEventsPerJob'.lower()])})
-            if 'nEventsPerInputFile'.lower() in project_mode.keys():
-                number_of_events_per_input_file = int(project_mode['nEventsPerInputFile'.lower()])
-                task_proto_dict.update({'number_of_events_per_input_file': number_of_events_per_input_file})
-            # if 'nEventsPerRange'.lower() in project_mode.keys():
-            #     number_of_events_per_range = int(project_mode['nEventsPerRange'.lower()])
-            #     task_proto_dict.update({'number_of_events_per_range': number_of_events_per_range})
-            # if 'nEventsPerMergeJob'.lower() in project_mode.keys():
-            #     task_proto_dict.update(
-            #         {'number_of_events_per_merge_job': int(project_mode['nEventsPerMergeJob'.lower()])}
-            #     )
-
-            # FIXME
-            # if prod_step.lower() == 'simul'.lower():
-            #     if not 'cpuTime'.lower() in project_mode.keys():
-            #         task_proto_dict.update({'cpu_time': 3000})
-            #     if not 'cpuTimeUnit'.lower() in project_mode.keys():
-            #         task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
+            if project_mode.toStaging is not None:
+                task_proto_dict.update({'to_staging': project_mode.toStaging or None})
 
             if step.request.request_type.lower() == 'MC'.lower():
                 if 'nEventsPerJob' in task_config.keys() and number_of_events > 0:
@@ -3661,39 +3220,11 @@ class TaskDefinition(object):
                         task_proto_dict.update({'goal': str(100.0)})
                         task_proto_dict.update({'fail_when_goal_unreached': False})
                         task_proto_dict.update({'disable_auto_finish': True})
-                        # if number_of_events <= 1000:
-                        #     task_proto_dict.update({'use_exhausted': True})
-                        #     task_proto_dict.update({'goal': str(100.0)})
-                        #     task_proto_dict.update({'fail_when_goal_unreached': True})
-                        # elif number_of_events > 1000:
-                        #     task_proto_dict.update({'use_exhausted': True})
-                        #     task_proto_dict.update({'goal': str(90.0)})
                     else:
                         if number_of_events <= 1000:
                             task_proto_dict.update({'use_exhausted': True})
                             task_proto_dict.update({'goal': str(100.0)})
                             task_proto_dict.update({'fail_when_goal_unreached': True})
-                # if number_of_events > 0:
-                #     small_events_numbers = dict()
-                #     small_events_numbers.update({
-                #         r'mc15_13TeV': 10000,
-                #         r'mc16_13TeV': 2000,
-                #         r'mc15:mc15(a|b|c)': 10000,
-                #         r'mc16:mc16(a|b|c|\*)': 2000
-                #     })
-                #     small_events_threshold = 0
-                #     for pattern in small_events_numbers.keys():
-                #         if re.match(pattern, project, re.IGNORECASE) or re.match(pattern, campaign, re.IGNORECASE):
-                #             small_events_threshold = small_events_numbers[pattern]
-                #             break
-                #     if number_of_events < small_events_threshold:
-                #         force_small_events = False
-                #         if 'isSmallEvents'.lower() in project_mode.keys():
-                #             option_value = str(project_mode['isSmallEvents'.lower()])
-                #             if option_value.lower() == 'yes'.lower():
-                #                 force_small_events = True
-                #         if not force_small_events:
-                #             raise TaskSmallEventsException(number_of_events)
             if not evgen_params:
                 self._check_number_of_events(step, project_mode)
 
@@ -3702,12 +3233,8 @@ class TaskDefinition(object):
                 if number_of_jobs > TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK:
                     raise MaxJobsPerTaskLimitExceededException(number_of_jobs)
 
-            if 'failWhenGoalUnreached'.lower() in project_mode.keys():
-                option_value = str(project_mode['failWhenGoalUnreached'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    task_proto_dict.update({'fail_when_goal_unreached': True})
-                elif option_value.lower() == 'no'.lower():
-                    task_proto_dict.update({'fail_when_goal_unreached': None})
+            if project_mode.failWhenGoalUnreached is not None:
+                task_proto_dict.update({'fail_when_goal_unreached': project_mode.failWhenGoalUnreached or None})
 
             io_intensity = None
 
@@ -3742,95 +3269,41 @@ class TaskDefinition(object):
                 task_proto_dict.update({'io_intensity': int(io_intensity)})
                 task_proto_dict.update({'io_intensity_unit': 'kBPerS'})
 
-            # number_of_max_files_per_job = 20
-            # task_proto_dict.update({'number_of_max_files_per_job': 50})
-
-            # # test JEDI merging: impossible to use --maxEvents=${MAXEVENTS}
-            # task_proto_dict['merge_output'] = True
-            # task_proto_dict['merge_spec'] = {}
-            # task_proto_dict['merge_spec']['transPath'] = "HITSMerge_tf.py"
-            # task_proto_dict['merge_spec']['jobParameters'] = \
-            # "--AMITag=s1776 " \
-            # "--autoConfiguration=everything " \
-            # "--DBRelease=current " \
-            # "--postInclude=RecJobTransforms/UseFrontierFallbackDBRelease.py " \
-            # "--outputHits_MRGFile=${OUTPUT0} " \
-            # "--inputHitsFile=${TRN_OUTPUT0} " \
-            # "--inputLogsFile=${TRN_LOG0}"
-
-            # test JEDI merging for train production
-            # if train_production:
-            # task_proto_dict['um_name_at_end'] = True
-            # task_proto_dict['merge_output'] = True
-            # task_proto_dict['merge_spec'] = {}
-            # task_proto_dict['merge_spec']['transPath'] = "AODMerge_tf.py"
-            # task_proto_dict['merge_spec']['jobParameters'] = \
-            # "--AMITag=p1787 " \
-            # "--autoConfiguration=everything " \
-            # "--fastPoolMerge=False " \
-            # "--postExec=GlobalEventTagBuilder.Enable=False " \
-            #     "--outputAOD_MRGFile=${OUTPUT0} " \
-            #     "--inputAODFile=${TRN_OUTPUT0} "
-            # task_proto_dict['um_name_at_end'] = True
-            # task_proto_dict['merge_output'] = True
-            # task_proto_dict['merge_spec'] = {}
-            # task_proto_dict['merge_spec']['transPath'] = "DAODMerge_tf.py"
-            # task_proto_dict['merge_spec']['jobParameters'] = \
-            #     "--autoConfiguration=everything " \
-            #     "--outputDAOD_EGAM1_MRGFile=${OUTPUT0} " \
-            #     "--inputDAOD_EGAM1File=${TRN_OUTPUT0} " \
-            #     "--outputDAOD_EGAM3_MRGFile=${OUTPUT1} " \
-            #     "--inputDAOD_EGAM3File=${TRN_OUTPUT1} "
-
             # test Event Service
-            if 'testES'.lower() in project_mode.keys():
-                option_value = str(project_mode['testES'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    # skip_check_input = True
-                    # task_proto_dict['prod_source'] = 'ptest'
-                    if 'nEventsPerWorker'.lower() in project_mode.keys():
-                        task_proto_dict['number_of_events_per_worker'] = int(project_mode['nEventsPerWorker'.lower()])
-                    else:
-                        task_proto_dict['number_of_events_per_worker'] = 1
-                    if 'nEsConsumers'.lower() in project_mode.keys():
-                        task_proto_dict['number_of_es_consumers'] = int(project_mode['nEsConsumers'.lower()])
-                    else:
-                        task_proto_dict['number_of_es_consumers'] = 1
-                    if 'esProcessingType'.lower() in project_mode.keys():
-                        task_proto_dict['type'] = str(project_mode['esProcessingType'.lower()])
-                    # else:
-                    #     task_proto_dict['type'] = 'validation'
-                    if 'maxAttemptES'.lower() in project_mode.keys():
-                        task_proto_dict['max_attempt_es'] = int(project_mode['maxAttemptES'.lower()])
-                    task_proto_dict['es_merge_spec'] = {}
-                    task_proto_dict['es_merge_spec']['transPath'] = 'HITSMerge_tf.py'
-                    name_postfix = ''
-                    if trf_release in ['20.3.7.5', '20.7.8.7']:
-                        name_postfix = "_000"
-                    task_proto_dict['es_merge_spec']['jobParameters'] = \
-                        "--AMITag s2049 --DBRelease=current --autoConfiguration=everything " \
-                        "--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}" + name_postfix
-                    # "--postInclude=RecJobTransforms/UseFrontierFallbackDBRelease.py " \
+            if project_mode.testES:
+                if project_mode.nEventsPerWorker:
+                    task_proto_dict['number_of_events_per_worker'] = project_mode.nEventsPerWorker
+                else:
+                    task_proto_dict['number_of_events_per_worker'] = 1
+                if project_mode.nEsConsumers:
+                    task_proto_dict['number_of_es_consumers'] = project_mode.nEsConsumers
+                else:
+                    task_proto_dict['number_of_es_consumers'] = 1
+                if project_mode.esProcessingType is not None:
+                    task_proto_dict['type'] = project_mode.esProcessingType
+                if project_mode.maxAttemptES is not None:
+                    task_proto_dict['max_attempt_es'] = project_mode.maxAttemptES
+                task_proto_dict['es_merge_spec'] = {}
+                task_proto_dict['es_merge_spec']['transPath'] = 'HITSMerge_tf.py'
+                name_postfix = ''
+                if trf_release in ['20.3.7.5', '20.7.8.7']:
+                    name_postfix = "_000"
+                task_proto_dict['es_merge_spec']['jobParameters'] = \
+                    "--AMITag s2049 --DBRelease=current --autoConfiguration=everything " \
+                    "--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}" + name_postfix
 
             if not 'number_of_events_per_input_file' in task_proto_dict.keys() and \
                     not 'number_of_gb_per_job' in task_proto_dict.keys():
                 if not 'number_of_files_per_job' in task_proto_dict.keys():
                     task_proto_dict.update({'number_of_files_per_job': 1})
 
-            # if use_real_nevents and 'tgt_num_events_per_job' in task_proto_dict.keys():
             if use_real_nevents:
                 task_proto_dict.update({'number_of_files_per_job': None})
                 if not 'number_of_max_files_per_job' in task_proto_dict.keys():
                     task_proto_dict.update({'number_of_max_files_per_job': 200})
 
-            # new randomSeed format
-            # if 'number_of_events_per_job' in task_proto_dict.keys() and number_of_events > 0:
-            #     number_of_requested_jobs = int(number_of_events) / int(task_proto_dict['number_of_events_per_job'])
-            #     random_seed_param = self._get_job_parameter('randomSeed', job_parameters)
-            #     random_seed_param['num_records'] = number_of_requested_jobs
-
             if 'number_of_gb_per_job' in task_proto_dict.keys():
-                if not 'nMaxFilesPerJob'.lower() in project_mode.keys():
+                if not project_mode.nMaxFilesPerJob:
                     task_proto_dict.update({'number_of_max_files_per_job': 1000})
 
             if use_real_nevents and 'number_of_events_per_input_file' in task_proto_dict.keys():
@@ -3866,7 +3339,6 @@ class TaskDefinition(object):
                     task_template = Template(template_string)
                     task_string = task_template.render(Context(context_dict))
                     task_id = self.task_reg.register_task_id()
-                    # FIXME
                     task_string = task_string.replace(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_proto_id,
                                                       TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_id)
 
@@ -3875,7 +3347,6 @@ class TaskDefinition(object):
             else:
                 task_string = self.protocol.serialize_task(task_proto)
                 task_id = self.task_reg.register_task_id()
-                # FIXME
                 task_string = task_string.replace(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_proto_id,
                                                   TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_id)
                 task = self.protocol.deserialize_task(task_string)
@@ -3905,7 +3376,6 @@ class TaskDefinition(object):
                 # self._check_task_cache_version_consistency(task, step, trf_release)
                 self._check_task_blacklisted_input(task, project_mode)
 
-                # FIXME
                 if not skip_check_input:
                     self._check_task_input(task, task_id, number_of_events, task_config, parent_task_id,
                                            input_data_name, step, primary_input_offset, prod_step,
@@ -3919,10 +3389,6 @@ class TaskDefinition(object):
                         parent_task_id = first_parent_task_id
                     else:
                         parent_task_id = self.task_reg.get_parent_task_id(step, task_id)
-
-                # primary_input = self._get_primary_input(task['jobParameters'])
-                # if primary_input:
-                #     input_data_name = primary_input['dataset'].split(':')[-1]
 
                 self.task_reg.register_task(task, step, task_id, parent_task_id, chain_id, project, input_data_name,
                                             number_of_events, step.request.campaign, step.request.subcampaign,
@@ -3951,7 +3417,7 @@ class TaskDefinition(object):
         for ps1_task in ps1_task_list:
             number_events_processed += int(ps1_task.total_events or 0)
 
-        split_slice = self._get_task_config(step).get('split_slice')
+        split_slice = ProjectMode.get_task_config(step).get('split_slice')
 
         if split_slice:
             ps2_task_list = \
@@ -4002,16 +3468,7 @@ class TaskDefinition(object):
     def _get_processed_datasets(self, step, requested_datasets=None):
         processed_datasets = []
         input_data_name = self.get_step_input_data_name(step)
-        # Drop ps1
-        # ps1_task_list = TTaskRequest.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete']),
-        #                                             project=step.request.project,
-        #                                             inputdataset=input_data_name,
-        #                                             ctag=step.step_template.ctag,
-        #                                             formats=step.step_template.output_formats)
-        # for ps1_task in ps1_task_list:
-        #     number_events_processed += int(ps1_task.total_events or 0)
-
-        split_slice = self._get_task_config(step).get('split_slice')
+        split_slice = ProjectMode.get_task_config(step).get('split_slice')
 
         if split_slice:
             ps2_task_list = \
@@ -4065,27 +3522,12 @@ class TaskDefinition(object):
         return nevents_per_file
 
     def get_events_per_input_file(self, step, input_name, use_real_events=False):
-        task_config = self._get_task_config(step)
+        task_config = ProjectMode.get_task_config(step)
         if not 'nEventsPerInputFile' in task_config.keys() or use_real_events:
             events_per_file = int(self.get_events_per_file(input_name))
         else:
             events_per_file = int(task_config['nEventsPerInputFile'])
         return events_per_file
-
-    # def get_events_in_container(self, step, input_name, use_real_events=False, content=None):
-    #     number_events_in_container = 0
-    #     if not content:
-    #         result = self.ddm_wrapper.get_datasets_and_containers(input_name, datasets_contained_only=True)
-    #         for dataset_name in result['datasets']:
-    #             events_per_file = self.get_events_per_input_file(step, dataset_name, use_real_events=use_real_events)
-    #             number_events_in_dataset = events_per_file * self.ddm_wrapper.ddm_get_number_files(dataset_name)
-    #             number_events_in_container += number_events_in_dataset
-    #     else:
-    #         for dataset_name in content:
-    #             events_per_file = self.get_events_per_input_file(step, dataset_name, use_real_events=use_real_events)
-    #             number_events_in_dataset = events_per_file * self.ddm_wrapper.ddm_get_number_files(dataset_name)
-    #             number_events_in_container += number_events_in_dataset
-    #     return number_events_in_container
 
     def get_events_in_datasets(self, datasets, step, use_real_events=False):
         number_events = 0
@@ -4163,8 +3605,8 @@ class TaskDefinition(object):
         if data_type in ['TXT']:
             return
 
-        task_config = self._get_task_config(step)
-        project_mode = self._get_project_mode(step)
+        task_config = ProjectMode.get_task_config(step)
+        project_mode = ProjectMode(step)
         config_events_per_file = int(task_config.get('nEventsPerInputFile', 0))
         if not config_events_per_file:
             return
@@ -4184,7 +3626,6 @@ class TaskDefinition(object):
                 round_up = lambda num: int(num + 1) if int(num) != num else int(num)
                 events_per_file = round_up(float(number_events) / float(number_files))
 
-            # FIXME
             if not events_per_file:
                 continue
 
@@ -4195,15 +3636,13 @@ class TaskDefinition(object):
                 if result:
                     parent_task = ProductionTask.objects.get(id=int(result.groupdict()['tid']))
                     parent_task_id = int(parent_task.id)
-                    parent_events_per_job = int(self._get_task_config(parent_task.step).get('nEventsPerJob', 0))
+                    parent_events_per_job = int(ProjectMode.get_task_config(parent_task.step).get('nEventsPerJob', 0))
             except Exception as ex:
                 logger.exception('Getting parent nEventsPerJob failed: {0}'.format(str(ex)))
 
             if parent_events_per_job:
                 if config_events_per_file != parent_events_per_job:
-                    if 'nEventsPerInputFile'.lower() in project_mode.keys():
-                        pass
-                    else:
+                    if not project_mode.nEventsPerInputFile:
                         raise UniformDataException(dataset_name, events_per_file, number_events, number_files,
                                                    config_events_per_file, parent_events_per_job, parent_task_id)
 
@@ -4211,11 +3650,9 @@ class TaskDefinition(object):
         # splitting chains
         splitting_dict = dict()
         if step.request.request_type.lower() in ['MC'.lower(), 'GROUP'.lower()]:
-            ctag = self._get_ami_tag_cached(
-                step.step_template.ctag)  # self.ami_wrapper.get_ami_tag(step.step_template.ctag)
-            prod_step = self._get_prod_step(step.step_template.ctag,
-                                            ctag)  # str(ctag['productionStep']).replace(' ', '')
-            project_mode = self._get_project_mode(step)
+            ctag = self._get_ami_tag_cached(step.step_template.ctag)
+            prod_step = self._get_prod_step(step.step_template.ctag, ctag)
+            project_mode = ProjectMode(step)
 
             prod_steps = list()
             campaigns = dict()
@@ -4238,26 +3675,26 @@ class TaskDefinition(object):
                     raise Exception(
                         'Processing of sub-campaign/campaign or production step failed: {0}'.format(str(ex)))
             if len(prod_steps) > 1:
-                task_config = self._get_task_config(step)
+                task_config = ProjectMode.get_task_config(step)
                 task_config_changed = False
-                if not 'forceSplitInput'.lower() in project_mode.keys():
+                if not project_mode.forceSplitInput:
                     task_config['project_mode'] = 'forceSplitInput=yes;{0}'.format(task_config.get('project_mode', ''))
                     task_config_changed = True
-                if not 'useContainerName'.lower() in project_mode.keys():
+                if not project_mode.useContainerName:
                     task_config['project_mode'] = 'useContainerName=yes;{0}'.format(task_config.get('project_mode', ''))
                     task_config_changed = True
                 if task_config_changed:
-                    self._set_task_config(step, task_config)
-                    project_mode = self._get_project_mode(step)
+                    ProjectMode.set_task_config(step, task_config)
+                    project_mode = ProjectMode(step)
             if len(campaigns.keys()) > 1:
-                if not 'forceSplitInput'.lower() in project_mode.keys():
-                    task_config = self._get_task_config(step)
+                if not project_mode.forceSplitInput:
+                    task_config = ProjectMode.get_task_config(step)
                     task_config['project_mode'] = 'forceSplitInput=yes;{0}'.format(task_config.get('project_mode', ''))
-                    self._set_task_config(step, task_config)
-                    project_mode = self._get_project_mode(step)
-                if 'runOnlyCampaign'.lower() in project_mode.keys():
+                    ProjectMode.set_task_config(step, task_config)
+                    project_mode = ProjectMode(step)
+                if project_mode.runOnlyCampaign:
                     requested_campaigns = list()
-                    for value in str(project_mode['runOnlyCampaign'.lower()]).split(','):
+                    for value in project_mode.runOnlyCampaign.split(','):
                         for e in TaskDefConstants.DEFAULT_SC_HASHTAGS.keys():
                             for pattern in TaskDefConstants.DEFAULT_SC_HASHTAGS[e]:
                                 if re.match(r'{0}'.format(pattern), value) and (not e in requested_campaigns):
@@ -4282,84 +3719,34 @@ class TaskDefinition(object):
                         else:
                             raise NoRequestedCampaignInput()
 
-            force_merge_container = None
-            if 'mergeCont'.lower() in project_mode.keys():
-                option_value = str(project_mode['mergeCont'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    force_merge_container = True
+            force_merge_container = project_mode.mergeCont
 
             use_default_splitting_rule = True
-            if 'forceSplitInput'.lower() in project_mode.keys():
-                option_value = str(project_mode['forceSplitInput'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_default_splitting_rule = False
+            if project_mode.forceSplitInput:
+                use_default_splitting_rule = False
 
             reuse_input = None
-            if 'reuseInput'.lower() in project_mode.keys():
-                option_value = int(project_mode['reuseInput'.lower()])
-                if option_value > 0:
-                    reuse_input = option_value
-            # TODO
-            # use_input_container = False
+            if project_mode.reuseInput:
+                if project_mode.reuseInput > 0:
+                    reuse_input = project_mode.reuseInput
+
             if use_default_splitting_rule and \
                     (prod_step.lower() == 'evgen'.lower() or prod_step.lower() == 'simul'.lower()
                      or force_merge_container):
-                # use_input_container = True
-
-                # skip_data_verify = False
-                # use_real_events = False
-
-                # dataset = self.get_step_input_data_name(step)
-                # if not self.verify_container_consistency(dataset):
-                #     use_input_container = False
-                #     skip_data_verify = True
-                #     use_real_events = True
-
-                # if use_input_container:
-
-                # using container for Evgen and Simul
-                # if prod_step.lower() == 'evgen'.lower():
-                #     # split large tasks
-                #     # FIXME: define constants, review algorithm
-                #     if step.input_events > 0:
-                #         number_events_requested = int(step.input_events)
-                #         input_data_name = self.get_step_input_data_name(step)
-                #         max_number_events = 2000000
-                #         number_parts = number_events_requested / max_number_events
-                #         offset = 0
-                #         if number_parts:
-                #             splitting_dict[step.id] = list()
-                #             for _ in range(number_parts):
-                #                 splitting_dict[step.id].append({'dataset': input_data_name,
-                #                                                 'offset': offset,
-                #                                                 'number_events': max_number_events})
-                #                 offset += max_number_events
-                #             remain_number_events = number_events_requested % max_number_events
-                #             if remain_number_events:
-                #                 splitting_dict[step.id].append({'dataset': input_data_name,
-                #                                                 'offset': offset,
-                #                                                 'number_events': remain_number_events})
                 return splitting_dict
 
-            # task_config = self._get_task_config(step)
-            # if not 'nEventsPerInputFile' in task_config.keys():
-            #     logger.info("Step = %d, nEventsPerInputFile is missing, skipping the step" % step.id)
-            #     return  splitting_dict
+            if project_mode.skipFilesUsedBy:
+                job_params = self.task_reg.get_task_parameter(project_mode.skipFilesUsedBy, 'jobParameters')
+                primary_input = self._get_primary_input(job_params)
+                if primary_input:
+                    splitting_dict[step.id] = list()
+                    splitting_dict[step.id].append({'dataset': primary_input['dataset'],
+                                                    'offset': 0,
+                                                    'number_events': int(step.input_events),
+                                                    'container': None})
+                    return splitting_dict
 
-            if 'skipFilesUsedBy'.lower() in project_mode.keys():
-                previous_task_id = int(project_mode['skipFilesUsedBy'.lower()])
-                if previous_task_id:
-                    job_params = self.task_reg.get_task_parameter(previous_task_id, 'jobParameters')
-                    primary_input = self._get_primary_input(job_params)
-                    if primary_input:
-                        splitting_dict[step.id] = list()
-                        splitting_dict[step.id].append({'dataset': primary_input['dataset'],
-                                                        'offset': 0,
-                                                        'number_events': int(step.input_events),
-                                                        'container': None})
-                        return splitting_dict
-
-            task_config = self._get_task_config(step)
+            task_config = ProjectMode.get_task_config(step)
             if 'previous_task_list' in task_config.keys():
                 previous_task_list = ProductionTask.objects.filter(id__in=task_config['previous_task_list'])
                 for previous_task in previous_task_list:
@@ -4386,41 +3773,17 @@ class TaskDefinition(object):
             if not self.rucio_client.is_dsn_container(input_data_name):
                 return splitting_dict
 
-            # if not 'nEventsPerInputFile' in task_config.keys():
-            #     nevents_per_files = self.get_events_per_file(input_data_name)
-            #     if not nevents_per_files:
-            #         logger.info("Step = %d, nEventsPerInputFile is missing, skipping the step" % step.id)
-            #         return splitting_dict
-            #     task_config['nEventsPerInputFile'] = nevents_per_files
-            #     log_msg = "_get_splitting_dict, step = %d, input_data_name = %s, found nEventsPerInputFile = %d" % \
-            #               (step.id, input_data_name, task_config['nEventsPerInputFile'])
-            #     logger.info(log_msg)
-
-            # TODO
-            # if not skip_data_verify:
-            #     self.verify_data_uniform(step, input_data_name)
-
-            use_real_events = True
-            if 'useRealEventsCont'.lower() in project_mode.keys():
-                option_value = str(project_mode['useRealEventsCont'.lower()])
-                if option_value.lower() == 'yes'.lower():
-                    use_real_events = True
-                else:
-                    use_real_events = False
+            use_real_events = project_mode.useRealEventsCont or True
 
             logger.info("Step = %d, container = %s, list of datasets = %s" %
                         (step.id, input_data_name, result['datasets']))
-            # events_per_file = int(task_config['nEventsPerInputFile'])
-            # number_events_in_container = events_per_file * self.ddm_wrapper.ddm_get_number_files(input_data_name)
+
             number_events_in_container = \
                 self.get_events_in_datasets(result['datasets'], step, use_real_events=use_real_events)
             if not number_events_in_container:
                 raise Exception(
                     'Container {0} has no events or there is no information in AMI/Rucio'.format(input_data_name))
-            # number_events_in_container = self.get_events_in_container(step, input_data_name, content=content)
-            # TODO
-            # number_events_in_container = self.get_events_in_container(step, input_data_name,
-            #                                                           use_real_events=use_real_events)
+
             logger.info("Step = %d, container = %s, number_events_in_container = %d" %
                         (step.id, input_data_name, number_events_in_container))
             if not number_events_in_container:
@@ -4472,8 +3835,6 @@ class TaskDefinition(object):
                 offset = 0
                 number_events = 0
                 events_per_file = self.get_events_per_input_file(step, dataset_name, use_real_events=use_real_events)
-                # TODO
-                # events_per_file = self.get_events_per_input_file(step, dataset_name, use_real_events=use_real_events)
                 if not events_per_file:
                     logger.info("Step = %d, nEventsPerInputFile for dataset %s is missing, skipping this dataset" %
                                 (step.id, dataset_name))
@@ -4504,7 +3865,7 @@ class TaskDefinition(object):
     def _get_evgen_input_list(self, step):
         evgen_input_list = list()
         input_data_name = self.get_step_input_data_name(step)
-        task_config = self._get_task_config(step)
+        task_config = ProjectMode.get_task_config(step)
         ctag_name = step.step_template.ctag
         ctag = self._get_ami_tag_cached(ctag_name)
         energy_gev = self._get_energy(step, ctag)
@@ -4589,7 +3950,7 @@ class TaskDefinition(object):
             if 'nFiles' in task_params:
                 nfiles_used += int(task_params['nFiles'])
 
-        nevents_per_job = input_params.get('nEventsPerJob')
+        nevents_per_job = int(input_params.get('nEventsPerJob'))
         if not nevents_per_job:
             raise Exception(
                 'JO file {0} does not contain evgenConfig.minevents definition. '.format(
@@ -4679,7 +4040,8 @@ class TaskDefinition(object):
             result_list.append(temporary_list[j])
         return result_list, another_chain_step
 
-    def _get_request_status(self, request):
+    @staticmethod
+    def _get_request_status(request):
         statuses = TRequestStatus.objects.filter(request=request).order_by('-timestamp').values_list(
             'status', flat=True)
         for status in statuses:
@@ -4706,7 +4068,6 @@ class TaskDefinition(object):
                     steps_in_slice = StepExecution.objects.filter(request=request,
                                                                   status=self.protocol.STEP_STATUS[StepStatus.APPROVED],
                                                                   slice=input_slice).order_by('id')
-                    # FIXME
                     try:
                         steps_in_slice, _ = self._build_linked_step_list(request, input_slice)
                     except Exception as ex:
@@ -4730,12 +4091,7 @@ class TaskDefinition(object):
                         if input_data_name:
                             input_data_dict = self.parse_data_name(input_data_name)
 
-                            project_mode = self._get_project_mode(step)
-                            force_split_evgen = None
-                            if 'splitEvgen'.lower() in project_mode.keys():
-                                option_value = str(project_mode['splitEvgen'.lower()])
-                                if option_value.lower() == 'yes'.lower():
-                                    force_split_evgen = True
+                            force_split_evgen = ProjectMode(step).splitEvgen
 
                             if str(input_data_dict['number']).lower().startswith('period'.lower()) \
                                     or input_data_dict['prod_step'].lower() == 'PhysCont'.lower():
@@ -4788,7 +4144,6 @@ class TaskDefinition(object):
                                 elif parent_step.status.lower() == \
                                         self.protocol.STEP_STATUS[StepStatus.NOTCHECKED].lower():
                                     raise Exception("Parent step is '{0}'".format(parent_step.status))
-                            # self.create_task_chain(step.id, restart=use_parent_output)
                             splitting_dict = dict()
                             try:
                                 if not use_parent_output:
@@ -4847,7 +4202,7 @@ class TaskDefinition(object):
                     except:
                         log_msg = "Request = %d, Chain = %d (%d), input = %s, exception occurred: %s" % \
                                   (request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
-                                   get_exception_string())  # str(ex))
+                                   get_exception_string())
                         logger.exception(log_msg)
                         if request.reference:
                             try:

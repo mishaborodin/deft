@@ -10,7 +10,6 @@ from django.utils.dateparse import parse_datetime
 from django.dispatch import receiver
 from django.db.models.signals import post_init
 from django.utils import timezone
-from django.contrib.auth.models import AbstractUser
 from deftcore.helpers import OracleClob
 
 models.options.DEFAULT_NAMES += ('db_name',)
@@ -853,12 +852,6 @@ class TConfig(models.Model):
         unique_together = (('app', 'component', 'key'),)
         db_name = u'deft_intr'
         db_table = u'"ATLAS_DEFT"."T_CONFIG"'
-
-
-class User(AbstractUser):
-    class Meta:
-        db_name = u'deft_intr'
-        db_table = u'"ATLAS_DEFT"."AUTH_USER"'
 
 
 class DatasetStaging(models.Model):

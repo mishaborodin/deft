@@ -225,7 +225,6 @@ else:
 
 TASTYPIE_DEFAULT_FORMATS = ['json']
 
-AUTH_USER_MODEL = 'taskengine.User'
 SESSION_ENGINE = 'taskengine.sessions'
 
 RUCIO_ACCOUNT_NAME = 'prodsys'

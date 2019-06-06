@@ -14,7 +14,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JediDataset, InstalledSW, OpenEnded, ProductionDataset, HashTag, TConfig
+    TTaskRequest, JEDIDataset, InstalledSW, OpenEnded, ProductionDataset, HashTag, TConfig
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -1154,7 +1154,7 @@ class TaskDefinition(object):
                 else:
                     if 'nEventsPerJob' in task_existing and 'nEventsPerInputFile' in task_existing:
                         try:
-                            jedi_dataset_info = JediDataset.objects.get(task_id=jedi_task_existing.id,
+                            jedi_dataset_info = JEDIDataset.objects.get(task_id=jedi_task_existing.id,
                                                                         dataset_name__contains=primary_input['dataset'])
                             number_files_finished = int(jedi_dataset_info.number_files_finished)
                             number_of_input_files = \
@@ -1180,7 +1180,7 @@ class TaskDefinition(object):
                 else:
                     if 'nEventsPerJob' in task_existing and 'nEventsPerInputFile' in task_existing:
                         try:
-                            jedi_dataset_info = JediDataset.objects.get(task_id=jedi_task_existing.id,
+                            jedi_dataset_info = JEDIDataset.objects.get(task_id=jedi_task_existing.id,
                                                                         dataset_name__contains=primary_input['dataset'])
                             nfiles = int(jedi_dataset_info.nfiles)
                             number_of_input_files = \
@@ -1652,7 +1652,9 @@ class TaskDefinition(object):
 
             use_evgen_otf = project_mode.isOTF or False
             use_no_output = project_mode.noOutput or False
-            leave_log = project_mode.leaveLog or True
+            leave_log = True
+            if project_mode.leaveLog is not None:
+                leave_log = project_mode.leaveLog
 
             if step.request.request_type.lower() == 'MC'.lower():
                 if prod_step.lower() == 'simul'.lower():
@@ -3773,7 +3775,9 @@ class TaskDefinition(object):
             if not self.rucio_client.is_dsn_container(input_data_name):
                 return splitting_dict
 
-            use_real_events = project_mode.useRealEventsCont or True
+            use_real_events = True
+            if project_mode.useRealEventsCont is not None:
+                use_real_events = project_mode.useRealEventsCont
 
             logger.info("Step = %d, container = %s, list of datasets = %s" %
                         (step.id, input_data_name, result['datasets']))

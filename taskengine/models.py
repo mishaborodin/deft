@@ -732,7 +732,7 @@ class ProductionTaskInput(models.Model):
         db_table = u'"ATLAS_DEFT"."T_PRODTASK_INPUT"'
 
 
-class JediDataset(models.Model):
+class JEDIDataset(models.Model):
     task_id = models.DecimalField(decimal_places=0, max_digits=11, db_column='JEDITASKID', primary_key=True)
     dataset_id = models.DecimalField(decimal_places=0, max_digits=11, db_column='DATASETID', null=False)
     dataset_name = models.CharField(max_length=255, db_column='DATASETNAME', null=False)
@@ -743,6 +743,20 @@ class JediDataset(models.Model):
     class Meta:
         db_name = u'deft_adcr'
         db_table = u'"ATLAS_PANDA"."JEDI_DATASETS"'
+
+
+class JEDIDatasetContent(models.Model):
+    dataset_id = models.DecimalField(decimal_places=0, max_digits=11, db_column='datasetid', primary_key=True)
+    task_id = models.DecimalField(decimal_places=0, max_digits=11, db_column='JEDITASKID', null=False)
+    status = models.CharField(max_length=64, db_column='STATUS', null=False)
+    filename = models.CharField(max_length=256, db_column='lfn', null=False)
+
+    def save(self, *args, **kwargs):
+        return
+
+    class Meta:
+        db_name = u'panda_adcr'
+        db_table = u'"ATLAS_PANDA"."JEDI_DATASET_CONTENTS"'
 
 
 class InstalledSW(models.Model):

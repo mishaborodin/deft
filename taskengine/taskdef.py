@@ -14,7 +14,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, InstalledSW, OpenEnded, ProductionDataset, HashTag, TConfig
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient

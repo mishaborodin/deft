@@ -3870,6 +3870,7 @@ class TaskDefinition(object):
         evgen_input_list = list()
         input_data_name = self.get_step_input_data_name(step)
         task_config = ProjectMode.get_task_config(step)
+        project_mode = ProjectMode(step)
         ctag_name = step.step_template.ctag
         ctag = self._get_ami_tag_cached(ctag_name)
         energy_gev = self._get_energy(step, ctag)
@@ -3940,6 +3941,7 @@ class TaskDefinition(object):
             break
 
         task_dsn_no_scope = None
+
         if task:
             jedi_task = TTask.objects.get(id=task.id)
             task_params = json.loads(jedi_task.jedi_task_param)
@@ -3952,7 +3954,20 @@ class TaskDefinition(object):
                 offset = int(task_random_seed['offset'])
             nfiles_used = offset
             if 'nFiles' in task_params:
-                nfiles_used += int(task_params['nFiles'])
+                nfiles_in_tid_ds = 0
+                if 'tid' in task_dsn_no_scope:
+                    nfiles_in_tid_ds = self.rucio_client.get_number_files_from_metadata(task_dsn_no_scope)
+                nfiles_used += max([int(task_params['nFiles']), nfiles_in_tid_ds])
+
+        if project_mode.splitEvgenOffsetByLast:
+            total_files = 0
+            for dsn in datasets:
+                tid_dsn_no_scope = dsn.split(':')[-1]
+                nfiles_in_tid_ds = self.rucio_client.get_number_files_from_metadata(dsn)
+                total_files += nfiles_in_tid_ds
+                if tid_dsn_no_scope == task_dsn_no_scope:
+                    nfiles_used = max([total_files, nfiles_used])
+                    break
 
         nevents_per_job = int(input_params.get('nEventsPerJob'))
         if not nevents_per_job:

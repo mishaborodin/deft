@@ -442,5 +442,9 @@
   "workQueueName": {
     "type": "str",
     "description": ""
+  },
+  "splitEvgenOffsetByLast": {
+    "type": "bool",
+    "description": ""
   }
 }

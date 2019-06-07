@@ -9,6 +9,7 @@ from django.utils import timezone
 from deftcore.settings import MONITORING_REQUEST_LINK_FORMAT
 from deftcore.jira import JIRAClient
 from deftcore.log import Logger
+from taskengine.rucioclient import RucioClient
 
 logger = Logger.get()
 
@@ -247,3 +248,25 @@ class TaskRegistration(object):
         if primary_input_param:
             primary_input_dsn = str(primary_input_param['dataset']).split('/')[0].split(':')[-1]
         return primary_input_dsn
+
+    @staticmethod
+    def check_task_output(task_id, types):
+        output_datasets = \
+            [dataset.name for dataset in ProductionDataset.objects.filter(task_id=task_id)]
+
+        rucio_client = RucioClient()
+
+        output_type_status_dict = dict()
+
+        for output_dataset in output_datasets:
+            result = re.match(TaskDefConstants.DEFAULT_DATA_NAME_PATTERN, output_dataset)
+            if not result:
+                continue
+            output_type = result.groupdict().get('data_type', None)
+            if not output_type in types:
+                continue
+            if output_type:
+                output_dataset_exists = rucio_client.is_dsn_exist(output_dataset)
+                output_type_status_dict.update({output_type: output_dataset_exists})
+
+        return output_type_status_dict

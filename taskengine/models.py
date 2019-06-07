@@ -11,6 +11,9 @@ from django.dispatch import receiver
 from django.db.models.signals import post_init
 from django.utils import timezone
 from deftcore.helpers import OracleClob
+from deftcore.log import Logger, get_exception_string
+
+logger = Logger.get()
 
 models.options.DEFAULT_NAMES += ('db_name',)
 
@@ -675,8 +678,9 @@ def t_request_proxy_post_init(sender, **kwargs):
                                                      'jo': input_slice.input_data,
                                                      'slice': int(input_slice.slice)})
                 except Exception as ex:
-                    pass
+                    logger.exception('Exception occurred: {0}'.format(ex))
     except:
+        logger.exception('Exception occurred: {0}'.format(get_exception_string()))
         self.evgen_steps = None
 
 

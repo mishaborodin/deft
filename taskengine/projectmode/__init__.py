@@ -36,10 +36,6 @@ class ProjectMode(object):
         if 'project_mode' in task_config.keys():
             project_mode.update(self._parse_project_mode(task_config['project_mode']))
 
-        if not project_mode:
-            # empty project_mode
-            return
-
         project_mode_options = self.get_options()
 
         option_names = {key.lower(): key for key in project_mode_options.keys()}

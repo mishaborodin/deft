@@ -87,6 +87,14 @@ class Command(BaseCommand):
                                 "AND timestamp < TO_DATE('01-02-2019', 'DD-MM-YYYY') " + \
                                 "ORDER BY timestamp ASC"
                         logger.info('check_datasets, pid={0}, query=\"{1}\"'.format(os.getpid(), query))
+                    elif options['extra_param'] == '3':
+                        query = "SELECT name, status, ddm_status, ddm_timestamp FROM t_production_dataset " + \
+                                "WHERE status is not NULL " + \
+                                "AND timestamp > TO_DATE('01-10-2018', 'DD-MM-YYYY') " + \
+                                "AND timestamp < TO_DATE('01-07-2019', 'DD-MM-YYYY') " + \
+                                "AND name LIKE '{0}' ".format('%%.DAOD_%%.%%') + \
+                                "ORDER BY timestamp ASC"
+                        logger.info('check_datasets, pid={0}, query=\"{1}\"'.format(os.getpid(), query))
                 for dataset in ProductionDataset.objects.raw(query):
                     current_timestamp = timezone.now()
 

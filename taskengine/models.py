@@ -658,7 +658,7 @@ def t_request_proxy_post_init(sender, **kwargs):
             input_slices = InputRequestList.objects.filter(request__id=self.id).order_by('slice')
             for input_slice in input_slices:
                 try:
-                    if input_slice.input_data:
+                    if input_slice.input_data and not input_slice.hided:
                         dsid = int(input_slice.input_data.split('.')[1])
                         brief = input_slice.input_data.split('.')[2]
                         evgen_steps = StepExecution.objects.filter(request__id=self.id,

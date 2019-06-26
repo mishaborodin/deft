@@ -20,4 +20,5 @@ class Watchdog(object):
             for client in self.client_list:
                 if not client.is_connected():
                     self.logger.warning('Watchdog: client {0} is disconnected'.format(client.id))
+                    client.connect()
             time.sleep(self.timeout)

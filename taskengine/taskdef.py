@@ -1674,7 +1674,7 @@ class TaskDefinition(object):
                             else:
                                 raise Exception(
                                     'The task is rejected because of inconsistency. ' +
-                                    'nEventsPerInputFile=%d does not match to nEventsPerJob=%d of the parent'.format(
+                                    'nEventsPerInputFile={0} does not match to nEventsPerJob={1} of the parent'.format(
                                         n_events_input_file, n_events_job_parent))
 
             overlay_production = False

@@ -1539,7 +1539,7 @@ class TaskDefinition(object):
                 if re.match(key, trf_name, re.IGNORECASE):
                     trf_options.update(Protocol.TRF_OPTIONS[key])
 
-            if ctag_name[0] in ('f', 'm', 'v', 'k'):
+            if ctag_name[0] in ('f', 'm', 'v', 'k') and 'phconfig' in ctag:
                 tzero_tag = self.ami_client.get_ami_tag_tzero(ctag_name)
                 if type(tzero_tag) == unicode:
                     tzero_tag = json.loads(tzero_tag)

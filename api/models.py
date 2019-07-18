@@ -1,6 +1,7 @@
 __author__ = 'Dmitry Golubkov'
 
 import json
+import socket
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -89,7 +90,8 @@ class Request(models.Model):
     STATUS_TEMPLATE = {
         'result': '{{result}}',
         'error': None,
-        'exception': None
+        'exception': None,
+        'server': socket.gethostname()
     }
 
     created = models.DateTimeField(auto_now_add=True, help_text='Request created time')

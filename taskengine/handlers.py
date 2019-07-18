@@ -125,9 +125,9 @@ class TaskActionHandler(object):
         if not task_id:
             return
         try:
-            task = ProductionTask.objects.get(id=task_id)
+            task = ProductionTask.objects.get(id=int(task_id))
         except ProductionTask.DoesNotExist:
-            logger.info('The task {0} is not found'.format(task_id))
+            logger.info('The task {0} is not found'.format(int(task_id)))
             return
         try:
             if task.reference:

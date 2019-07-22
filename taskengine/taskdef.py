@@ -2932,7 +2932,9 @@ class TaskDefinition(object):
                 if project.lower().startswith('data'):
                     task_proto_dict.update({'goal': str(100.0)})
                     task_proto_dict.update({'use_exhausted': True})
-
+                if project.lower().startswith('mc'):
+                    task_proto_dict.update({'cpu_time': 200})
+                    
             if trf_name in ['AODMerge_tf.py', 'DAODMerge_tf.py', 'Archive_tf.py', 'ESDMerge_tf.py']:
                 task_proto_dict.update({'out_disk_count': 1000})
                 task_proto_dict.update({'out_disk_unit': 'kB'})

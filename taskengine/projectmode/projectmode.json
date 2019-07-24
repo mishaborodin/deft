@@ -450,5 +450,9 @@
   "checkOutputDeleted": {
     "type": "bool",
     "description": ""
+  },
+  "amiHashtagInput": {
+    "type": "str",
+    "description": ""
   }
 }

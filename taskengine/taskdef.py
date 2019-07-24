@@ -2934,7 +2934,7 @@ class TaskDefinition(object):
                     task_proto_dict.update({'use_exhausted': True})
                 if project.lower().startswith('mc'):
                     task_proto_dict.update({'cpu_time': 200})
-                    
+
             if trf_name in ['AODMerge_tf.py', 'DAODMerge_tf.py', 'Archive_tf.py', 'ESDMerge_tf.py']:
                 task_proto_dict.update({'out_disk_count': 1000})
                 task_proto_dict.update({'out_disk_unit': 'kB'})
@@ -4144,11 +4144,13 @@ class TaskDefinition(object):
                     try:
                         phys_cont_list = list()
                         evgen_input_list = list()
+                        ami_hashtag_input_list = list()
                         input_data_name = self.get_step_input_data_name(step)
                         if input_data_name:
                             input_data_dict = self.parse_data_name(input_data_name)
 
                             force_split_evgen = ProjectMode(step).splitEvgen
+                            ami_hashtag_input = ProjectMode(step).amiHashtagInput
 
                             if str(input_data_dict['number']).lower().startswith('period'.lower()) \
                                     or input_data_dict['prod_step'].lower() == 'PhysCont'.lower():
@@ -4160,6 +4162,12 @@ class TaskDefinition(object):
                                         phys_cont_list.extend(input_params[key])
                             elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
                                 evgen_input_list.extend(self._get_evgen_input_list(step))
+                            elif not ami_hashtag_input is None:
+                                if ami_hashtag_input:
+                                    logger.info('AMI # {0} is used as input'.format(ami_hashtag_input))
+                                    ami_hashtag_input_list = self.ami_client.list_containers_for_hashtag(
+                                        ami_hashtag_input.split(':')[0], ami_hashtag_input.split(':')[-1]
+                                    )
                         if phys_cont_list:
                             for input_dataset in phys_cont_list:
                                 try:
@@ -4181,6 +4189,25 @@ class TaskDefinition(object):
                                     self.create_task_chain(step.id,
                                                            first_step_number_of_events=input_params['nevents'],
                                                            evgen_params=input_params)
+                                except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
+                                        UnmergedInputProcessedException) as ex:
+                                    log_msg = \
+                                        'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
+                                            request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
+                                            get_exception_string())
+                                    jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    exception = True
+                                    continue
+                                except Exception as ex:
+                                    raise ex
+                        elif ami_hashtag_input_list:
+                            for input_dataset in ami_hashtag_input_list:
+                                try:
+                                    if int(step.input_events) != -1:
+                                        raise Exception(
+                                            'Input/total events should be -1 (ALL) if AMI # is used as input')
+                                    self.create_task_chain(step.id, input_dataset=input_dataset,
+                                                           first_step_number_of_events=-1)
                                 except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                         UnmergedInputProcessedException) as ex:
                                     log_msg = \

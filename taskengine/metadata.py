@@ -35,6 +35,36 @@ class AMIClient(object):
         except Exception as ex:
             logger.critical('AMI initialization failed: {0}'.format(str(ex)))
 
+    def list_containers_for_hashtag(self, scope, name):
+        containers = list()
+
+        command = [
+            'DatasetWBListDatasetsForHashtag',
+            ' -scope="{0}"'.format(scope),
+            '-name="{0}"'.format(name)
+        ]
+
+        for row in self.client.execute(command, format='dom_object').get_rows():
+            containers.append(row['ldn'])
+
+        return containers
+
+    def add_hashtag_for_container(self, scope, name, dsn, comment=None, pattern='AMI_GLOBAL_SCOPE'):
+        command = [
+            'DatasetWBAddHashtag',
+            '-pattern="{0}"'.format(pattern),
+            '-scope="{0}"'.format(scope),
+            '-name="{0}"'.format(name),
+            '-ldn="{0}"'.format(dsn)
+        ]
+
+        if not comment is None:
+            command.append('-comment="{0}"'.format(comment))
+
+        row_id = int(self.client.execute(command, format='dom_object').get_rows()[0]['id'])
+
+        return row_id != 0
+
     def _get_current_user(self):
         command = ['GetSessionInfo']
         result = self.client.execute(command, format='dom_object').get_rows('user')

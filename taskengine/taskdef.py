@@ -4146,11 +4146,23 @@ class TaskDefinition(object):
                         evgen_input_list = list()
                         ami_hashtag_input_list = list()
                         input_data_name = self.get_step_input_data_name(step)
-                        if input_data_name:
+
+                        if input_data_name.startswith('ami#'):
+                            ami_hashtag_input = input_data_name.split('ami#')[-1]
+                            if ami_hashtag_input:
+                                logger.info('AMI # "{0}" is used as input'.format(ami_hashtag_input))
+                                ami_hashtag_input_list = self.ami_client.list_containers_for_hashtag(
+                                    ami_hashtag_input.split(':')[0], ami_hashtag_input.split(':')[-1]
+                                )
+                                if not ami_hashtag_input_list:
+                                    raise Exception('AMI # "{0}" input list is empty'.format(ami_hashtag_input))
+                            else:
+                                raise Exception('AMI # input "{0}" has wrong format'.format(input_data_name))
+
+                        if input_data_name and not ami_hashtag_input_list:
                             input_data_dict = self.parse_data_name(input_data_name)
 
                             force_split_evgen = ProjectMode(step).splitEvgen
-                            ami_hashtag_input = ProjectMode(step).amiHashtagInput
 
                             if str(input_data_dict['number']).lower().startswith('period'.lower()) \
                                     or input_data_dict['prod_step'].lower() == 'PhysCont'.lower():
@@ -4162,12 +4174,6 @@ class TaskDefinition(object):
                                         phys_cont_list.extend(input_params[key])
                             elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
                                 evgen_input_list.extend(self._get_evgen_input_list(step))
-                            elif not ami_hashtag_input is None:
-                                if ami_hashtag_input:
-                                    logger.info('AMI # {0} is used as input'.format(ami_hashtag_input))
-                                    ami_hashtag_input_list = self.ami_client.list_containers_for_hashtag(
-                                        ami_hashtag_input.split(':')[0], ami_hashtag_input.split(':')[-1]
-                                    )
                         if phys_cont_list:
                             for input_dataset in phys_cont_list:
                                 try:

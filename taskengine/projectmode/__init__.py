@@ -79,9 +79,18 @@ class ProjectMode(object):
         return task_config
 
     @staticmethod
-    def set_task_config(step, task_config):
-        step.task_config = json.dumps(task_config)
-        step.save(update_fields=['task_config'])
+    def set_task_config(step, task_config, keys_to_save=None):
+        if keys_to_save is None:
+            step.task_config = json.dumps(task_config)
+            step.save(update_fields=['task_config'])
+        else:
+            if len(keys_to_save) > 0:
+                config = {key: task_config[key] for key in keys_to_save}
+                if config:
+                    step_task_config = ProjectMode.get_task_config(step)
+                    step_task_config.update(config)
+                    step.task_config = json.dumps(step_task_config)
+                    step.save(update_fields=['task_config'])
 
     @staticmethod
     def _parse_project_mode(project_mode_string):

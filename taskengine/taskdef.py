@@ -1282,7 +1282,7 @@ class TaskDefinition(object):
                 if first_event_param:
                     first_event_param['offset'] = number_of_input_files_used * events_per_file
 
-        if evgen_params:
+        if evgen_params and prod_step.lower() == 'evgen'.lower():
             random_seed_param = self._get_job_parameter('randomSeed', task['jobParameters'])
             if random_seed_param:
                 random_seed_param['offset'] = evgen_params['offset']
@@ -1652,9 +1652,10 @@ class TaskDefinition(object):
                                 evgen_events_per_job = int(evgen_input_params['nEventsPerJob'])
                                 evgen_step_task_config = ProjectMode.get_task_config(evgen_step)
                                 evgen_step_task_config.update({'nEventsPerJob': evgen_events_per_job})
-                                ProjectMode.set_task_config(evgen_step, evgen_step_task_config)
+                                ProjectMode.set_task_config(evgen_step, evgen_step_task_config,
+                                                            keys_to_save=('nEventsPerJob',))
                                 task_config.update({'nEventsPerInputFile': evgen_events_per_job})
-                                ProjectMode.set_task_config(step, task_config)
+                                ProjectMode.set_task_config(step, task_config, keys_to_save=('nEventsPerInputFile',))
                         except Exception as ex:
                             logger.warning("Checking the parent evgen step failed: %s" % str(ex))
 
@@ -1782,7 +1783,7 @@ class TaskDefinition(object):
             if 'nFilesPerJob' in input_params.keys() and not 'nFilesPerJob' in task_config.keys():
                 task_config.update({'nFilesPerJob': int(input_params['nFilesPerJob'])})
 
-            if evgen_params:
+            if evgen_params and prod_step.lower() == 'evgen'.lower():
                 input_params.update(evgen_params)
                 number_of_events = evgen_params['nevents']
                 task_config['nFiles'] = evgen_params['nfiles']
@@ -2018,7 +2019,7 @@ class TaskDefinition(object):
 
             if 'nEventsPerJob' in input_params.keys():
                 task_config.update({'nEventsPerJob': int(input_params['nEventsPerJob'])})
-                ProjectMode.set_task_config(step, task_config)
+                ProjectMode.set_task_config(step, task_config, keys_to_save=('nEventsPerJob',))
 
             random_seed_offset = 0
             first_event_offset = 0
@@ -2046,7 +2047,7 @@ class TaskDefinition(object):
                 if evgen_number_input_files == 1:
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
-                    ProjectMode.set_task_config(step, task_config)
+                    ProjectMode.set_task_config(step, task_config, keys_to_save=('split_slice',))
                     random_seed_offset = self._get_number_events_processed(step) / events_per_job
                     first_event_offset = random_seed_offset * events_per_job
                     skip_check_input = True
@@ -2067,7 +2068,7 @@ class TaskDefinition(object):
                     skip_check_input_ne = True
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
-                    ProjectMode.set_task_config(step, task_config)
+                    ProjectMode.set_task_config(step, task_config, keys_to_save=('split_slice',))
                     random_seed_offset = self._get_number_events_processed(step) / events_per_job
                     first_event_offset = random_seed_offset * events_per_job
 
@@ -3724,13 +3725,13 @@ class TaskDefinition(object):
                     task_config['project_mode'] = 'useContainerName=yes;{0}'.format(task_config.get('project_mode', ''))
                     task_config_changed = True
                 if task_config_changed:
-                    ProjectMode.set_task_config(step, task_config)
+                    ProjectMode.set_task_config(step, task_config, keys_to_save=('project_mode',))
                     project_mode = ProjectMode(step)
             if len(campaigns.keys()) > 1:
                 if not project_mode.forceSplitInput:
                     task_config = ProjectMode.get_task_config(step)
                     task_config['project_mode'] = 'forceSplitInput=yes;{0}'.format(task_config.get('project_mode', ''))
-                    ProjectMode.set_task_config(step, task_config)
+                    ProjectMode.set_task_config(step, task_config, keys_to_save=('project_mode',))
                     project_mode = ProjectMode(step)
                 if project_mode.runOnlyCampaign:
                     requested_campaigns = list()

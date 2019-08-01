@@ -890,5 +890,5 @@ class DatasetStaging(models.Model):
         super(DatasetStaging, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_intr'
+        db_name = u'deft_adcr'
         db_table = u'"ATLAS_DEFT"."T_DATASET_STAGING"'

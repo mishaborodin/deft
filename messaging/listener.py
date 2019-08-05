@@ -76,19 +76,30 @@ class Listener(stomp.ConnectionListener):
         elif event_type in (TaskDefConstants.DDM_PROGRESS_EVENT_TYPE.lower()):
             rule_id = payload.get('rule_id', None)
             progress = int(payload.get('progress', 0))
+            current_timestamp = timezone.now()
+            dsn = name.split(':')[-1]
+            dataset_staging = DatasetStaging.objects.filter(dataset=dsn).first()
+            if dataset_staging:
+                last_progress = int(dataset_staging.staged_files * 100 / dataset_staging.total_files)
+                if last_progress >= progress:
+                    '[PROGRESS ({0})]: IGNORED, dsn={1}, progress={2}%, last_progress={3}%'.format(
+                        event_type,
+                        dsn,
+                        progress,
+                        last_progress
+                    )
+                    return
+
             self._logger.info(
-                '[PROGRESS ({0})]: scope={1}, name={2}, rule_id={3}, progress={4}'.format(
+                '[PROGRESS ({0})]: dsn={1}, rule_id={2}, progress={3}%'.format(
                     event_type,
-                    scope,
-                    name,
+                    dsn,
                     rule_id,
                     progress
                 )
             )
+
             if not self._no_db_log:
-                current_timestamp = timezone.now()
-                dsn = name.split(':')[-1]
-                dataset_staging = DatasetStaging.objects.filter(dataset=dsn).first()
                 if dataset_staging:
                     dataset_staging.update_time = current_timestamp
                     if progress == 100:

@@ -3449,6 +3449,7 @@ class TaskDefinition(object):
     def _get_number_events_processed(self, step, requested_datasets=None):
         number_events_processed = 0
         input_data_name = self.get_step_input_data_name(step)
+        project_mode = ProjectMode(step)
 
         ps1_task_list = TTaskRequest.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete']),
                                                     project=step.request.project,
@@ -3497,6 +3498,22 @@ class TaskDefinition(object):
                 requested_datasets_no_scope = [e.split(':')[-1] for e in requested_datasets]
                 previous_dsn_no_scope = previous_dsn.split(':')[-1]
                 if not previous_dsn_no_scope in requested_datasets_no_scope:
+                    continue
+
+            if project_mode.checkOutputDeleted:
+                requested_output_types = step.step_template.output_formats.split('.')
+                previous_output_status_dict = \
+                    self.task_reg.check_task_output(ps2_task.id, requested_output_types)
+                previous_output_exists = False
+                for requested_output_type in requested_output_types:
+                    if not requested_output_type in previous_output_status_dict.keys():
+                        continue
+                    if previous_output_status_dict[requested_output_type]:
+                        previous_output_exists = True
+                        break
+                    else:
+                        logger.info('Output {0} of task {1} is deleted'.format(requested_output_type, ps2_task.id))
+                if not previous_output_exists:
                     continue
 
             number_events = int(ps2_task.total_req_events or 0)

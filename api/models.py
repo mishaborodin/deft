@@ -145,7 +145,7 @@ class Request(models.Model):
         return str(self.id)
 
     class Meta:
-        db_name = u'deft_intr'
+        db_name = u'deft_adcr'
         db_table = u'"ATLAS_DEFT"."T_API_REQUEST"'
 
 

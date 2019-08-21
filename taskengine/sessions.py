@@ -10,7 +10,7 @@ class CustomSession(AbstractBaseSession):
         return SessionStore
 
     class Meta:
-        db_name = u'deft_intr'
+        db_name = u'deft_adcr'
         db_table = u'"ATLAS_DEFT"."DJANGO_SESSION"'
 
 

@@ -700,7 +700,7 @@ class TDataFormat(models.Model):
     description = models.CharField(max_length=256, db_column='DESCRIPTION', null=True)
 
     class Meta:
-        db_name = u'deft_intr'
+        db_name = u'deft_adcr'
         db_table = u'"ATLAS_DEFT"."T_DATA_FORMAT"'
 
 
@@ -718,22 +718,6 @@ def t_step_proxy_post_init(sender, **kwargs):
         self.ctag = self.step_template.ctag
         self.slice_n = self.slice.slice
         self.request_id = self.request.id
-
-
-class ProductionTaskInput(models.Model):
-    task = models.OneToOneField(ProductionTask, db_column='TASKID', primary_key=True)
-    ctag = models.CharField(max_length=12, db_column='CTAG', null=False)
-    output_formats = models.CharField(max_length=80, db_column='OUTPUT_FORMATS', null=False)
-    input_name = models.CharField(max_length=150, db_column='INPUT_NAME', null=True)
-    events = models.DecimalField(decimal_places=0, max_digits=12, db_column='EVENTS', null=False)
-    files = models.DecimalField(decimal_places=0, max_digits=12, db_column='FILES', null=False)
-    events_per_job = models.DecimalField(decimal_places=0, max_digits=10, db_column='EVENTS_PER_JOB', null=False)
-    events_per_file = models.DecimalField(decimal_places=0, max_digits=10, db_column='EVENTS_PER_FILE', null=False)
-    input_dataset = models.CharField(max_length=150, db_column='INPUT_DATASET', null=True)
-
-    class Meta:
-        db_name = u'deft_intr'
-        db_table = u'"ATLAS_DEFT"."T_PRODTASK_INPUT"'
 
 
 class JEDIDataset(models.Model):
@@ -791,7 +775,7 @@ class OpenEnded(models.Model):
     status = models.CharField(max_length=20, db_column='STATUS', null=True)
 
     class Meta:
-        db_name = u'deft_intr'
+        db_name = u'deft_adcr'
         db_table = u'"ATLAS_DEFT"."T_OPEN_ENDED"'
 
 

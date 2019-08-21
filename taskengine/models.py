@@ -852,7 +852,7 @@ class TConfig(models.Model):
 
     class Meta:
         unique_together = (('app', 'component', 'key'),)
-        db_name = u'deft_intr'
+        db_name = u'deft_adcr'
         db_table = u'"ATLAS_DEFT"."T_CONFIG"'
 
 

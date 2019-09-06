@@ -3579,6 +3579,7 @@ class TaskDefinition(object):
                                               step__step_template__ctag=step.step_template.ctag,
                                               step__step_template__output_formats=step.step_template.output_formats)
 
+        max_by_offset = 0
         for ps2_task in ps2_task_list:
 
             if split_slice:
@@ -3589,8 +3590,8 @@ class TaskDefinition(object):
                 if not processed_output_types:
                     continue
 
+            jedi_task_existing = TTask.objects.get(id=ps2_task.id)
             if requested_datasets:
-                jedi_task_existing = TTask.objects.get(id=ps2_task.id)
                 task_existing = json.loads(jedi_task_existing.jedi_task_param)
                 previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
                 requested_datasets_no_scope = [e.split(':')[-1] for e in requested_datasets]
@@ -3618,8 +3619,12 @@ class TaskDefinition(object):
             if not number_events:
                 number_events = int(ps2_task.total_events or 0)
             number_events_processed += number_events
+            offset = jedi_task_existing._get_job_parameter('firstEvent','offset')
+            if offset and offset>0:
+                max_by_offset = max(max_by_offset,number_events+offset)
 
-        return number_events_processed
+
+        return max(number_events_processed,max_by_offset)
 
     def _get_processed_datasets(self, step, requested_datasets=None):
         processed_datasets = []

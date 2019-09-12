@@ -195,22 +195,45 @@ class TaskDefinition(object):
 
     @staticmethod
     def get_step_input_data_name(step):
-        if step.slice.input_dataset:
-            return step.slice.input_dataset
-        elif step.slice.input_data:
+        if step.step_template.step == 'Evgen':
             return step.slice.input_data
         else:
-            return None
+            if step.slice.input_dataset:
+                return step.slice.input_dataset
+            elif step.slice.input_data:
+                return step.slice.input_data
+            else:
+                return None
+
+
+    @staticmethod
+    def is_new_jo_format(name):
+        return ('/' in name) and (name.split('/')[0].isdigit())
+
 
     @staticmethod
     def parse_data_name(name):
-        result = re.match(TaskDefConstants.DEFAULT_DATA_NAME_PATTERN, name)
-        if not result:
-            raise Exception('Invalid data name')
+        # New format
+        if TaskDefinition.is_new_jo_format(name):
+            data_name_dict = dict()
+            data_name_dict['number'] = name.split('/')[0]
+            data_name_dict['file_name'] = name.split('/')[1]
+            data_name_dict['prod_step'] = 'py'
+            data_name_dict['project'] = name.split('/')[1].split('.')[0]
+            data_name_dict['brief'] = name.split('/')[1].split('.')[1]
+            data_name_dict['version'] = ''
+            data_name_dict.update({'name': name})
+            return data_name_dict
+        else:
+            result = re.match(TaskDefConstants.DEFAULT_DATA_NAME_PATTERN, name)
+            if not result:
+                raise Exception('Invalid data name')
 
-        data_name_dict = result.groupdict()
-        data_name_dict.update({'name': name})
-        return data_name_dict
+            data_name_dict = result.groupdict()
+            data_name_dict.update({'name': name})
+            return data_name_dict
+
+
 
     @staticmethod
     def _get_svn_output(svn_command):
@@ -262,6 +285,55 @@ class TaskDefinition(object):
                 continue
             lines.append(line)
         return '\n'.join(lines)
+
+    def _get_evgen_input_files_new(self, input_data_dict, energy, evgen_input_container=None):
+        path_template = Template("/{{number|slice:\"0:3\"}}xxx/{{number}}/{{file_name}}")
+        job_options_file_path = path_template.render(
+            Context({'number': str(input_data_dict['number']), 'file_name': input_data_dict['file_name']}, autoescape=False))
+        path = TaskDefConstants.DEFAULT_NEW_EVGEN_JO_PATH + job_options_file_path
+        with open(path, 'r') as fp:
+            job_options_file_content = fp.read()
+        params = dict()
+        if evgen_input_container:
+            result = self.rucio_client.get_datasets_and_containers(evgen_input_container,
+                                                                   datasets_contained_only=True)
+            params.update({'inputGeneratorFile': result['datasets']})
+
+        events_per_job_param = 'evgenConfig.minevents'
+        events_per_job = None
+        if job_options_file_content.find(events_per_job_param) >= 0:
+            for jo_file_content_line in job_options_file_content.splitlines():
+                if jo_file_content_line.find(events_per_job_param) >= 0:
+                    try:
+                        if jo_file_content_line.startswith('#'):
+                            continue
+                        events_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
+                        logger.info('Using nEventsPerJob from JO file: evgenConfig.minevents={0}'.format(
+                            events_per_job))
+                        break
+                    except:
+                        pass
+        if events_per_job:
+            params.update({'nEventsPerJob': events_per_job})
+
+        files_per_job_param = 'evgenConfig.inputFilesPerJob'
+        files_per_job = None
+        if job_options_file_content.find(files_per_job_param) >= 0:
+            for jo_file_content_line in job_options_file_content.splitlines():
+                if jo_file_content_line.find(files_per_job_param) >= 0:
+                    try:
+                        if jo_file_content_line.startswith('#'):
+                            continue
+                        files_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
+                        logger.info('Using nFilesPerJob from JO file: evgenConfig.inputFilesPerJob={0}'.format(
+                            files_per_job))
+                        break
+                    except:
+                        pass
+        if files_per_job:
+            params.update({'nFilesPerJob': files_per_job})
+        params.update({'ecmEnergy': energy})
+        return params
 
     def _get_evgen_input_files(self, input_data_dict, energy, svn=False, use_containers=True, use_evgen_otf=False):
         path_template = Template("share/DSID{{number|slice:\"0:3\"}}xxx/{{file_name}}")
@@ -450,15 +522,26 @@ class TaskDefinition(object):
 
             if not input_data_name:
                 return input_params
-
+            is_new_format = False
+            if self.is_new_jo_format(input_data_name):
+                is_new_format = True
             input_data_dict = self.parse_data_name(input_data_name)
 
             if input_data_dict['prod_step'].lower() == 'py'.lower():
                 # event generation - get input from latest JobOptions or SVN
                 # inputGeneratorFile, inputGenConfFile
-                input_params.update(self._get_evgen_input_files(input_data_dict, energy, use_evgen_otf=use_evgen_otf))
-                job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
-                input_params.update({'jobConfig': job_config})
+                if is_new_format:
+                    if step.slice.input_dataset:
+                        input_params.update(
+                            self._get_evgen_input_files_new(input_data_dict, energy,step.slice.input_dataset ))
+                    else:
+                        input_params.update(
+                            self._get_evgen_input_files_new(input_data_dict, energy))
+                    input_params.update({'jobConfig': input_data_dict['number']})
+                else:
+                    input_params.update(self._get_evgen_input_files(input_data_dict, energy, use_evgen_otf=use_evgen_otf))
+                    job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
+                    input_params.update({'jobConfig': job_config})
                 project_mode = ProjectMode(step)
                 if project_mode.nEventsPerJob:
                     events_per_job = project_mode.nEventsPerJob
@@ -1253,6 +1336,8 @@ class TaskDefinition(object):
 
         if number_of_events > 0:
             number_input_files_requested = number_of_events / int(task_config['nEventsPerInputFile'])
+            if 'nFiles' in task and task['nFiles']>0 and task['nFiles']>number_input_files_requested:
+                number_input_files_requested = task['nFiles']
         else:
             number_input_files_requested = primary_input_total_files - number_of_input_files_used
 
@@ -1833,10 +1918,14 @@ class TaskDefinition(object):
 
                     input_data_name = step.slice.input_data
                     input_data_dict = self.parse_data_name(input_data_name)
-                    max_events_forced = \
-                        self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
-                            'nEventsPerJob']
-                    job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
+                    if self.is_new_jo_format(input_data_name):
+                        max_events_forced = self._get_evgen_input_files_new(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
+                                'nEventsPerJob']
+                        job_config = input_data_dict['number']
+                    else:
+                        max_events_forced = self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
+                                'nEventsPerJob']
+                        job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
                     input_params.update({'jobConfig': job_config})
                     input_params.update({'nEventsPerJob': max_events_forced})
                     if 'inputEVNTFile' in input_params.keys():
@@ -1861,8 +1950,10 @@ class TaskDefinition(object):
                     use_evnt_filter = True
 
             use_lhe_filter = None
+            is_evnt = False
             if prod_step.lower() == 'evgen'.lower():
                 input_types = list()
+                is_evnt = True
                 for key in input_params.keys():
                     result = re.match(r'^(--)?input(?P<intype>.*)File', key, re.IGNORECASE)
                     if not result:
@@ -1873,6 +1964,8 @@ class TaskDefinition(object):
                             if input_name_dict['prod_step'] == 'evgen':
                                 input_types.append(input_name_dict['data_type'])
                         except Exception as ex:
+                            # if 'TXT' in input_name:
+                            #     input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = input_params.get('nEventsPerJob', None)
@@ -1882,7 +1975,8 @@ class TaskDefinition(object):
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
                         number_files = number_of_events * number_files_per_job / min_events
                         task_config['nFiles'] = number_files
-
+                        if number_files_per_job > 1:
+                            max_events_forced = min_events
                         use_lhe_filter = True
 
             # proto_fix
@@ -1955,7 +2049,7 @@ class TaskDefinition(object):
 
             input_data_dict = self.parse_data_name(input_data_name)
 
-            if use_evnt_filter:
+            if use_evnt_filter or is_evnt:
                 input_data_name = step.slice.input_data
                 input_data_dict = self.parse_data_name(input_data_name)
 
@@ -2038,6 +2132,8 @@ class TaskDefinition(object):
                                     evgen_input_formats.append(input_name_dict['data_type'])
                             except Exception:
                                 pass
+                                # if 'TXT' in input_name:
+                                #     evgen_input_formats.append('TXT')
                 if number_of_events > 0 and task_config.get('nEventsPerJob', None) and not evgen_params:
                     events_per_job = int(task_config['nEventsPerJob'])
                     if not (number_of_events % events_per_job == 0):
@@ -2300,6 +2396,15 @@ class TaskDefinition(object):
                                 self.protocol.render_param(TaskParamName.DB_RELEASE, param_dict)
                             )
                 elif re.match(r'^(--)?jobConfig', name, re.IGNORECASE):
+                    param_value = self._get_parameter_value(name, input_params)
+                    if not param_value or str(param_value).lower() == 'none':
+                        continue
+                    param_dict = {'name': name, 'value': param_value}
+                    param_dict.update(trf_options)
+                    job_parameters.append(
+                        self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
+                    )
+                elif re.match(r'^(--)?ecmEnergy', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, input_params)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
@@ -3481,6 +3586,7 @@ class TaskDefinition(object):
                                               step__step_template__ctag=step.step_template.ctag,
                                               step__step_template__output_formats=step.step_template.output_formats)
 
+        max_by_offset = 0
         for ps2_task in ps2_task_list:
 
             if split_slice:
@@ -3491,8 +3597,8 @@ class TaskDefinition(object):
                 if not processed_output_types:
                     continue
 
+            jedi_task_existing = TTask.objects.get(id=ps2_task.id)
             if requested_datasets:
-                jedi_task_existing = TTask.objects.get(id=ps2_task.id)
                 task_existing = json.loads(jedi_task_existing.jedi_task_param)
                 previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
                 requested_datasets_no_scope = [e.split(':')[-1] for e in requested_datasets]
@@ -3520,8 +3626,12 @@ class TaskDefinition(object):
             if not number_events:
                 number_events = int(ps2_task.total_events or 0)
             number_events_processed += number_events
+            offset = jedi_task_existing._get_job_parameter('firstEvent','offset')
+            if offset and offset>0:
+                max_by_offset = max(max_by_offset,number_events+offset)
 
-        return number_events_processed
+
+        return max(number_events_processed,max_by_offset)
 
     def _get_processed_datasets(self, step, requested_datasets=None):
         processed_datasets = []
@@ -3716,8 +3826,10 @@ class TaskDefinition(object):
             campaigns = dict()
 
             input_data_name = self.get_step_input_data_name(step)
-            result = self.rucio_client.get_datasets_and_containers(input_data_name, datasets_contained_only=True)
-
+            if not self.is_new_jo_format(input_data_name):
+                result = self.rucio_client.get_datasets_and_containers(input_data_name, datasets_contained_only=True)
+            else:
+                result = {'datasets':[]}
             for name in result['datasets']:
                 try:
                     name_dict = self.parse_data_name(name)

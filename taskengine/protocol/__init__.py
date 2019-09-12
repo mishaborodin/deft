@@ -442,7 +442,7 @@ class TaskDefConstants(object):
     DEFAULT_EVGEN_JO_SVN_PATH_TEMPLATE = Constant(
         'svn+ssh://svn.cern.ch/reps/atlasoff/Generators/{{campaign}}JobOptions/trunk/')
     DEFAULT_EVGEN_JO_PATH_TEMPLATE = Constant('/cvmfs/atlas.cern.ch/repo/sw/Generators/{{campaign}}JobOptions/latest/')
-
+    DEFAULT_NEW_EVGEN_JO_PATH = '/cvmfs/atlas.cern.ch/repo/sw/Generators/MCJobOptions/'
     DEFAULT_TASK_ID_FORMAT_BASE = Constant('.08d')
     DEFAULT_TASK_ID_FORMAT = Constant('%%%s', ('DEFAULT_TASK_ID_FORMAT_BASE',))
     DEFAULT_TASK_NAME_TEMPLATE = Constant('{{project}}.{{number}}.{{brief}}.{{prod_step}}.{{version}}')

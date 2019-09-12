@@ -432,9 +432,21 @@ class TTask(models.Model):
                 return dataset
         return
 
+    def _get_job_parameter(self, value, parameter_key):
+        params = self._get_task_params()
+        job_params = params.get('jobParameters')
+        if not job_params:
+            return None
+        for param in job_params:
+            if ('value' in param) and ('%s='%value in param['value']) and (parameter_key in param):
+                    return param[parameter_key]
+        return None
+
     @property
     def input_dataset(self):
         return self._get_dataset('input')
+
+
 
     @property
     def output_dataset(self):

@@ -1336,6 +1336,8 @@ class TaskDefinition(object):
 
         if number_of_events > 0:
             number_input_files_requested = number_of_events / int(task_config['nEventsPerInputFile'])
+            if 'nFiles' in task and task['nFiles']>0 and task['nFiles']>number_input_files_requested:
+                number_input_files_requested = task['nFiles']
         else:
             number_input_files_requested = primary_input_total_files - number_of_input_files_used
 
@@ -1962,6 +1964,8 @@ class TaskDefinition(object):
                             if input_name_dict['prod_step'] == 'evgen':
                                 input_types.append(input_name_dict['data_type'])
                         except Exception as ex:
+                            # if 'TXT' in input_name:
+                            #     input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = input_params.get('nEventsPerJob', None)
@@ -1971,7 +1975,8 @@ class TaskDefinition(object):
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
                         number_files = number_of_events * number_files_per_job / min_events
                         task_config['nFiles'] = number_files
-
+                        if number_files_per_job > 1:
+                            max_events_forced = min_events
                         use_lhe_filter = True
 
             # proto_fix
@@ -2127,6 +2132,8 @@ class TaskDefinition(object):
                                     evgen_input_formats.append(input_name_dict['data_type'])
                             except Exception:
                                 pass
+                                # if 'TXT' in input_name:
+                                #     evgen_input_formats.append('TXT')
                 if number_of_events > 0 and task_config.get('nEventsPerJob', None) and not evgen_params:
                     events_per_job = int(task_config['nEventsPerJob'])
                     if not (number_of_events % events_per_job == 0):

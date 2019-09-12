@@ -195,7 +195,7 @@ class TaskDefinition(object):
 
     @staticmethod
     def get_step_input_data_name(step):
-        if step.step_template.step == 'Evgen':
+        if step.step_template.step.lower() == 'evgen'.lower():
             return step.slice.input_data
         else:
             if step.slice.input_dataset:

@@ -2406,6 +2406,8 @@ class TaskDefinition(object):
                     )
                 elif re.match(r'^(--)?ecmEnergy', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, input_params)
+                    if not param_value:
+                        param_value = self._get_energy(step, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
                     param_dict = {'name': name, 'value': param_value}

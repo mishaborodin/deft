@@ -3441,9 +3441,14 @@ class TaskDefinition(object):
                     "--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}" + name_postfix
 
             if not 'number_of_events_per_input_file' in task_proto_dict.keys() and \
-                    not 'number_of_gb_per_job' in task_proto_dict.keys():
+                    not 'number_of_gb_per_job' in task_proto_dict.keys() and \
+                    not 'tgt_max_output_for_ng' in task_proto_dict.keys():
                 if not 'number_of_files_per_job' in task_proto_dict.keys():
                     task_proto_dict.update({'number_of_files_per_job': 1})
+
+            if 'number_of_gb_per_job' in task_proto_dict.keys() or 'tgt_max_output_for_ng' in task_proto_dict.keys():
+                if 'respect_split_rule' not in task_proto_dict.keys():
+                    task_proto_dict.update({'respect_split_rule': True})
 
             if use_real_nevents:
                 task_proto_dict.update({'number_of_files_per_job': None})

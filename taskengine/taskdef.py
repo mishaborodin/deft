@@ -305,8 +305,8 @@ class TaskDefinition(object):
             for jo_file_content_line in job_options_file_content.splitlines():
                 if jo_file_content_line.find(events_per_job_param) >= 0:
                     try:
-                        if jo_file_content_line.startswith('#'):
-                            continue
+                        if '#' in jo_file_content_line:
+                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
                         events_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
                         logger.info('Using nEventsPerJob from JO file: evgenConfig.minevents={0}'.format(
                             events_per_job))
@@ -322,8 +322,8 @@ class TaskDefinition(object):
             for jo_file_content_line in job_options_file_content.splitlines():
                 if jo_file_content_line.find(files_per_job_param) >= 0:
                     try:
-                        if jo_file_content_line.startswith('#'):
-                            continue
+                        if '#' in jo_file_content_line:
+                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
                         files_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
                         logger.info('Using nFilesPerJob from JO file: evgenConfig.inputFilesPerJob={0}'.format(
                             files_per_job))
@@ -456,8 +456,8 @@ class TaskDefinition(object):
             for jo_file_content_line in job_options_file_content.splitlines():
                 if jo_file_content_line.find(events_per_job_param) >= 0:
                     try:
-                        if jo_file_content_line.startswith('#'):
-                            continue
+                        if '#' in jo_file_content_line:
+                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
                         events_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
                         logger.info('Using nEventsPerJob from JO file: evgenConfig.minevents={0}'.format(
                             events_per_job))
@@ -473,8 +473,9 @@ class TaskDefinition(object):
             for jo_file_content_line in job_options_file_content.splitlines():
                 if jo_file_content_line.find(files_per_job_param) >= 0:
                     try:
-                        if jo_file_content_line.startswith('#'):
-                            continue
+                        if '#' in jo_file_content_line:
+                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
+
                         files_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
                         logger.info('Using nFilesPerJob from JO file: evgenConfig.inputFilesPerJob={0}'.format(
                             files_per_job))

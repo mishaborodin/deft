@@ -18,9 +18,15 @@ class AGISClient(object):
         return r.json()
 
     def _list_swreleases(self):
-        url = urlparse.urljoin(self.base_uri, 'jsoncache/list_swreleases.json')
-        r = requests.get(url)
-        return r.json()
+        url = urlparse.urljoin(self.base_uri, 'request/swrelease/query/list/?json')
+        try:
+            r = requests.get(url)
+            return r.json()
+        except requests.exceptions.RequestException as ex:
+            logger.warning('_list_swreleases failed. Using failover url to list SW releases: {0}'.format(ex))
+            failover_url = urlparse.urljoin(self.base_uri, 'jsoncache/list_swreleases.json')
+            r = requests.get(failover_url)
+            return r.json()
 
     def _list_blacklisted_rses(self):
         url = urlparse.urljoin(self.base_uri, 'request/ddmendpointstatus/query/list/?json')

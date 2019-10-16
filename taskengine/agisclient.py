@@ -18,7 +18,7 @@ class AGISClient(object):
         return r.json()
 
     def _list_swreleases(self):
-        url = urlparse.urljoin(self.base_uri, 'request/swrelease/query/list/?json')
+        url = urlparse.urljoin(self.base_uri, 'jsoncache/list_swreleases.json')
         r = requests.get(url)
         return r.json()
 

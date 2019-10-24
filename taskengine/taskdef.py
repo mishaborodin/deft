@@ -205,11 +205,9 @@ class TaskDefinition(object):
             else:
                 return None
 
-
     @staticmethod
     def is_new_jo_format(name):
         return ('/' in name) and (name.split('/')[0].isdigit())
-
 
     @staticmethod
     def parse_data_name(name):
@@ -232,8 +230,6 @@ class TaskDefinition(object):
             data_name_dict = result.groupdict()
             data_name_dict.update({'name': name})
             return data_name_dict
-
-
 
     @staticmethod
     def _get_svn_output(svn_command):
@@ -286,10 +282,38 @@ class TaskDefinition(object):
             lines.append(line)
         return '\n'.join(lines)
 
+    @staticmethod
+    def _read_param_from_jo(jo, names, ignore_case=True):
+        value = None
+        if ignore_case:
+            names = [name.lower() for name in names]
+            jo = jo.lower()
+        if any(p in jo for p in names):
+            for line in jo.splitlines():
+                if any(p in line for p in names):
+                    try:
+                        if '#' in line:
+                            line = line[:line.find('#')]
+                        value = int(line.replace(' ', '').split('=')[-1])
+                        logger.info('Using ({0}) from JO file: {1}'.format('|'.join(names), value))
+                        break
+                    except Exception as ex:
+                        logger.warning('JO line parse error: {0}'.format(ex))
+        return value
+
+    @staticmethod
+    def _read_events_per_job_from_jo(jo):
+        return TaskDefinition._read_param_from_jo(jo, ['evgenConfig.minevents', 'evgenConfig.nEventsPerJob'])
+
+    @staticmethod
+    def _read_files_per_job_from_jo(jo):
+        return TaskDefinition._read_param_from_jo(jo, ['evgenConfig.inputFilesPerJob'])
+
     def _get_evgen_input_files_new(self, input_data_dict, energy, evgen_input_container=None):
         path_template = Template("/{{number|slice:\"0:3\"}}xxx/{{number}}/{{file_name}}")
         job_options_file_path = path_template.render(
-            Context({'number': str(input_data_dict['number']), 'file_name': input_data_dict['file_name']}, autoescape=False))
+            Context({'number': str(input_data_dict['number']), 'file_name': input_data_dict['file_name']},
+                    autoescape=False))
         path = TaskDefConstants.DEFAULT_NEW_EVGEN_JO_PATH + job_options_file_path
         with open(path, 'r') as fp:
             job_options_file_content = fp.read()
@@ -299,39 +323,14 @@ class TaskDefinition(object):
                                                                    datasets_contained_only=True)
             params.update({'inputGeneratorFile': result['datasets']})
 
-        events_per_job_param = 'evgenConfig.minevents'
-        events_per_job = None
-        if job_options_file_content.find(events_per_job_param) >= 0:
-            for jo_file_content_line in job_options_file_content.splitlines():
-                if jo_file_content_line.find(events_per_job_param) >= 0:
-                    try:
-                        if '#' in jo_file_content_line:
-                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
-                        events_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
-                        logger.info('Using nEventsPerJob from JO file: evgenConfig.minevents={0}'.format(
-                            events_per_job))
-                        break
-                    except:
-                        pass
-        if events_per_job:
+        events_per_job = self._read_events_per_job_from_jo(job_options_file_content)
+        if events_per_job is not None:
             params.update({'nEventsPerJob': events_per_job})
 
-        files_per_job_param = 'evgenConfig.inputFilesPerJob'
-        files_per_job = None
-        if job_options_file_content.find(files_per_job_param) >= 0:
-            for jo_file_content_line in job_options_file_content.splitlines():
-                if jo_file_content_line.find(files_per_job_param) >= 0:
-                    try:
-                        if '#' in jo_file_content_line:
-                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
-                        files_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
-                        logger.info('Using nFilesPerJob from JO file: evgenConfig.inputFilesPerJob={0}'.format(
-                            files_per_job))
-                        break
-                    except:
-                        pass
-        if files_per_job:
+        files_per_job = self._read_files_per_job_from_jo(job_options_file_content)
+        if files_per_job is not None:
             params.update({'nFilesPerJob': files_per_job})
+
         params.update({'ecmEnergy': energy})
         return params
 
@@ -450,39 +449,12 @@ class TaskDefinition(object):
                             evgen_input_container = "%s/" % entry['inputconfigfile']
                             params.update({'inputGenConfFile': [evgen_input_container]})
 
-        events_per_job_param = 'evgenConfig.minevents'
-        events_per_job = None
-        if job_options_file_content.find(events_per_job_param) >= 0:
-            for jo_file_content_line in job_options_file_content.splitlines():
-                if jo_file_content_line.find(events_per_job_param) >= 0:
-                    try:
-                        if '#' in jo_file_content_line:
-                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
-                        events_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
-                        logger.info('Using nEventsPerJob from JO file: evgenConfig.minevents={0}'.format(
-                            events_per_job))
-                        break
-                    except:
-                        pass
-        if events_per_job:
+        events_per_job = self._read_events_per_job_from_jo(job_options_file_content)
+        if events_per_job is not None:
             params.update({'nEventsPerJob': events_per_job})
 
-        files_per_job_param = 'evgenConfig.inputFilesPerJob'
-        files_per_job = None
-        if job_options_file_content.find(files_per_job_param) >= 0:
-            for jo_file_content_line in job_options_file_content.splitlines():
-                if jo_file_content_line.find(files_per_job_param) >= 0:
-                    try:
-                        if '#' in jo_file_content_line:
-                            jo_file_content_line = jo_file_content_line[:jo_file_content_line.find('#')]
-
-                        files_per_job = int(jo_file_content_line.replace(' ', '').split('=')[-1])
-                        logger.info('Using nFilesPerJob from JO file: evgenConfig.inputFilesPerJob={0}'.format(
-                            files_per_job))
-                        break
-                    except:
-                        pass
-        if files_per_job:
+        files_per_job = self._read_files_per_job_from_jo(job_options_file_content)
+        if files_per_job is not None:
             params.update({'nFilesPerJob': files_per_job})
 
         return params
@@ -534,13 +506,14 @@ class TaskDefinition(object):
                 if is_new_format:
                     if step.slice.input_dataset:
                         input_params.update(
-                            self._get_evgen_input_files_new(input_data_dict, energy,step.slice.input_dataset ))
+                            self._get_evgen_input_files_new(input_data_dict, energy, step.slice.input_dataset))
                     else:
                         input_params.update(
                             self._get_evgen_input_files_new(input_data_dict, energy))
                     input_params.update({'jobConfig': input_data_dict['number']})
                 else:
-                    input_params.update(self._get_evgen_input_files(input_data_dict, energy, use_evgen_otf=use_evgen_otf))
+                    input_params.update(
+                        self._get_evgen_input_files(input_data_dict, energy, use_evgen_otf=use_evgen_otf))
                     job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
                     input_params.update({'jobConfig': job_config})
                 project_mode = ProjectMode(step)
@@ -1337,7 +1310,7 @@ class TaskDefinition(object):
 
         if number_of_events > 0:
             number_input_files_requested = number_of_events / int(task_config['nEventsPerInputFile'])
-            if 'nFiles' in task and task['nFiles']>0 and task['nFiles']>number_input_files_requested:
+            if 'nFiles' in task and task['nFiles'] > 0 and task['nFiles'] > number_input_files_requested:
                 number_input_files_requested = task['nFiles']
         else:
             number_input_files_requested = primary_input_total_files - number_of_input_files_used
@@ -1797,7 +1770,7 @@ class TaskDefinition(object):
                     max_events_forced = params['nEventsPerJob']
                 else:
                     raise Exception(
-                        'JO file {0} does not contain evgenConfig.minevents definition. '.format(input_data_name) +
+                        'JO file {0} does not contain nEventsPerJob definition. '.format(input_data_name) +
                         'fixedMaxEvents option cannot be used. The task is rejected')
 
             skip_events_forced = project_mode.skipEvents
@@ -1920,11 +1893,13 @@ class TaskDefinition(object):
                     input_data_name = step.slice.input_data
                     input_data_dict = self.parse_data_name(input_data_name)
                     if self.is_new_jo_format(input_data_name):
-                        max_events_forced = self._get_evgen_input_files_new(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
+                        max_events_forced = \
+                            self._get_evgen_input_files_new(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
                                 'nEventsPerJob']
                         job_config = input_data_dict['number']
                     else:
-                        max_events_forced = self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
+                        max_events_forced = \
+                            self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
                                 'nEventsPerJob']
                         job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
                     input_params.update({'jobConfig': job_config})
@@ -3634,12 +3609,11 @@ class TaskDefinition(object):
             if not number_events:
                 number_events = int(ps2_task.total_events or 0)
             number_events_processed += number_events
-            offset = jedi_task_existing._get_job_parameter('firstEvent','offset')
-            if offset and offset>0:
-                max_by_offset = max(max_by_offset,number_events+offset)
+            offset = jedi_task_existing._get_job_parameter('firstEvent', 'offset')
+            if offset and offset > 0:
+                max_by_offset = max(max_by_offset, number_events + offset)
 
-
-        return max(number_events_processed,max_by_offset)
+        return max(number_events_processed, max_by_offset)
 
     def _get_processed_datasets(self, step, requested_datasets=None):
         processed_datasets = []
@@ -3837,7 +3811,7 @@ class TaskDefinition(object):
             if not self.is_new_jo_format(input_data_name):
                 result = self.rucio_client.get_datasets_and_containers(input_data_name, datasets_contained_only=True)
             else:
-                result = {'datasets':[]}
+                result = {'datasets': []}
             for name in result['datasets']:
                 try:
                     name_dict = self.parse_data_name(name)
@@ -4148,7 +4122,7 @@ class TaskDefinition(object):
         nevents_per_job = int(input_params.get('nEventsPerJob'))
         if not nevents_per_job:
             raise Exception(
-                'JO file {0} does not contain evgenConfig.minevents definition. '.format(
+                'JO file {0} does not contain nEventsPerJob definition. '.format(
                     input_data_name) +
                 'The task is rejected')
         nfiles_per_job = 1

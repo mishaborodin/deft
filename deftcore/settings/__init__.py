@@ -106,7 +106,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-from private import *
+from .private import *
 
 DATABASE_ROUTERS = ['deftcore.routers.DefaultRouter']
 

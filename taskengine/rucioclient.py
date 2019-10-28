@@ -192,7 +192,7 @@ class RucioClient(object):
     def get_metadata_attribute(self, dsn, attribute_name):
         scope, dataset = self.extract_scope(dsn)
         metadata = self.client.get_metadata(scope=scope, name=dataset)
-        if attribute_name in metadata.keys():
+        if attribute_name in list(metadata.keys()):
             return metadata[attribute_name]
         else:
             return None

@@ -19,7 +19,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         request_types = None
-        if 'request_types' in options.keys():
+        if 'request_types' in list(options.keys()):
             if options['request_types']:
                 request_types = options['request_types'].split(',')
         engine = TaskDefinition()

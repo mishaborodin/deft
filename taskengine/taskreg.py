@@ -14,13 +14,14 @@ from taskengine.rucioclient import RucioClient
 logger = Logger.get()
 
 
+# noinspection PyUnresolvedReferences
 class TaskRegistration(object):
     @staticmethod
     def register_task_id():
         return TTask().get_id()
 
     def register_task_output(self, output_params, task_proto_id, task_id, parent_task_id, usergroup, campaign):
-        for key in output_params.keys():
+        for key in list(output_params.keys()):
             for output_dataset_name in output_params[key]:
                 output_dataset_name = output_dataset_name.replace(
                     TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_proto_id,
@@ -51,13 +52,10 @@ class TaskRegistration(object):
 
                 ticket_summary = 'Request {0}'.format(request.id)
                 ticket_description = \
-                    'Request Id: {0}\nDescription: {1}\nReference link: {2}\nManager: {3}\nLink to the request: {4}'.format(
-                        request.id,
-                        request.description,
-                        request.ref_link,
-                        request.manager,
-                        link_to_request
-                    )
+                    'Request Id: {0}\nDescription: {1}\nReference link: {2}\n'.format(
+                        request.id, request.description, request.ref_link) + \
+                    'Manager: {0}\nLink to the request: {1}'.format(
+                        request.manager, link_to_request)
 
                 client = JIRAClient()
                 client.authorize()
@@ -83,7 +81,7 @@ class TaskRegistration(object):
         is_extension = False
         try:
             for param in task['jobParameters']:
-                if 'offset' in param.keys():
+                if 'offset' in list(param.keys()):
                     if param['offset'] != 0:
                         is_extension = True
                         break
@@ -214,8 +212,8 @@ class TaskRegistration(object):
         if not step.step_parent_id or step.step_parent_id == step.id:
             return task_id
         parent_tasks = \
-            ProductionTask.objects.filter(step=step.step_parent_id) \
-                .exclude(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']).order_by('-id')
+            ProductionTask.objects.filter(step=step.step_parent_id).exclude(
+                status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']).order_by('-id')
         if len(parent_tasks) == 0:
             return task_id
         return parent_tasks[0].id
@@ -232,7 +230,7 @@ class TaskRegistration(object):
         primary_input_param = None
         primary_input_dsn = None
         for job_param in job_parameters:
-            if not 'param_type' in job_param.keys() or job_param['param_type'].lower() != 'input'.lower():
+            if 'param_type' not in list(job_param.keys()) or job_param['param_type'].lower() != 'input'.lower():
                 continue
             if re.match(r'^(--)?input.*File', job_param['value'], re.IGNORECASE):
                 result = re.match(r'^(--)?input(?P<intype>.*)File', job_param['value'], re.IGNORECASE)
@@ -263,7 +261,7 @@ class TaskRegistration(object):
             if not result:
                 continue
             output_type = result.groupdict().get('data_type', None)
-            if not output_type in types:
+            if output_type not in types:
                 continue
             if output_type:
                 output_dataset_exists = rucio_client.is_dsn_exist(output_dataset)

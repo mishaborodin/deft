@@ -118,7 +118,7 @@ class Request(models.Model):
         return json.loads(self.status)
 
     def create_default_task_comment(self, body):
-        params = ', '.join('{0} = \"{1}\"'.format(key, value) for key, value in body.items())
+        params = ', '.join('{0} = \"{1}\"'.format(key, value) for key, value in list(body.items()))
         status = self.get_status()
         if params:
             task_comment = '[{0}] action = \"{1}\", owner = \"{2}\", result = \"{3}\", parameters: {4}'.format(
@@ -145,8 +145,8 @@ class Request(models.Model):
         return str(self.id)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_API_REQUEST"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_API_REQUEST"'
 
 
 @receiver(post_save, sender=Request)

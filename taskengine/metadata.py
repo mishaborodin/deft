@@ -2,7 +2,7 @@ __author__ = 'Dmitry Golubkov'
 
 import re
 import json
-import httplib
+import http.client
 import ast
 import os
 import sys
@@ -22,6 +22,7 @@ from deftcore.security.voms import VOMSClient
 logger = Logger.get()
 
 
+# noinspection PyBroadException
 class AMIClient(object):
     def __init__(self):
         try:
@@ -58,7 +59,7 @@ class AMIClient(object):
             '-ldn="{0}"'.format(dsn)
         ]
 
-        if not comment is None:
+        if comment is not None:
             command.append('-comment="{0}"'.format(comment))
 
         row_id = int(self.client.execute(command, format='dom_object').get_rows()[0]['id'])
@@ -177,7 +178,7 @@ class AMIClient(object):
         return trf_params
 
     def is_new_ami_tag(self, ami_tag):
-        if 'notAKTR' in ami_tag.keys() and ami_tag['notAKTR']:
+        if 'notAKTR' in list(ami_tag.keys()) and ami_tag['notAKTR']:
             return True
         else:
             return False
@@ -185,10 +186,10 @@ class AMIClient(object):
     def apply_phconfig_ami_tag(self, ami_tag):
         if 'phconfig' in ami_tag:
             phconfig_dict = eval(ami_tag['phconfig'])
-            for config_key in phconfig_dict.keys():
+            for config_key in list(phconfig_dict.keys()):
                 if isinstance(phconfig_dict[config_key], dict):
                     value_list = list()
-                    for key in phconfig_dict[config_key].keys():
+                    for key in list(phconfig_dict[config_key].keys()):
                         if isinstance(phconfig_dict[config_key][key], list):
                             for value in ['{0}:{1}'.format(key, ss) for ss in phconfig_dict[config_key][key]]:
                                 value_list.append(value)
@@ -201,7 +202,7 @@ class AMIClient(object):
                 else:
                     config_value = json.dumps(phconfig_dict[config_key])
                 logger.debug("apply phconfig key=value: %s=%s" % (config_key, config_value))
-                for key in ami_tag.keys():
+                for key in list(ami_tag.keys()):
                     if key.lower() == config_key.lower():
                         ami_tag[key] = config_value
                 ami_tag.update({config_key: config_value})
@@ -244,7 +245,7 @@ class AMIClient(object):
                 raise Exception(ex.message)
             else:
                 logger.exception('pyAMI.exception.Error: {0}'.format(ex.message))
-        except httplib.BadStatusLine as ex:
+        except http.client.BadStatusLine as ex:
             raise Exception('pyAMI.exception: {0}'.format(type(ex).__name__))
         except Exception as ex:
             logger.exception("[2] Exception: %s" % str(ex))
@@ -255,7 +256,7 @@ class AMIClient(object):
             if not ami_tag:
                 ami_tag['transformation'] = prodsys_tag.trf
                 ami_tag['SWReleaseCache'] = "%s_%s" % (prodsys_tag.cache, prodsys_tag.trf_version)
-                ami_tag.update(dict(zip(prodsys_tag.lparams.split(','), prodsys_tag.vparams.split(','))))
+                ami_tag.update(dict(list(zip(prodsys_tag.lparams.split(','), prodsys_tag.vparams.split(',')))))
 
             ami_tag['productionStep'] = prodsys_tag.prod_step
             ami_tag['notAKTR'] = False
@@ -404,7 +405,7 @@ class AMIClient(object):
             except Exception as ex:
                 logger.exception("ami_get_params failed: %s" % str(ex))
 
-        if not sub_step_list is None:
+        if sub_step_list is not None:
             # old way from PS1
             if trf_transform.lower() in [e.lower() for e in ['AtlasG4_tf.py', 'Sim_tf.py', 'StoppedParticleG4_tf.py',
                                                              'TrigFTKMergeReco_tf.py', 'Reco_tf.py',

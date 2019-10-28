@@ -4,7 +4,7 @@ import re
 import json
 import subprocess
 import csv
-import StringIO
+import io
 import ast
 import datetime
 import copy
@@ -34,7 +34,7 @@ class NotEnoughEvents(Exception):
 
 class TaskDuplicateDetected(Exception):
     def __init__(self, previous_task_id, reason_code, **kwargs):
-        prefix = ', '.join(['{0} = {1}'.format(name, value) for name, value in kwargs.items()])
+        prefix = ', '.join(['{0} = {1}'.format(name, value) for name, value in list(kwargs.items())])
         message = '[Check duplicates] The task is rejected, previous_task = {0}, reason_code = {1}' \
             .format(previous_task_id, reason_code)
         if prefix:
@@ -162,6 +162,7 @@ class BlacklistedInputException(Exception):
         super(BlacklistedInputException, self).__init__(message)
 
 
+# noinspection PyBroadException, PyUnresolvedReferences
 class TaskDefinition(object):
     def __init__(self):
         self.protocol = Protocol()
@@ -184,7 +185,7 @@ class TaskDefinition(object):
     @staticmethod
     def _get_energy(step, ctag):
         energy_ctag = None
-        for name in ctag.keys():
+        for name in list(ctag.keys()):
             if re.match(r'^(--)?ecmEnergy$', name, re.IGNORECASE):
                 energy_ctag = int(ctag[name])
         energy_req = int(step.request.energy_gev)
@@ -240,7 +241,7 @@ class TaskDefinition(object):
 
     @staticmethod
     def _get_evgen_input_dict(content):
-        input_db = csv.DictReader(StringIO.StringIO(content))
+        input_db = csv.DictReader(io.StringIO(content))
         input_dict = dict()
 
         for i, row in enumerate(input_db):
@@ -250,13 +251,13 @@ class TaskDefinition(object):
 
                 try:
                     dsid = int(row[input_db.fieldnames[0]].strip())
-                except:
+                except Exception:
                     continue
                 energy = int(row[input_db.fieldnames[1]].strip())
 
-                if not dsid in input_dict.keys():
+                if dsid not in list(input_dict.keys()):
                     input_dict[dsid] = dict()
-                if not energy in input_dict[dsid].keys():
+                if energy not in list(input_dict[dsid].keys()):
                     input_dict[dsid][energy] = dict()
 
                 if row[input_db.fieldnames[2]]:
@@ -268,7 +269,7 @@ class TaskDefinition(object):
                     input_conf_file = row[input_db.fieldnames[3]].strip().strip('/')
                     if len(input_conf_file) > 1:
                         input_dict[dsid][energy]['inputconfigfile'] = input_conf_file
-            except:
+            except Exception:
                 continue
 
         return input_dict
@@ -442,10 +443,10 @@ class TaskDefinition(object):
                 if dsid_row:
                     entry = dsid_row.get(energy)
                     if entry:
-                        if entry.keys()[0] == 'inputeventfile':
+                        if list(entry.keys())[0] == 'inputeventfile':
                             evgen_input_container = "%s/" % entry['inputeventfile']
                             params.update({'inputGeneratorFile': [evgen_input_container]})
-                        elif entry.keys()[0] == 'inputconfigfile':
+                        elif list(entry.keys())[0] == 'inputconfigfile':
                             evgen_input_container = "%s/" % entry['inputconfigfile']
                             params.update({'inputGenConfFile': [evgen_input_container]})
 
@@ -462,14 +463,14 @@ class TaskDefinition(object):
     def _add_input_dataset_name(self, name, params):
         input_dataset_dict = self.parse_data_name(name)
         param_name = "input%sFile" % input_dataset_dict['data_type']
-        if not param_name in params.keys():
+        if param_name not in list(params.keys()):
             params[param_name] = list()
         params[param_name].append(name)
 
     def _add_output_dataset_name(self, name, params):
         output_dataset_dict = self.parse_data_name(name)
         param_name = "output%sFile" % output_dataset_dict['data_type']
-        if not param_name in params.keys():
+        if param_name not in list(params.keys()):
             params[param_name] = list()
         params[param_name].append(name)
 
@@ -542,7 +543,7 @@ class TaskDefinition(object):
             # not first step - internal input, from previous step
             task_config = ProjectMode.get_task_config(step)
             input_formats = list()
-            if 'input_format' in task_config.keys():
+            if 'input_format' in list(task_config.keys()):
                 for format_name in task_config['input_format'].split('.'):
                     input_formats.append(format_name)
             for input_dataset_name in self.task_reg.get_step_output(step.step_parent_id, task_id=task_id):
@@ -647,13 +648,13 @@ class TaskDefinition(object):
 
         # escape all Linux spec chars
         if value.find(' ') >= 0 or value.find('(') >= 0 or value.find('=') >= 0 or value.find('*') >= 0 \
-                or value.find(';') >= 0 or value.find('{') >= 0 or value.find('}') >= 0 or re.match(
-            '^(--)?ignorePatterns', name, re.IGNORECASE):
+                or value.find(';') >= 0 or value.find('{') >= 0 or value.find('}') >= 0 \
+                or re.match('^(--)?ignorePatterns', name, re.IGNORECASE):
             if not enclosed_value:
                 value = '"%s"' % value
 
         # support for transformation sub_steps
-        if not sub_steps is None:
+        if sub_steps is not None:
             sub_step_exists = False
             for sub_step in sub_steps:
                 if "%s:" % sub_step in value:
@@ -675,14 +676,14 @@ class TaskDefinition(object):
 
     def _get_parameter_value(self, name, source_dict, sub_steps=None):
         name = name.lower()
-        for key in source_dict.keys():
+        for key in list(source_dict.keys()):
             param_name_prefix = '--'
             key_name = key
             if key_name.startswith(param_name_prefix):
                 key_name = key_name[len(param_name_prefix):]
             if re.match("^(%s)?%s$" % (param_name_prefix, key_name), name, re.IGNORECASE) \
                     and str(source_dict[key]).lower() != 'none'.lower():
-                if not (isinstance(source_dict[key], str) or isinstance(source_dict[key], unicode)):
+                if not (isinstance(source_dict[key], str) or isinstance(source_dict[key], str)):
                     return source_dict[key]
                 if self.ami_client.is_new_ami_tag(source_dict):
                     return source_dict[key]
@@ -725,7 +726,7 @@ class TaskDefinition(object):
     def _get_parameter_name(name, source_dict):
         param_name = None
         name = name.lower()
-        for key in source_dict.keys():
+        for key in list(source_dict.keys()):
             if re.match("^(--)?%s.*$" % key, name, re.IGNORECASE):
                 param_name = key
                 break
@@ -740,7 +741,7 @@ class TaskDefinition(object):
             pattern = r'^(--)?(input|output).*%s.*File$' % input_type
         else:
             pattern = r'^(--)?(input|output)%s.*File$' % input_type
-        for key in params.keys():
+        for key in list(params.keys()):
             if re.match(pattern, key, re.IGNORECASE):
                 return key
         return None
@@ -749,7 +750,7 @@ class TaskDefinition(object):
         order_dict = dict()
         count = 0
         for param in task_proto_dict['job_params']:
-            if 'param_type' in param.keys():
+            if 'param_type' in list(param.keys()):
                 if param['param_type'] == 'output':
                     order_dict.update({self.parse_data_name(param['dataset'])['data_type']: count})
                     count += 1
@@ -758,7 +759,7 @@ class TaskDefinition(object):
     @staticmethod
     def _get_primary_input(job_parameters):
         for job_param in job_parameters:
-            if not 'param_type' in job_param.keys() or job_param['param_type'].lower() != 'input'.lower():
+            if 'param_type' not in list(job_param.keys()) or job_param['param_type'].lower() != 'input'.lower():
                 continue
             if re.match(r'^(--)?input.*File', job_param['value'], re.IGNORECASE):
                 result = re.match(r'^(--)?input(?P<intype>.*)File', job_param['value'], re.IGNORECASE)
@@ -782,7 +783,7 @@ class TaskDefinition(object):
             number_of_events = int(step.input_events)
             project = self._get_project(step)
             bunchspacing = project_mode.bunchspacing
-            campaign = ':'.join(filter(None, (step.request.campaign, step.request.subcampaign, bunchspacing,)))
+            campaign = ':'.join([_f for _f in (step.request.campaign, step.request.subcampaign, bunchspacing,) if _f])
             if number_of_events > 0:
                 small_events_numbers = dict()
                 small_events_numbers.update({
@@ -792,7 +793,7 @@ class TaskDefinition(object):
                     r'mc16:mc16(a|b|c|\*)': 2000
                 })
                 small_events_threshold = 0
-                for pattern in small_events_numbers.keys():
+                for pattern in list(small_events_numbers.keys()):
                     if re.match(pattern, project, re.IGNORECASE) or re.match(pattern, campaign, re.IGNORECASE):
                         small_events_threshold = small_events_numbers[pattern]
                         break
@@ -855,7 +856,7 @@ class TaskDefinition(object):
                 total_nevents = self.rucio_client.get_number_events(dsn)
                 if not total_nevents:
                     raise EmptyDataset()
-            except:
+            except Exception:
                 chain_input_events = self._extract_chain_input_events(step)
                 if chain_input_events > 0:
                     total_nevents = chain_input_events
@@ -1020,7 +1021,7 @@ class TaskDefinition(object):
             return
 
         for rse in dataset_rses:
-            if not rse in blacklisted_rses:
+            if rse not in blacklisted_rses:
                 return
 
         raise BlacklistedInputException(dataset_rses)
@@ -1079,7 +1080,7 @@ class TaskDefinition(object):
         except Exception as ex:
             logger.exception('Exception occurred: {0}'.format(ex))
 
-        if not 'nEventsPerInputFile' in task_config.keys():
+        if 'nEventsPerInputFile' not in list(task_config.keys()):
             nevents_per_files = self.get_events_per_file(primary_input['dataset'])
             if not nevents_per_files:
                 logger.info(
@@ -1093,7 +1094,7 @@ class TaskDefinition(object):
 
         try:
             primary_input_total_files = self.rucio_client.get_number_files(primary_input['dataset'])
-        except:
+        except Exception:
             logger.info('_check_task_input, get_number_files for {0} failed (parent_task_id = {2}): {1}'.format(
                 primary_input['dataset'], get_exception_string(), parent_task_id))
             task_output_name_suffix = '_tid{0}_00'.format(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % parent_task_id)
@@ -1106,9 +1107,9 @@ class TaskDefinition(object):
             self.verify_data_uniform(step, primary_input['dataset'])
 
         number_of_jobs = 0
-        if number_of_events > 0 and 'nEventsPerJob' in task_config.keys():
+        if number_of_events > 0 and 'nEventsPerJob' in list(task_config.keys()):
             number_of_jobs = number_of_events / int(task_config['nEventsPerJob'])
-        elif 'nEventsPerInputFile' in task_config.keys() and 'nEventsPerJob' in task_config.keys() \
+        elif 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) \
                 and primary_input_total_files > 0:
             number_of_jobs = \
                 primary_input_total_files * int(task_config['nEventsPerInputFile']) / int(task_config['nEventsPerJob'])
@@ -1148,9 +1149,9 @@ class TaskDefinition(object):
                                                     formats=step.step_template.output_formats)
         for ps1_task in ps1_task_list:
             previous_tasks.append(int(ps1_task.reqid))
+            total_r_jobs = ps1_task.total_req_jobs or 0
             number_of_input_files_used += \
-                int(((
-                             ps1_task.total_events / ps1_task.events_per_file) / ps1_task.total_req_jobs or 0) * ps1_task.total_req_jobs or 0)
+                int(((ps1_task.total_events / ps1_task.events_per_file) / ps1_task.total_req_jobs or 0) * total_r_jobs)
 
         task_list = ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']),
                                                   project=step.request.project,
@@ -1186,7 +1187,7 @@ class TaskDefinition(object):
             jedi_task_existing = TTask.objects.get(id=prod_task_existing.id)
             task_existing = json.loads(jedi_task_existing.jedi_task_param)
 
-            if 'use_real_nevents' in task_existing.keys():
+            if 'use_real_nevents' in list(task_existing.keys()):
                 raise Exception('Extensions are not allowed if useRealNumEvents is specified')
 
             previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
@@ -1231,7 +1232,7 @@ class TaskDefinition(object):
                             previous_output_status_dict = \
                                 self.task_reg.check_task_output(task_id, requested_output_types)
                             for requested_output_type in requested_output_types:
-                                if not requested_output_type in previous_output_status_dict.keys():
+                                if requested_output_type not in list(previous_output_status_dict.keys()):
                                     continue
                                 if previous_output_status_dict[requested_output_type]:
                                     raise TaskDuplicateDetected(task_id, 1,
@@ -1274,7 +1275,7 @@ class TaskDefinition(object):
                             previous_output_status_dict = \
                                 self.task_reg.check_task_output(task_id, requested_output_types)
                             for requested_output_type in requested_output_types:
-                                if not requested_output_type in previous_output_status_dict.keys():
+                                if requested_output_type not in list(previous_output_status_dict.keys()):
                                     continue
                                 if previous_output_status_dict[requested_output_type]:
                                     raise TaskDuplicateDetected(task_id, 3,
@@ -1303,9 +1304,10 @@ class TaskDefinition(object):
                                                 processed_formats='.'.join(processed_output_types),
                                                 requested_formats='.'.join(requested_output_types),
                                                 tag=step.step_template.ctag)
-            log_msg = "[NotERROR][Check duplicates] request=%d, chain=%d (%d), previous_task=%d (%s), n_files_used=%d" % \
-                      (step.request.id, step.slice.slice, step.id, task_id, prod_task_existing.status,
-                       number_of_input_files_used)
+            log_msg = '[NotERROR][Check duplicates] request={0}, chain={1} ({2}),'.format(
+                step.request.id, step.slice.slice, step.id)
+            log_msg += ' previous_task={0} ({1}), n_files_used={2}'.format(
+                task_id, prod_task_existing.status, number_of_input_files_used)
             logger.debug(log_msg)
 
         if number_of_events > 0:
@@ -1318,7 +1320,7 @@ class TaskDefinition(object):
         if reuse_input:
             primary_input['offset'] = 0
             for param in task['jobParameters']:
-                if 'dataset' in param.keys() and param['dataset'] == 'seq_number':
+                if 'dataset' in list(param.keys()) and param['dataset'] == 'seq_number':
                     param['offset'] = number_of_input_files_used
             return
 
@@ -1356,7 +1358,7 @@ class TaskDefinition(object):
     def _get_merge_tag_name(step):
         task_config = ProjectMode.get_task_config(step)
         merging_tag_name = ''
-        if 'merging_tag' in task_config.keys():
+        if 'merging_tag' in list(task_config.keys()):
             merging_tag_name = task_config['merging_tag']
         if not merging_tag_name:
             merging_tag_name = ProjectMode(step).merging
@@ -1367,15 +1369,15 @@ class TaskDefinition(object):
 
         merging_tag_name = ''
 
-        if 'merging_tag' in task_config.keys():
+        if 'merging_tag' in list(task_config.keys()):
             merging_tag_name = task_config['merging_tag']
-        if 'nFilesPerMergeJob' in task_config.keys():
+        if 'nFilesPerMergeJob' in list(task_config.keys()):
             merging_number_of_files_per_job = int(task_config['nFilesPerMergeJob'])
             task_proto_dict.update({'merging_number_of_files_per_job': merging_number_of_files_per_job})
-        if 'nGBPerMergeJob' in task_config.keys():
+        if 'nGBPerMergeJob' in list(task_config.keys()):
             merging_number_of_gb_pef_job = int(task_config['nGBPerMergeJob'])
             task_proto_dict.update({'merging_number_of_gb_pef_job': merging_number_of_gb_pef_job})
-        if 'nMaxFilesPerMergeJob' in task_config.keys():
+        if 'nMaxFilesPerMergeJob' in list(task_config.keys()):
             merging_number_of_max_files_per_job = int(task_config['nMaxFilesPerMergeJob'])
             task_proto_dict.update({'merging_number_of_max_files_per_job': merging_number_of_max_files_per_job})
 
@@ -1398,34 +1400,34 @@ class TaskDefinition(object):
 
         # proto_fix
         if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
-            if not '--inputHISTFile' in trf_params:
+            if '--inputHISTFile' not in trf_params:
                 trf_params.append('--inputHISTFile')
-            if not '--outputHIST_MRGFile' in trf_params:
+            if '--outputHIST_MRGFile' not in trf_params:
                 trf_params.remove('--outputHISTFile')
                 trf_params.append('--outputHIST_MRGFile')
         elif trf_name.lower() == 'DAODMerge_tf.py'.lower():
             input_params = ["--input%sFile" % output_format for output_format in
                             step.step_template.output_formats.split('.')]
             for input_param in input_params:
-                if not input_param in trf_params:
+                if input_param not in trf_params:
                     trf_params.append(input_param)
                     result = re.match(r'^(--)?input(?P<intype>.*)File', input_param, re.IGNORECASE)
                     if result:
                         in_type = result.groupdict()['intype']
                         output_param = "--output%s_MRGFile" % in_type
-                        if not output_param in trf_params:
+                        if output_param not in trf_params:
                             trf_params.append(output_param)
-            if not '--inputDAOD_EGAM1File' in trf_params:
+            if '--inputDAOD_EGAM1File' not in trf_params:
                 trf_params.append('--inputDAOD_EGAM1File')
-            if not '--inputDAOD_EGAM3File' in trf_params:
+            if '--inputDAOD_EGAM3File' not in trf_params:
                 trf_params.append('--inputDAOD_EGAM3File')
-            if not '--outputDAOD_EGAM1_MRGFile' in trf_params:
+            if '--outputDAOD_EGAM1_MRGFile' not in trf_params:
                 trf_params.append('--outputDAOD_EGAM1_MRGFile')
-            if not '--outputDAOD_EGAM3_MRGFile' in trf_params:
+            if '--outputDAOD_EGAM3_MRGFile' not in trf_params:
                 trf_params.append('--outputDAOD_EGAM3_MRGFile')
 
         trf_options = {}
-        for key in Protocol.TRF_OPTIONS.keys():
+        for key in list(Protocol.TRF_OPTIONS.keys()):
             if re.match(key, trf_name, re.IGNORECASE):
                 trf_options.update(Protocol.TRF_OPTIONS[key])
 
@@ -1594,16 +1596,16 @@ class TaskDefinition(object):
             trf_name = ctag['transformation']
 
             trf_options = {}
-            for key in Protocol.TRF_OPTIONS.keys():
+            for key in list(Protocol.TRF_OPTIONS.keys()):
                 if re.match(key, trf_name, re.IGNORECASE):
                     trf_options.update(Protocol.TRF_OPTIONS[key])
 
             if ctag_name[0] in ('f', 'm', 'v', 'k') and 'phconfig' in ctag:
                 tzero_tag = self.ami_client.get_ami_tag_tzero(ctag_name)
-                if type(tzero_tag) == unicode:
+                if type(tzero_tag) == str:
                     tzero_tag = json.loads(tzero_tag)
                 tzero_outputs = tzero_tag['transformation']['args']['outputs']
-                if type(tzero_outputs) == unicode:
+                if type(tzero_outputs) == str:
                     tzero_outputs = ast.literal_eval(tzero_outputs)
                 try:
                     self.ami_client.apply_phconfig_ami_tag(ctag)
@@ -1654,7 +1656,7 @@ class TaskDefinition(object):
 
             skip_prod_step_check = project_mode.skipProdStepCheck or False
 
-            if 'merge'.lower() in step.step_template.step.lower() and not 'merge' in prod_step.lower():
+            if 'merge'.lower() in step.step_template.step.lower() and 'merge' not in prod_step.lower():
                 if not skip_prod_step_check:
                     raise Exception('productionStep in the tag ({0}) differs from the step name in the request ({1})'
                                     .format(prod_step, step.step_template.step))
@@ -1669,7 +1671,7 @@ class TaskDefinition(object):
                 ami_types.append('EI')
                 ami_types.append('BS_TRIGSKIM')
                 for output_type in output_types:
-                    if not output_type in ami_types:
+                    if output_type not in ami_types:
                         raise Exception("The output format \"%s\" is not registered in AMI" % output_type)
             else:
                 logger.warning('AMI type list is empty')
@@ -1681,7 +1683,7 @@ class TaskDefinition(object):
 
             trf_params = list()
             trf_sub_steps = list()
-            for key in trf_dict.keys():
+            for key in list(trf_dict.keys()):
                 trf_params.extend(self.ami_client.get_trf_params(trf_dict[key][0], trf_dict[key][1], key,
                                                                  sub_step_list=trf_sub_steps, force_ami=force_ami))
 
@@ -1707,7 +1709,7 @@ class TaskDefinition(object):
                             evgen_step.slice.input_dataset = evgen_step.slice.input_data
                             evgen_input_params = self.get_input_params(evgen_step, evgen_step, False, energy_gev,
                                                                        use_evgen_otf=True)
-                            if 'nEventsPerJob' in evgen_input_params.keys():
+                            if 'nEventsPerJob' in list(evgen_input_params.keys()):
                                 evgen_events_per_job = int(evgen_input_params['nEventsPerJob'])
                                 evgen_step_task_config = ProjectMode.get_task_config(evgen_step)
                                 evgen_step_task_config.update({'nEventsPerJob': evgen_events_per_job})
@@ -1718,7 +1720,7 @@ class TaskDefinition(object):
                         except Exception as ex:
                             logger.warning("Checking the parent evgen step failed: %s" % str(ex))
 
-            if 'nEventsPerInputFile' in task_config.keys():
+            if 'nEventsPerInputFile' in list(task_config.keys()):
                 n_events_input_file = int(task_config['nEventsPerInputFile'])
                 parent_step = StepExecution.objects.get(id=step.step_parent_id)
                 is_parent_merge = 'Merge'.lower() in parent_step.step_template.step.lower()
@@ -1726,7 +1728,7 @@ class TaskDefinition(object):
                     parent_step.status.lower() == self.protocol.STEP_STATUS[StepStatus.APPROVED].lower()
                 if parent_step.id != step.id and not is_parent_merge and is_parent_approved:
                     parent_task_config = ProjectMode.get_task_config(parent_step)
-                    if 'nEventsPerJob' in parent_task_config.keys():
+                    if 'nEventsPerJob' in list(parent_task_config.keys()):
                         n_events_job_parent = int(parent_task_config['nEventsPerJob'])
                         if n_events_input_file != n_events_job_parent:
                             if project_mode.nEventsPerInputFile:
@@ -1740,7 +1742,7 @@ class TaskDefinition(object):
             overlay_production = False
             train_production = False
 
-            for key in ctag.keys():
+            for key in list(ctag.keys()):
                 if re.match(r'^(--)?reductionConf$', key, re.IGNORECASE):
                     if str(ctag[key]).lower() != 'none':
                         train_production = True
@@ -1836,10 +1838,10 @@ class TaskDefinition(object):
                 input_params = self.get_input_params(step, first_step, True, energy_gev, use_containers, use_evgen_otf,
                                                      task_id=parent_task_id)
 
-            if 'input_params' in task_config.keys():
+            if 'input_params' in list(task_config.keys()):
                 input_params.update(task_config['input_params'])
 
-            if 'nFilesPerJob' in input_params.keys() and not 'nFilesPerJob' in task_config.keys():
+            if 'nFilesPerJob' in list(input_params.keys()) and 'nFilesPerJob' not in list(task_config.keys()):
                 task_config.update({'nFilesPerJob': int(input_params['nFilesPerJob'])})
 
             if evgen_params and prod_step.lower() == 'evgen'.lower():
@@ -1848,9 +1850,10 @@ class TaskDefinition(object):
                 task_config['nFiles'] = evgen_params['nfiles']
 
             try:
-                if step.request.request_type.lower() == 'MC'.lower() and 'nEventsPerInputFile' in task_config.keys():
+                if step.request.request_type.lower() == 'MC'.lower() and 'nEventsPerInputFile' in list(
+                        task_config.keys()):
                     real_input_events = 0
-                    for key in input_params.keys():
+                    for key in list(input_params.keys()):
                         if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                             for input_name in input_params[key]:
                                 result = re.match(r'^.+_tid(?P<tid>\d+)_00$', input_name)
@@ -1868,13 +1871,13 @@ class TaskDefinition(object):
                             step.slice.input_events = number_of_events
                             step.slice.save()
                             step.save()
-            except:
+            except Exception:
                 logger.warning('Checking real number of input events failed: {0}'.format(get_exception_string()))
 
             use_evnt_filter = None
             if self.protocol.is_evnt_filter_step(project_mode, task_config) and prod_step.lower() == 'evgen'.lower():
                 input_types = list()
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     result = re.match(r'^(--)?input(?P<intype>.*)File', key, re.IGNORECASE)
                     if not result:
                         continue
@@ -1894,25 +1897,24 @@ class TaskDefinition(object):
                     input_data_dict = self.parse_data_name(input_data_name)
                     if self.is_new_jo_format(input_data_name):
                         max_events_forced = \
-                            self._get_evgen_input_files_new(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
-                                'nEventsPerJob']
+                            self._get_evgen_input_files_new(input_data_dict, energy_gev)['nEventsPerJob']
                         job_config = input_data_dict['number']
                     else:
                         max_events_forced = \
-                            self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)[
-                                'nEventsPerJob']
+                            self._get_evgen_input_files(
+                                input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)['nEventsPerJob']
                         job_config = "%sJobOptions/%s" % (input_data_dict['project'], input_data_name)
                     input_params.update({'jobConfig': job_config})
                     input_params.update({'nEventsPerJob': max_events_forced})
-                    if 'inputEVNTFile' in input_params.keys():
+                    if 'inputEVNTFile' in list(input_params.keys()):
                         input_params['inputEVNT_PreFile'] = input_params['inputEVNTFile']
                     ignore_trf_params.append('inputEVNTFile')
 
                     min_events = max_events_forced
                     project_mode.nEventsPerInputFile = min_events
 
-                    if not 'nEventsPerInputFile' in task_config.keys():
-                        input_name = input_params[input_params.keys()[0]][0]
+                    if 'nEventsPerInputFile' not in list(task_config.keys()):
+                        input_name = input_params[list(input_params.keys())[0]][0]
                         input_file_min_events = self.get_events_per_file(input_name)
                     else:
                         input_file_min_events = int(task_config['nEventsPerInputFile'])
@@ -1930,7 +1932,7 @@ class TaskDefinition(object):
             if prod_step.lower() == 'evgen'.lower():
                 input_types = list()
                 is_evnt = True
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     result = re.match(r'^(--)?input(?P<intype>.*)File', key, re.IGNORECASE)
                     if not result:
                         continue
@@ -1944,7 +1946,7 @@ class TaskDefinition(object):
                             #     input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
-                    min_events = input_params.get('nEventsPerJob', None)
+                    min_events = int(input_params.get('nEventsPerJob', None))
                     if min_events:
                         project_mode.nEventsPerInputFile = min_events
 
@@ -1960,7 +1962,7 @@ class TaskDefinition(object):
                 trf_options.update({'separator': ' '})
                 for name in trf_params:
                     if re.match(r'^(--)?inputBS_RDOFile$', name, re.IGNORECASE) and 'RAW'.lower() in ','.join(
-                            [e.lower() for e in input_params.keys()]):
+                            [e.lower() for e in list(input_params.keys())]):
                         input_param_name = self._get_input_output_param_name(input_params, 'RAW', extended_pattern=True)
                         if input_param_name:
                             use_bs_rdo = self._get_parameter_value('prodSysBSRDO', ctag)
@@ -1973,26 +1975,28 @@ class TaskDefinition(object):
                                 if '--inputBS_RDOFile' in trf_params:
                                     trf_params.remove('--inputBS_RDOFile')
                         break
-                if 'athenaopts' in ctag.keys() and ctag_name == 'r6395':
-                    ctag[
-                        'athenaopts'] = " -c \"import os;os.unsetenv('FRONTIER_SERVER');rerunLVL1=True\" -J TrigConf::HLTJobOptionsSvc --use-database --db-type Coral --db-server TRIGGERDBREPR --db-smkey 598 --db-hltpskey 401 --db-extra \"{'lvl1key': 82}\" "
+                if 'athenaopts' in list(ctag.keys()) and ctag_name == 'r6395':
+                    ctag['athenaopts'] = \
+                        ' -c "import os;os.unsetenv(\'FRONTIER_SERVER\');rerunLVL1=True" -J ' + \
+                        'TrigConf::HLTJobOptionsSvc --use-database --db-type Coral --db-server ' + \
+                        'TRIGGERDBREPR --db-smkey 598 --db-hltpskey 401 --db-extra "{\'lvl1key\': 82}" '
             elif trf_name.lower() == 'POOLtoEI_tf.py'.lower():
                 use_no_output = True
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         input_params['inputPOOLFile'] = input_params[key]
                         del input_params[key]
             elif trf_name.lower() == 'HITSMerge_tf.py'.lower():
                 param_name = 'inputLogsFile'
-                if not param_name in ignore_trf_params:
+                if param_name not in ignore_trf_params:
                     ignore_trf_params.append(param_name)
             elif trf_name.lower() == 'BSOverlayFilter_tf.py'.lower():
                 overlay_production = True
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     for name in input_params[key][:]:
                         if re.match(r'^.+_tid(?P<tid>\d+)_00$', name, re.IGNORECASE):
                             input_params[key].remove(name)
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         input_params['inputBSCONFIGFile'] = input_params[key]
                         del input_params[key]
@@ -2003,7 +2007,7 @@ class TaskDefinition(object):
             if step.step_parent_id == step.id:
                 input_data_name = self.get_step_input_data_name(step)
             else:
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         if len(input_params[key]):
                             input_data_name = input_params[key][0]
@@ -2040,13 +2044,13 @@ class TaskDefinition(object):
                 if 'Ph' in input_data_name or 'Powheg' in input_data_name:
                     if (trf_cache == 'AtlasProduction' and LooseVersion(trf_release) >= LooseVersion('19.2.4.11')) or \
                             (trf_cache == 'MCProd' and LooseVersion(trf_release) >= LooseVersion('19.2.4.9.3')):
-                        if 'inputGenConfFile' in input_params.keys():
+                        if 'inputGenConfFile' in list(input_params.keys()):
                             use_evnt_txt = True
-                        elif not 'inputGenConfFile' in input_params.keys() and \
-                                not 'inputGeneratorFile' in input_params.keys():
+                        elif 'inputGenConfFile' not in list(input_params.keys()) and \
+                                'inputGeneratorFile' not in list(input_params.keys()):
                             use_evnt_txt = True
                     if use_evnt_txt:
-                        if not 'TXT' in output_types:
+                        if 'TXT' not in output_types:
                             pass
                     else:
                         if 'TXT' in output_types:
@@ -2054,13 +2058,13 @@ class TaskDefinition(object):
                 if 'aMcAtNlo' in input_data_name:
                     if int(ctag_name[1:]) >= 6000 and \
                             project in ('mc15_13TeV', 'mc16_13TeV', 'mc15_valid', 'mc16_valid', 'mc15_5TeV'):
-                        if 'inputGenConfFile' in input_params.keys():
+                        if 'inputGenConfFile' in list(input_params.keys()):
                             use_evnt_txt = True
-                        elif not 'inputGenConfFile' in input_params.keys() and \
-                                not 'inputGeneratorFile' in input_params.keys():
+                        elif 'inputGenConfFile' not in list(input_params.keys()) and \
+                                'inputGeneratorFile' not in list(input_params.keys()):
                             use_evnt_txt = True
                     if use_evnt_txt:
-                        if not 'TXT' in output_types:
+                        if 'TXT' not in output_types:
                             pass
                     else:
                         if 'TXT' in output_types:
@@ -2087,7 +2091,7 @@ class TaskDefinition(object):
             except Exception as ex:
                 logger.exception("Checking OE failed: %s" % str(ex))
 
-            if 'nEventsPerJob' in input_params.keys():
+            if 'nEventsPerJob' in list(input_params.keys()):
                 task_config.update({'nEventsPerJob': int(input_params['nEventsPerJob'])})
                 ProjectMode.set_task_config(step, task_config, keys_to_save=('nEventsPerJob',))
 
@@ -2098,7 +2102,7 @@ class TaskDefinition(object):
 
             if prod_step.lower() == 'evgen'.lower():
                 evgen_number_input_files = 0
-                for key in input_params.keys():
+                for key in list(input_params.keys()):
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         for input_name in input_params[key]:
                             evgen_number_input_files += self.rucio_client.get_number_files(input_name)
@@ -2128,9 +2132,10 @@ class TaskDefinition(object):
                         skip_check_input_ne = True
                 elif evgen_number_input_files > 1:
                     if len(evgen_input_formats) == 1 and 'TXT' in evgen_input_formats:
-                        if 'nEventsPerInputFile' in task_config.keys() and 'nEventsPerJob' in task_config.keys():
+                        if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(
+                                task_config.keys()):
                             task_config['nEventsPerInputFile'] = int(task_config['nEventsPerJob'])
-                    if 'nEventsPerInputFile' in task_config.keys() and task_config['nEventsPerInputFile'] > 0 \
+                    if 'nEventsPerInputFile' in list(task_config.keys()) and task_config['nEventsPerInputFile'] > 0 \
                             and number_of_events > 0:
                         evgen_number_input_files_requested = number_of_events / task_config['nEventsPerInputFile']
                         if evgen_number_input_files_requested < evgen_number_input_files and not use_evnt_filter and \
@@ -2144,12 +2149,12 @@ class TaskDefinition(object):
                     random_seed_offset = self._get_number_events_processed(step) / events_per_job
                     first_event_offset = random_seed_offset * events_per_job
 
-                if 'nEventsPerJob' in task_config.keys() and number_of_events > 0:
+                if 'nEventsPerJob' in list(task_config.keys()) and number_of_events > 0:
                     evgen_number_jobs = number_of_events / int(task_config['nEventsPerJob'])
                     if evgen_number_jobs <= 10:
                         skip_scout_jobs = True
 
-            if 'nEventsPerInputFile' in task_config.keys() and 'nEventsPerJob' in task_config.keys() and \
+            if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) and \
                     (not skip_check_input_ne) and not project_mode.nEventsPerInputFile:
                 self._check_task_events_consistency(task_config)
 
@@ -2159,32 +2164,32 @@ class TaskDefinition(object):
                     if output_type.lower().startswith('DAOD_'.lower()):
                         reduction_conf.append(output_type.split('_')[-1])
                         output_param_name = "--output{0}File".format(output_type)
-                        if not output_param_name in trf_params:
+                        if output_param_name not in trf_params:
                             trf_params.append(output_param_name)
-                for key in ctag.keys():
+                for key in list(ctag.keys()):
                     if re.match('^(--)?reductionConf', key, re.IGNORECASE):
                         ctag[key] = ' '.join(reduction_conf)
                         break
 
             # proto_fix
             if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
-                if not '--inputHISTFile' in trf_params:
+                if '--inputHISTFile' not in trf_params:
                     trf_params.append('--inputHISTFile')
-                if not '--outputHIST_MRGFile' in trf_params:
+                if '--outputHIST_MRGFile' not in trf_params:
                     trf_params.remove('--outputHISTFile')
                     trf_params.append('--outputHIST_MRGFile')
             elif trf_name.lower() == 'SkimNTUP_trf.py'.lower():
-                for input_key in input_params.keys():
+                for input_key in list(input_params.keys()):
                     trf_params.append(input_key)
                 for output_type in output_types:
                     trf_params.append("output%sFile" % output_type)
             elif trf_name.lower() == 'csc_MergeHIST_trf.py'.lower():
-                if not '--inputHISTFile' in trf_params:
+                if '--inputHISTFile' not in trf_params:
                     trf_params.append('--inputHISTFile')
-                if not '--outputHISTFile' in trf_params:
+                if '--outputHISTFile' not in trf_params:
                     trf_params.append('--outputHISTFile')
 
-            if not 'log' in output_types:
+            if 'log' not in output_types:
                 output_types.append('log')
             output_params = self._get_output_params(input_data_name,
                                                     output_types,
@@ -2195,23 +2200,23 @@ class TaskDefinition(object):
 
             # proto_fix
             if trf_name.lower() == 'TrainReco_tf.py'.lower():
-                trf_params.extend(["--%s" % key for key in input_params.keys()])
+                trf_params.extend(["--%s" % key for key in list(input_params.keys())])
                 trf_params.extend(
-                    ["--%s" % key for key in output_params.keys() if key.lower() != 'outputlogFile'.lower()])
+                    ["--%s" % key for key in list(output_params.keys()) if key.lower() != 'outputlogFile'.lower()])
 
             # proto_fix
             if trf_name.lower() == 'DigiMReco_trf.py'.lower():
-                if not 'preExec' in trf_params:
+                if 'preExec' not in trf_params:
                     trf_params.append('preExec')
-                if not 'postExec' in trf_params:
+                if 'postExec' not in trf_params:
                     trf_params.append('postExec')
-                if not 'preInclude' in trf_params:
+                if 'preInclude' not in trf_params:
                     trf_params.append('preInclude')
 
             if change_output_type_dict:
-                for key in change_output_type_dict.keys():
+                for key in list(change_output_type_dict.keys()):
                     output_param_name = "output{0}File".format(key)
-                    if output_param_name in output_params.keys():
+                    if output_param_name in list(output_params.keys()):
                         output_params["output{0}File".format(change_output_type_dict[key])] = \
                             output_params.pop(output_param_name)
 
@@ -2223,9 +2228,9 @@ class TaskDefinition(object):
             if parent_task_id > 0 and not use_real_nevents:
                 try:
                     number_of_events_per_input_file = self.task_reg.get_task_parameter(parent_task_id, 'nEventsPerJob')
-                    if not 'nEventsPerInputFile' in task_config.keys():
+                    if 'nEventsPerInputFile' not in list(task_config.keys()):
                         task_config.update({'nEventsPerInputFile': number_of_events_per_input_file})
-                except:
+                except Exception:
                     pass
 
             if project_mode.primaryInputOffset is not None:
@@ -2252,7 +2257,7 @@ class TaskDefinition(object):
                     output_type = 'BS'
                 if trf_name.lower().startswith('TrigFTK'.lower()) and output_type == 'RAW':
                     output_type = 'BS'
-                if output_type in change_output_type_dict.keys():
+                if output_type in list(change_output_type_dict.keys()):
                     output_type = change_output_type_dict[output_type]
                 param_names = \
                     [e for e in trf_params if re.match(r"^(--)?output%s.*File$" % output_type, e, re.IGNORECASE)]
@@ -2273,7 +2278,7 @@ class TaskDefinition(object):
                             )
                         else:
                             for extra_param in param_value.split(' '):
-                                if not extra_param in trf_params:
+                                if extra_param not in trf_params:
                                     trf_params.append(extra_param)
                     break
 
@@ -2282,10 +2287,10 @@ class TaskDefinition(object):
                 name = self._get_input_output_param_name(input_params, 'DRAW')
             if name:
                 input_bs_type = 'inputBSFile'
-                if not input_bs_type in input_params.keys():
+                if input_bs_type not in list(input_params.keys()):
                     input_params[input_bs_type] = list()
                 for input_param_value in input_params[name]:
-                    if not input_param_value in input_params[input_bs_type]:
+                    if input_param_value not in input_params[input_bs_type]:
                         input_params[input_bs_type].append(input_param_value)
                 del input_params[name]
 
@@ -2402,9 +2407,10 @@ class TaskDefinition(object):
                     else:
                         param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        if ('nEventsPerJob' in task_config.keys() or 'nEventsPerRange' in task_config.keys() or
+                        if ('nEventsPerJob' in list(task_config.keys()) or 'nEventsPerRange' in list(
+                                task_config.keys()) or
                             project_mode.tgtNumEventsPerJob) and \
-                                ('nEventsPerInputFile' in task_config.keys() or use_real_nevents):
+                                ('nEventsPerInputFile' in list(task_config.keys()) or use_real_nevents):
                             param_dict = {'name': name}
                             param_dict.update(trf_options)
                             job_parameters.append(
@@ -2428,7 +2434,7 @@ class TaskDefinition(object):
                         re.match(r'^(--)?digiSeedOffset2$', name, re.IGNORECASE):
                     input_real_data = False
                     # or check .RAW in the end: data12_8TeV.00208811.physics_JetTauEtmiss.merge.RAW?
-                    for key in input_params.keys():
+                    for key in list(input_params.keys()):
                         if re.match(r'^(--)?inputBSFile$', key, re.IGNORECASE) or \
                                 re.match(r'^(--)?inputRAWFile$', key, re.IGNORECASE):
                             input_real_data = True
@@ -2445,9 +2451,10 @@ class TaskDefinition(object):
                     else:
                         param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        if ('nEventsPerJob' in task_config.keys() or 'nEventsPerRange' in task_config.keys() or
+                        if ('nEventsPerJob' in list(task_config.keys()) or 'nEventsPerRange' in list(
+                                task_config.keys()) or
                             project_mode.tgtNumEventsPerJob) and \
-                                ('nEventsPerInputFile' in task_config.keys() or use_real_nevents):
+                                ('nEventsPerInputFile' in list(task_config.keys()) or use_real_nevents):
                             param_dict = {'name': name}
                             param_dict.update(trf_options)
                             job_parameters.append(
@@ -2464,9 +2471,10 @@ class TaskDefinition(object):
                 elif re.match('^(--)?firstEvent$', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        if ('nEventsPerJob' in task_config.keys() or 'nEventsPerRange' in task_config.keys() or
+                        if ('nEventsPerJob' in list(task_config.keys()) or 'nEventsPerRange' in list(
+                                task_config.keys()) or
                             project_mode.tgtNumEventsPerJob) and \
-                                ('nEventsPerInputFile' in task_config.keys() or use_real_nevents):
+                                ('nEventsPerInputFile' in list(task_config.keys()) or use_real_nevents):
                             param_dict = {'name': name, 'offset': 0}
                             if prod_step.lower() == 'evgen'.lower():
                                 param_dict.update({'offset': first_event_offset})
@@ -2515,7 +2523,7 @@ class TaskDefinition(object):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
-                    if param_value[-1] != '/' and (not '_tid' in param_value):
+                    if param_value[-1] != '/' and ('_tid' not in param_value):
                         if self.rucio_client.is_dsn_container(param_value):
                             param_value = '%s/' % param_value
                     param_dict = {'name': name, 'dataset': param_value}
@@ -2545,7 +2553,7 @@ class TaskDefinition(object):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
-                    if param_value[-1] != '/' and (not '_tid' in param_value):
+                    if param_value[-1] != '/' and ('_tid' not in param_value):
                         param_value = '%s/' % param_value
                     postfix = ''
                     if 'Low'.lower() in name.lower():
@@ -2595,31 +2603,31 @@ class TaskDefinition(object):
                     param_name = re.sub("(?<=input)evgen(?=file)", "EVNT".lower(), name.lower())
                     # BS (byte stream) - for all *RAW* (DRAW, RAW, DRAW_ZEE, etc.) [2]
                     if re.match(r'^(--)?inputBSFile$', name, re.IGNORECASE) and 'RAW'.lower() in ','.join(
-                            [e.lower() for e in input_params.keys()]):
+                            [e.lower() for e in list(input_params.keys())]):
                         param_name = self._get_input_output_param_name(input_params, 'RAW')
                         if not param_name:
                             param_name = self._get_input_output_param_name(input_params, 'DRAW')
                             if not param_name:
                                 continue
                     if re.match(r'^(--)?inputESDFile$', name, re.IGNORECASE) and 'ESD'.lower() in ','.join(
-                            [e.lower() for e in input_params.keys()]):
+                            [e.lower() for e in list(input_params.keys())]):
                         param_name = self._get_input_output_param_name(input_params, 'ESD')
                         if not param_name:
                             param_name = self._get_input_output_param_name(input_params, 'DESD')
                             if not param_name:
                                 continue
                     if re.match(r'^(--)?inputLogsFile$', name, re.IGNORECASE) and 'log'.lower() in ','.join(
-                            [e.lower() for e in input_params.keys()]):
+                            [e.lower() for e in list(input_params.keys())]):
                         param_name = self._get_input_output_param_name(input_params, 'log')
                         if not param_name:
                             continue
                     if re.match(r'^(--)?inputHISTFile', name, re.IGNORECASE) and 'HIST'.lower() in ','.join(
-                            [e.lower() for e in input_params.keys()]):
+                            [e.lower() for e in list(input_params.keys())]):
                         param_name = self._get_input_output_param_name(input_params, 'HIST')
                         if not param_name:
                             continue
                     if re.match(r'^(--)?input(AOD|POOL)File$', name, re.IGNORECASE) and 'AOD'.lower() in ','.join(
-                            [e.lower() for e in input_params.keys()]):
+                            [e.lower() for e in list(input_params.keys())]):
                         param_name = self._get_input_output_param_name(input_params, 'AOD')
                         if not param_name:
                             param_name = self._get_input_output_param_name(input_params, 'DAOD')
@@ -2644,7 +2652,7 @@ class TaskDefinition(object):
                         if result:
                             postfix = "_%s" % result.groupdict()['intype']
                             postfix = postfix.upper()
-                    except:
+                    except Exception:
                         pass
 
                     param_dict = {'name': name, 'dataset': param_value, 'postfix': postfix}
@@ -2668,7 +2676,7 @@ class TaskDefinition(object):
                 elif re.match(r'^(--)?output.*File$', name, re.IGNORECASE):
                     if use_no_output:
                         continue
-                    if output_trf_params and not name in output_trf_params:
+                    if output_trf_params and name not in output_trf_params:
                         continue
                     param_name = name
                     if re.match(r'^(--)?output.*_MRGFile$', name, re.IGNORECASE):
@@ -2683,29 +2691,29 @@ class TaskDefinition(object):
                                 if not param_name:
                                     continue
                     elif re.match(r'^(--)?outputBS.*File$', name, re.IGNORECASE) and 'RAW'.lower() in ','.join(
-                            [e.lower() for e in output_params.keys()]):
+                            [e.lower() for e in list(output_params.keys())]):
                         param_name = self._get_input_output_param_name(output_params, 'RAW')
                         if not param_name:
                             continue
                     elif re.match(r'^(--)?outputAODFile$', name, re.IGNORECASE) and 'AOD'.lower() in ','.join(
-                            [e.lower() for e in output_params.keys()]):
+                            [e.lower() for e in list(output_params.keys())]):
                         if train_production:
                             continue
                         param_name = self._get_input_output_param_name(output_params, 'AOD')
                         if not param_name:
                             continue
                     elif re.match(r'^(--)?outputESDFile$', name, re.IGNORECASE) and 'ESD'.lower() in ','.join(
-                            [e.lower() for e in output_params.keys()]):
+                            [e.lower() for e in list(output_params.keys())]):
                         param_name = self._get_input_output_param_name(output_params, 'ESD')
                         if not param_name:
                             continue
                     elif re.match(r'^(--)?outputDAODFile$', name, re.IGNORECASE) and 'DAOD'.lower() in ','.join(
-                            [e.lower() for e in output_params.keys()]):
+                            [e.lower() for e in list(output_params.keys())]):
                         param_name = self._get_input_output_param_name(output_params, 'DAOD')
                         if not param_name:
                             continue
                     elif re.match(r'^(--)?outputHITS.*File$', name, re.IGNORECASE) and 'HITS'.lower() in ','.join(
-                            [e.lower() for e in output_params.keys()]):
+                            [e.lower() for e in list(output_params.keys())]):
                         param_name = self._get_input_output_param_name(output_params, 'HITS')
                         if not param_name:
                             continue
@@ -2742,7 +2750,7 @@ class TaskDefinition(object):
                     output_param = self.protocol.render_param(proto_key, param_dict)
                     if project_mode.spacetoken is not None:
                         output_param['token'] = project_mode.spacetoken
-                    if 'token' in task_config.keys():
+                    if 'token' in list(task_config.keys()):
                         output_param['token'] = task_config['token']
                     if train_production and output_data_type.split('_')[0] == 'DAOD':
                         output_param['hidden'] = True
@@ -2803,7 +2811,7 @@ class TaskDefinition(object):
                     param_dict = {'name': name, 'value': param_value}
                     param_dict.update(trf_options)
 
-                    if not trf_sub_steps is None:
+                    if trf_sub_steps is not None:
                         for trf_sub_step in trf_sub_steps:
                             if "%s:" % trf_sub_step in param_value:
                                 param_dict.update({'separator': ' '})
@@ -2852,11 +2860,11 @@ class TaskDefinition(object):
                     # moving primary input parameter
                     job_parameters.remove(job_param)
                     job_parameters.insert(0, job_param)
-                if not 'param_type' in job_param.keys():
+                if 'param_type' not in list(job_param.keys()):
                     continue
                 if job_param['param_type'].lower() == 'output'.lower():
                     no_output = False
-                    if 'dataset' in job_param.keys():
+                    if 'dataset' in list(job_param.keys()):
                         output_dataset_dict = self.parse_data_name(job_param['dataset'])
                         output_types_defined.append(output_dataset_dict['data_type'])
 
@@ -2880,7 +2888,7 @@ class TaskDefinition(object):
                 log_param['transient'] = not is_not_transient_output
             if leave_log:
                 self.protocol.set_leave_log_param(log_param)
-            if 'token' in task_config.keys():
+            if 'token' in list(task_config.keys()):
                 if step.request.request_type.lower() in ['GROUP'.lower()]:
                     log_param['token'] = task_config['token']
 
@@ -2892,7 +2900,7 @@ class TaskDefinition(object):
                             break
 
             if trf_name.lower() == 'DigiMReco_trf.py'.lower():
-                if not 'outputESDFile' in output_params.keys():
+                if 'outputESDFile' not in list(output_params.keys()):
                     param_dict = {'name': 'outputESDFile', 'value': 'ESD.TMP._0000000_tmp.pool.root'}
                     param_dict.update(trf_options)
                     job_parameters.append(
@@ -2917,7 +2925,7 @@ class TaskDefinition(object):
                     )
 
             if env_params_dict:
-                for key in env_params_dict.keys():
+                for key in list(env_params_dict.keys()):
                     param_dict = {'name': '--env {0}'.format(key), 'value': env_params_dict[key]}
                     options = {'separator': '='}
                     param_dict.update(options)
@@ -2934,7 +2942,7 @@ class TaskDefinition(object):
             if prod_step.lower() == 'archive'.lower():
                 task_type = prod_step
 
-            campaign = ':'.join(filter(None, (step.request.campaign, step.request.subcampaign, bunchspacing,)))
+            campaign = ':'.join([_f for _f in (step.request.campaign, step.request.subcampaign, bunchspacing,) if _f])
 
             task_request_type = None
             if step.request.request_type.lower() == 'TIER0'.lower():
@@ -3046,7 +3054,7 @@ class TaskDefinition(object):
                     specified_sites.append(site_value)
                 available_sites = self.agis_client.get_sites()
                 for site_name in specified_sites:
-                    if not site_name in available_sites:
+                    if site_name not in available_sites:
                         raise UnknownSiteException(site_name)
                 task_proto_dict.update({'site': site_value})
 
@@ -3069,7 +3077,7 @@ class TaskDefinition(object):
             if no_input and number_of_events > 0:
                 task_proto_dict.update({'number_of_events': number_of_events})
             elif not no_input and number_of_events > 0:
-                if prod_step.lower() != 'evgen'.lower() and 'nEventsPerInputFile' in task_config.keys():
+                if prod_step.lower() != 'evgen'.lower() and 'nEventsPerInputFile' in list(task_config.keys()):
                     number_input_files_requested = number_of_events / int(task_config['nEventsPerInputFile'])
                     if number_input_files_requested == 0:
                         raise Exception(
@@ -3077,33 +3085,33 @@ class TaskDefinition(object):
                             (int(number_of_events), int(task_config['nEventsPerInputFile']))
                         )
                     task_proto_dict.update({'number_of_files': number_input_files_requested})
-                elif prod_step.lower() != 'evgen'.lower() and not 'nEventsPerInputFile' in task_config.keys():
+                elif prod_step.lower() != 'evgen'.lower() and 'nEventsPerInputFile' not in list(task_config.keys()):
                     task_proto_dict.update({'number_of_events': number_of_events})
 
             if no_input:
                 task_proto_dict.update({'no_primary_input': no_input})
-                if not 'number_of_events' in task_proto_dict.keys():
+                if 'number_of_events' not in list(task_proto_dict.keys()):
                     raise Exception("Number of events to be processed is mandatory when task has no input")
 
-            if no_input and not prod_step.lower() in ['evgen', 'simul']:
+            if no_input and prod_step.lower() not in ['evgen', 'simul']:
                 raise Exception('This type of task ({0}) cannot be submitted without input'.format(prod_step))
 
-            if 'nFiles' in task_config.keys():
+            if 'nFiles' in list(task_config.keys()):
                 number_of_files = int(task_config['nFiles'])
                 task_proto_dict.update({'number_of_files': number_of_files})
 
-            if 'nEvents' in task_config.keys():
+            if 'nEvents' in list(task_config.keys()):
                 task_proto_dict.update({'number_of_events': int(task_config['nEvents'])})
 
-            if 'nEventsPerInputFile' in task_config.keys() and not no_input:
+            if 'nEventsPerInputFile' in list(task_config.keys()) and not no_input:
                 number_of_events_per_input_file = int(task_config['nEventsPerInputFile'])
                 task_proto_dict.update({'number_of_events_per_input_file': number_of_events_per_input_file})
 
-            if 'nEventsPerJob' in task_config.keys():
+            if 'nEventsPerJob' in list(task_config.keys()):
                 number_of_events_per_job = int(task_config['nEventsPerJob'])
                 task_proto_dict.update({'number_of_events_per_job': number_of_events_per_job})
 
-            if 'nFilesPerJob' in task_config.keys():
+            if 'nFilesPerJob' in list(task_config.keys()):
                 number_of_files_per_job = int(task_config['nFilesPerJob'])
                 if number_of_files_per_job == 0:
                     task_proto_dict.update({'number_of_files_per_job': None})
@@ -3112,29 +3120,29 @@ class TaskDefinition(object):
                 if number_of_files_per_job > TaskDefConstants.DEFAULT_MAX_FILES_PER_JOB:
                     task_proto_dict.update({'number_of_max_files_per_job': number_of_files_per_job})
 
-            if 'nEventsPerRange' in task_config.keys():
+            if 'nEventsPerRange' in list(task_config.keys()):
                 number_of_events_per_range = int(task_config['nEventsPerRange'])
                 task_proto_dict.update({'number_of_events_per_range': number_of_events_per_range})
 
-            if 'nEventsPerInputFile' in task_config.keys() and 'nEventsPerJob' in task_config.keys():
+            if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()):
                 number_of_max_files_per_job = \
                     int(task_config['nEventsPerJob']) / int(task_config['nEventsPerInputFile'])
                 if number_of_max_files_per_job > TaskDefConstants.DEFAULT_MAX_FILES_PER_JOB:
                     task_proto_dict.update({'number_of_max_files_per_job': number_of_max_files_per_job})
 
-            if 'nGBPerJob' in task_config.keys():
+            if 'nGBPerJob' in list(task_config.keys()):
                 number_of_gb_per_job = int(task_config['nGBPerJob'])
                 task_proto_dict.update({'number_of_gb_per_job': number_of_gb_per_job})
 
-            if 'maxAttempt' in task_config.keys():
+            if 'maxAttempt' in list(task_config.keys()):
                 max_attempt = int(task_config['maxAttempt'])
                 task_proto_dict.update({'max_attempt': max_attempt})
 
-            if 'maxFailure' in task_config.keys():
+            if 'maxFailure' in list(task_config.keys()):
                 max_failure = int(task_config['maxFailure'])
                 task_proto_dict.update({'max_failure': max_failure})
 
-            if 'nEventsPerMergeJob' in task_config.keys():
+            if 'nEventsPerMergeJob' in list(task_config.keys()):
                 number_of_events_per_merge_job = int(task_config['nEventsPerMergeJob'])
                 task_proto_dict.update({'number_of_events_per_merge_job': number_of_events_per_merge_job})
 
@@ -3253,7 +3261,8 @@ class TaskDefinition(object):
                     if trf_release in ['20.3.7.5', '20.7.8.7']:
                         name_postfix = '_000'
                     task_proto_dict['es_merge_spec']['jobParameters'] = \
-                        '--AMITag {0} --DBRelease=current --autoConfiguration=everything '.format(es_merging_tag_name) + \
+                        '--AMITag {0} --DBRelease=current --autoConfiguration=everything '.format(
+                            es_merging_tag_name) + \
                         '--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}' + name_postfix
 
             if project_mode.esConsumers is not None:
@@ -3337,7 +3346,7 @@ class TaskDefinition(object):
                 task_proto_dict.update({'to_staging': project_mode.toStaging or None})
 
             if step.request.request_type.lower() == 'MC'.lower():
-                if 'nEventsPerJob' in task_config.keys() and number_of_events > 0:
+                if 'nEventsPerJob' in list(task_config.keys()) and number_of_events > 0:
                     number_of_jobs = int(number_of_events) / int(task_config['nEventsPerJob'])
                     if number_of_jobs <= 10:
                         task_proto_dict.update({'use_exhausted': True})
@@ -3352,7 +3361,7 @@ class TaskDefinition(object):
             if not evgen_params:
                 self._check_number_of_events(step, project_mode)
 
-            if number_of_events > 0 and 'nEventsPerJob' in task_config.keys():
+            if number_of_events > 0 and 'nEventsPerJob' in list(task_config.keys()):
                 number_of_jobs = number_of_events / int(task_config['nEventsPerJob'])
                 if number_of_jobs > TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK:
                     raise MaxJobsPerTaskLimitExceededException(number_of_jobs)
@@ -3416,26 +3425,27 @@ class TaskDefinition(object):
                     "--AMITag s2049 --DBRelease=current --autoConfiguration=everything " \
                     "--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}" + name_postfix
 
-            if not 'number_of_events_per_input_file' in task_proto_dict.keys() and \
-                    not 'number_of_gb_per_job' in task_proto_dict.keys() and \
-                    not 'tgt_max_output_for_ng' in task_proto_dict.keys():
-                if not 'number_of_files_per_job' in task_proto_dict.keys():
+            if 'number_of_events_per_input_file' not in list(task_proto_dict.keys()) and \
+                    'number_of_gb_per_job' not in list(task_proto_dict.keys()) and \
+                    'tgt_max_output_for_ng' not in list(task_proto_dict.keys()):
+                if 'number_of_files_per_job' not in list(task_proto_dict.keys()):
                     task_proto_dict.update({'number_of_files_per_job': 1})
 
-            if 'number_of_gb_per_job' in task_proto_dict.keys() or 'tgt_max_output_for_ng' in task_proto_dict.keys():
-                if 'respect_split_rule' not in task_proto_dict.keys():
+            if 'number_of_gb_per_job' in list(task_proto_dict.keys()) or 'tgt_max_output_for_ng' in list(
+                    task_proto_dict.keys()):
+                if 'respect_split_rule' not in list(task_proto_dict.keys()):
                     task_proto_dict.update({'respect_split_rule': True})
 
             if use_real_nevents:
                 task_proto_dict.update({'number_of_files_per_job': None})
-                if not 'number_of_max_files_per_job' in task_proto_dict.keys():
+                if 'number_of_max_files_per_job' not in list(task_proto_dict.keys()):
                     task_proto_dict.update({'number_of_max_files_per_job': 200})
 
-            if 'number_of_gb_per_job' in task_proto_dict.keys():
+            if 'number_of_gb_per_job' in list(task_proto_dict.keys()):
                 if not project_mode.nMaxFilesPerJob:
                     task_proto_dict.update({'number_of_max_files_per_job': 1000})
 
-            if use_real_nevents and 'number_of_events_per_input_file' in task_proto_dict.keys():
+            if use_real_nevents and 'number_of_events_per_input_file' in list(task_proto_dict.keys()):
                 raise TaskConfigurationException(
                     "The task is rejected due to incompatible parameters: useRealNumEvents, 'Events per Input file'"
                 )
@@ -3447,21 +3457,21 @@ class TaskDefinition(object):
             task_elements = list()
 
             input_file_dict = dict()
-            for key in input_params.keys():
+            for key in list(input_params.keys()):
                 if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                     input_file_dict.update({key: input_params[key]})
 
-            if len(input_file_dict.keys()):
-                input_list_length = len(input_file_dict[input_file_dict.keys()[0]])
-                all_lists = [input_file_dict[key] for key in input_file_dict.keys()]
+            if len(list(input_file_dict.keys())):
+                input_list_length = len(input_file_dict[list(input_file_dict.keys())[0]])
+                all_lists = [input_file_dict[key] for key in list(input_file_dict.keys())]
                 if any(len(input_list) != input_list_length for input_list in all_lists):
                     raise Exception("Input lists are different lengths")
                 context_dict_list = list()
                 for i in range(input_list_length):
                     context_dict = dict()
-                    for key in input_file_dict.keys():
+                    for key in list(input_file_dict.keys()):
                         context_dict.update({"%s_dataset" % key: input_file_dict[key][i]})
-                    if len(context_dict.keys()):
+                    if len(list(context_dict.keys())):
                         context_dict_list.append(context_dict)
                 for context_dict in context_dict_list:
                     template_string = self.protocol.serialize_task(task_proto)
@@ -3485,10 +3495,10 @@ class TaskDefinition(object):
                 raise Exception("List of tasks is empty")
 
             for task_element in task_elements:
-                task_id = task_element.keys()[0]
-                task = task_element.values()[0]
+                task_id = list(task_element.keys())[0]
+                task = list(task_element.values())[0]
 
-                for key in output_params.keys():
+                for key in list(output_params.keys()):
                     for output_dataset_name in output_params[key]:
                         output_dataset_name = output_dataset_name.replace(
                             TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_proto_id,
@@ -3586,7 +3596,7 @@ class TaskDefinition(object):
                 previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
                 requested_datasets_no_scope = [e.split(':')[-1] for e in requested_datasets]
                 previous_dsn_no_scope = previous_dsn.split(':')[-1]
-                if not previous_dsn_no_scope in requested_datasets_no_scope:
+                if previous_dsn_no_scope not in requested_datasets_no_scope:
                     continue
 
             if project_mode.checkOutputDeleted:
@@ -3595,7 +3605,7 @@ class TaskDefinition(object):
                     self.task_reg.check_task_output(ps2_task.id, requested_output_types)
                 previous_output_exists = False
                 for requested_output_type in requested_output_types:
-                    if not requested_output_type in previous_output_status_dict.keys():
+                    if requested_output_type not in list(previous_output_status_dict.keys()):
                         continue
                     if previous_output_status_dict[requested_output_type]:
                         previous_output_exists = True
@@ -3609,7 +3619,7 @@ class TaskDefinition(object):
             if not number_events:
                 number_events = int(ps2_task.total_events or 0)
             number_events_processed += number_events
-            offset = jedi_task_existing._get_job_parameter('firstEvent', 'offset')
+            offset = jedi_task_existing.get_job_parameter('firstEvent', 'offset')
             if offset and offset > 0:
                 max_by_offset = max(max_by_offset, number_events + offset)
 
@@ -3655,7 +3665,7 @@ class TaskDefinition(object):
             requested_datasets_no_scope = [e.split(':')[-1] for e in requested_datasets]
             previous_dsn_no_scope = previous_dsn.split(':')[-1]
             if requested_datasets:
-                if not previous_dsn_no_scope in requested_datasets_no_scope:
+                if previous_dsn_no_scope not in requested_datasets_no_scope:
                     continue
             processed_datasets.append(previous_dsn_no_scope)
         return processed_datasets
@@ -3665,15 +3675,15 @@ class TaskDefinition(object):
         try:
             try:
                 nevents_per_file = self.rucio_client.get_nevents_per_file(input_name)
-            except:
+            except Exception:
                 nevents_per_file = self.ami_client.get_nevents_per_file(input_name)
-        except:
+        except Exception:
             logger.info("get_nevents_per_file, exception occurred: %s" % get_exception_string())
         return nevents_per_file
 
     def get_events_per_input_file(self, step, input_name, use_real_events=False):
         task_config = ProjectMode.get_task_config(step)
-        if not 'nEventsPerInputFile' in task_config.keys() or use_real_events:
+        if 'nEventsPerInputFile' not in list(task_config.keys()) or use_real_events:
             events_per_file = int(self.get_events_per_file(input_name))
         else:
             events_per_file = int(task_config['nEventsPerInputFile'])
@@ -3695,7 +3705,7 @@ class TaskDefinition(object):
         tasks = ProductionTask.objects.filter(id=task_id)
         if not tasks:
             subcampaign = self.rucio_client.get_campaign(name)
-            for e in TaskDefConstants.DEFAULT_SC_HASHTAGS.keys():
+            for e in list(TaskDefConstants.DEFAULT_SC_HASHTAGS.keys()):
                 for pattern in TaskDefConstants.DEFAULT_SC_HASHTAGS[e]:
                     result = re.match(r'{0}'.format(pattern), subcampaign)
                     if result:
@@ -3703,7 +3713,7 @@ class TaskDefinition(object):
 
         task = tasks[0]
         sc_hashtags = \
-            [e + TaskDefConstants.DEFAULT_SC_HASHTAG_SUFFIX for e in TaskDefConstants.DEFAULT_SC_HASHTAGS.keys()]
+            [e + TaskDefConstants.DEFAULT_SC_HASHTAG_SUFFIX for e in list(TaskDefConstants.DEFAULT_SC_HASHTAGS.keys())]
         for e in sc_hashtags:
             try:
                 hashtag = HashTag.objects.get(hashtag=e)
@@ -3714,7 +3724,7 @@ class TaskDefinition(object):
                 return e.split(TaskDefConstants.DEFAULT_SC_HASHTAG_SUFFIX)[0]
 
         subcampaign = self.rucio_client.get_campaign(name)
-        for e in TaskDefConstants.DEFAULT_SC_HASHTAGS.keys():
+        for e in list(TaskDefConstants.DEFAULT_SC_HASHTAGS.keys()):
             for pattern in TaskDefConstants.DEFAULT_SC_HASHTAGS[e]:
                 result = re.match(r'{0}'.format(pattern), subcampaign)
                 if result:
@@ -3816,11 +3826,11 @@ class TaskDefinition(object):
                 try:
                     name_dict = self.parse_data_name(name)
                     name_prod_step = name_dict['prod_step']
-                    if not name_prod_step in prod_steps:
+                    if name_prod_step not in prod_steps:
                         prod_steps.append(name_prod_step)
                     campaign = self.get_dataset_subcampaign(name)
                     if campaign:
-                        if not campaign in campaigns.keys():
+                        if campaign not in list(campaigns.keys()):
                             campaigns[campaign] = list()
                         campaigns[campaign].append(name)
                 except Exception as ex:
@@ -3838,7 +3848,7 @@ class TaskDefinition(object):
                 if task_config_changed:
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('project_mode',))
                     project_mode = ProjectMode(step)
-            if len(campaigns.keys()) > 1:
+            if len(list(campaigns.keys())) > 1:
                 if not project_mode.forceSplitInput:
                     task_config = ProjectMode.get_task_config(step)
                     task_config['project_mode'] = 'forceSplitInput=yes;{0}'.format(task_config.get('project_mode', ''))
@@ -3847,13 +3857,13 @@ class TaskDefinition(object):
                 if project_mode.runOnlyCampaign:
                     requested_campaigns = list()
                     for value in project_mode.runOnlyCampaign.split(','):
-                        for e in TaskDefConstants.DEFAULT_SC_HASHTAGS.keys():
+                        for e in list(TaskDefConstants.DEFAULT_SC_HASHTAGS.keys()):
                             for pattern in TaskDefConstants.DEFAULT_SC_HASHTAGS[e]:
-                                if re.match(r'{0}'.format(pattern), value) and (not e in requested_campaigns):
+                                if re.match(r'{0}'.format(pattern), value) and (e not in requested_campaigns):
                                     requested_campaigns.append(e)
                     requested_datasets = list()
                     for requested_campaign in requested_campaigns:
-                        if requested_campaign in campaigns.keys():
+                        if requested_campaign in list(campaigns.keys()):
                             requested_datasets.extend(campaigns[requested_campaign])
                     if len(requested_datasets) > 0:
                         result['datasets'] = requested_datasets
@@ -3864,7 +3874,7 @@ class TaskDefinition(object):
                     if requested_campaign.lower().startswith('MC16'.lower()) and \
                             step.request.request_type.lower() == 'MC'.lower():
                         requested_datasets = list()
-                        if requested_campaign in campaigns.keys():
+                        if requested_campaign in list(campaigns.keys()):
                             requested_datasets.extend(campaigns[requested_campaign])
                         if len(requested_datasets) > 0:
                             result['datasets'] = requested_datasets
@@ -3899,13 +3909,13 @@ class TaskDefinition(object):
                     return splitting_dict
 
             task_config = ProjectMode.get_task_config(step)
-            if 'previous_task_list' in task_config.keys():
+            if 'previous_task_list' in list(task_config.keys()):
                 previous_task_list = ProductionTask.objects.filter(id__in=task_config['previous_task_list'])
                 for previous_task in previous_task_list:
                     job_params = self.task_reg.get_task_parameter(previous_task.id, 'jobParameters')
                     primary_input = self._get_primary_input(job_params)
                     if primary_input:
-                        if not step.id in splitting_dict.keys():
+                        if step.id not in list(splitting_dict.keys()):
                             splitting_dict[step.id] = list()
                         splitting_dict[step.id].append({'dataset': primary_input['dataset'],
                                                         'offset': 0,
@@ -3916,7 +3926,7 @@ class TaskDefinition(object):
 
             if reuse_input and len(result['datasets']) == 1:
                 for i in range(reuse_input):
-                    if not step.id in splitting_dict.keys():
+                    if step.id not in list(splitting_dict.keys()):
                         splitting_dict[step.id] = list()
                     splitting_dict[step.id].append({'dataset': result['datasets'][0], 'offset': 0,
                                                     'number_events': int(step.input_events), 'container': None})
@@ -3978,7 +3988,7 @@ class TaskDefinition(object):
                         number_events = events_per_file * self.rucio_client.get_number_files(
                             dataset_name)
                         if number_events:
-                            if not step.id in splitting_dict.keys():
+                            if step.id not in list(splitting_dict.keys()):
                                 splitting_dict[step.id] = list()
                             splitting_dict[step.id].append({'dataset': dataset_name, 'offset': 0,
                                                             'number_events': number_events,
@@ -4010,7 +4020,7 @@ class TaskDefinition(object):
                     number_events_requested -= number_events
                     number_events_processed += number_events
                     if number_events:
-                        if not step.id in splitting_dict.keys():
+                        if step.id not in list(splitting_dict.keys()):
                             splitting_dict[step.id] = list()
                         splitting_dict[step.id].append({'dataset': dataset_name, 'offset': offset / events_per_file,
                                                         'number_events': number_events, 'container': input_data_name})
@@ -4027,7 +4037,7 @@ class TaskDefinition(object):
         input_params = self.get_input_params(step, step, False, energy_gev, False)
         container_name_key = None
         container_name = None
-        for key in input_params.keys():
+        for key in list(input_params.keys()):
             if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                 container_name_key = key
                 container_name = input_params[key][0]
@@ -4036,10 +4046,10 @@ class TaskDefinition(object):
         if not container_name:
             raise Exception('No input container found')
 
-        if 'nFilesPerJob' in input_params.keys() and not 'nFilesPerJob' in task_config.keys():
+        if 'nFilesPerJob' in list(input_params.keys()) and 'nFilesPerJob' not in list(task_config.keys()):
             task_config.update({'nFilesPerJob': int(input_params['nFilesPerJob'])})
 
-        if 'previous_task_list' in task_config.keys():
+        if 'previous_task_list' in list(task_config.keys()):
             previous_task_list = ProductionTask.objects.filter(
                 id__in=task_config['previous_task_list'])
             for previous_task in previous_task_list:
@@ -4126,7 +4136,7 @@ class TaskDefinition(object):
                     input_data_name) +
                 'The task is rejected')
         nfiles_per_job = 1
-        if 'nFilesPerJob' in task_config.keys():
+        if 'nFilesPerJob' in list(task_config.keys()):
             nfiles_per_job = int(task_config['nFilesPerJob'])
 
         nfiles_requested = int(step.input_events) * nfiles_per_job / nevents_per_job
@@ -4281,7 +4291,7 @@ class TaskDefinition(object):
                                 input_params = self.get_input_params(step, step, None, 0, False)
                                 if not input_params:
                                     raise Exception("No datasets in the period container %s" % input_data_name)
-                                for key in input_params.keys():
+                                for key in list(input_params.keys()):
                                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                                         phys_cont_list.extend(input_params[key])
                             elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
@@ -4356,9 +4366,9 @@ class TaskDefinition(object):
                                 raise ex
                             except NoRequestedCampaignInput:
                                 raise Exception('No input for specified campaign')
-                            except:
+                            except Exception:
                                 raise
-                            if not step.id in splitting_dict.keys():
+                            if step.id not in list(splitting_dict.keys()):
                                 if use_parent_output:
                                     parent_step = StepExecution.objects.get(id=step.step_parent_id)
                                     for task_id in self.task_reg.get_step_tasks(parent_step.id):
@@ -4368,11 +4378,10 @@ class TaskDefinition(object):
                                                                    first_parent_task_id=task_id)
                                         except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                                 UnmergedInputProcessedException) as ex:
-                                            log_msg = \
-                                                'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
-                                                    request.id, step.slice.slice, step.id,
-                                                    self.get_step_input_data_name(step),
-                                                    get_exception_string())
+                                            log_msg = 'Request = {0}, Chain = {1} ({2}),'.format(
+                                                request.id, step.slice.slice, step.id)
+                                            log_msg += ' input = {0}, exception occurred: {1}'.format(
+                                                self.get_step_input_data_name(step), get_exception_string())
                                             jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                             exception = True
                                             continue
@@ -4390,10 +4399,10 @@ class TaskDefinition(object):
                                                                container_name=step_input['container'])
                                     except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
                                             UnmergedInputProcessedException, UniformDataException) as ex:
-                                        log_msg = \
-                                            'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
-                                                request.id, step.slice.slice, step.id,
-                                                self.get_step_input_data_name(step), get_exception_string())
+                                        log_msg = 'Request = {0}, Chain = {1} ({2}),'.format(
+                                            request.id, step.slice.slice, step.id)
+                                        log_msg += ' input = {0}, exception occurred: {1}'.format(
+                                            self.get_step_input_data_name(step), get_exception_string())
                                         jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                         exception = True
                                         continue
@@ -4401,16 +4410,16 @@ class TaskDefinition(object):
                                         raise ex
                     except KeyboardInterrupt:
                         pass
-                    except:
-                        log_msg = "Request = %d, Chain = %d (%d), input = %s, exception occurred: %s" % \
-                                  (request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
-                                   get_exception_string())
+                    except Exception:
+                        log_msg = 'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
+                            request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
+                            get_exception_string())
                         logger.exception(log_msg)
                         if request.reference:
                             try:
                                 jira_client.add_issue_comment(request.reference, log_msg)
                                 exception = True
-                            except:
+                            except Exception:
                                 pass
                         continue
                 request.status = self._get_request_status(request)

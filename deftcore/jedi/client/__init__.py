@@ -23,8 +23,8 @@ def _x509():
 with open(JEDI_CLIENT_PATH, 'r') as fp:
     client_data = fp.read()
 jedi_client_module = imp.new_module('Client')
-exec client_data in jedi_client_module.__dict__
+exec(client_data, jedi_client_module.__dict__)
 jedi_client_module.__dict__['_x509'] = _x509
 
 sys.modules[jedi_client_module.__name__] = jedi_client_module
-exec 'from ' + jedi_client_module.__name__ + ' import *'
+exec('from {0} import *'.format(jedi_client_module.__name__))

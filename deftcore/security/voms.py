@@ -13,6 +13,7 @@ class NoProxyException(Exception):
         super(NoProxyException, self).__init__('Unable to initialize the valid VOMS proxy')
 
 
+# noinspection PyBroadException, PyUnresolvedReferences
 class VOMSClient(object):
     def __init__(self):
         self.lifetime = 43200

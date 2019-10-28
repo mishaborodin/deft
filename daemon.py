@@ -1,11 +1,11 @@
 __author__ = 'Dmitry Golubkov'
 
-import os
 import argparse
-import time
-from daemonize import Daemonize
-import logging
 import logging.handlers
+import os
+import time
+
+from daemonize import Daemonize
 
 pid = '../deftcore-daemon.pid'
 

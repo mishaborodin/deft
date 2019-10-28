@@ -26,17 +26,17 @@ class Constant(object):
         self.format_arg_names = format_arg_names or tuple()
 
     def is_dynamic(self):
-        return not self.format_arg_names is tuple()
+        return self.format_arg_names is not tuple()
 
 
 class Constants(type):
     def __new__(mcs, name, bases, namespace):
         attributes = dict()
 
-        for attr_name in namespace.keys():
+        for attr_name in list(namespace.keys()):
             attr = namespace[attr_name]
             if isinstance(attr, Constant):
-                if isinstance(attr.format_or_value, str) or isinstance(attr.format_or_value, unicode):
+                if isinstance(attr.format_or_value, str) or isinstance(attr.format_or_value, str):
                     args = list()
                     for arg_name in attr.format_arg_names:
                         arg_attr = namespace[arg_name]
@@ -49,7 +49,7 @@ class Constants(type):
                 # FIXME: implement support for protocol fixes
                 attributes[attr_name] = attr_value
 
-        for attr_name in attributes.keys():
+        for attr_name in list(attributes.keys()):
             namespace[attr_name] = attributes[attr_name]
 
         cls = super(Constants, mcs).__new__(mcs, name, bases, namespace)
@@ -113,6 +113,7 @@ class RequestStatus(Enum):
     values = ['APPROVED', 'PROCESSED', 'WORKING']
 
 
+# noinspection PyBroadException, PyUnresolvedReferences
 class Protocol(object):
     VERSION = '2.0'
 
@@ -327,17 +328,17 @@ class Protocol(object):
     }
 
     def render_param(self, proto_key, param_dict):
-        for key in param_dict.keys():
-            if not isinstance(param_dict[key], (str, unicode, int)):
+        for key in list(param_dict.keys()):
+            if not isinstance(param_dict[key], (str, int)):
                 try:
                     param_dict[key] = json.dumps(param_dict[key])
-                except:
+                except Exception:
                     param_dict[key] = param_dict[key]
         default_param_dict = {'separator': '='}
         default_param_dict.update(param_dict)
         t = Template(self.TASK_PARAM_TEMPLATES[proto_key])
         param = json.loads(t.render(Context(default_param_dict, autoescape=False)))
-        for key in param.keys()[:]:
+        for key in list(param.keys())[:]:
             if param[key] == 'None':
                 param.pop(key, None)
         return param
@@ -348,7 +349,7 @@ class Protocol(object):
             task_template = Template(fp.read())
         proto_task = json.loads(task_template.render(Context(task_dict, autoescape=False)))
         task = {}
-        for key in proto_task.keys():
+        for key in list(proto_task.keys()):
             if proto_task[key] == "" or proto_task[key] == "''" or proto_task[key].lower() == 'None'.lower() or \
                     proto_task[key].lower() == '\'None\''.lower():
                 continue
@@ -356,7 +357,7 @@ class Protocol(object):
         return task
 
     def is_dynamic_jobdef_enabled(self, task):
-        keys = [k.lower() for k in task.keys()]
+        keys = [k.lower() for k in list(task.keys())]
         if 'nEventsPerJob'.lower() in keys or 'nFilesPerJob'.lower() in keys:
             return False
         else:
@@ -382,7 +383,7 @@ class Protocol(object):
     def get_primary_input(self, task):
         job_params = task['jobParameters']
         for job_param in job_params:
-            if not 'param_type' in job_param.keys() or job_param['param_type'].lower() != 'input'.lower():
+            if not 'param_type' in list(job_param.keys()) or job_param['param_type'].lower() != 'input'.lower():
                 continue
             if re.match(r'^(--)?input.*File', job_param['value'], re.IGNORECASE):
                 result = re.match(r'^(--)?input(?P<intype>.*)File', job_param['value'], re.IGNORECASE)
@@ -402,9 +403,9 @@ class Protocol(object):
     def is_leave_log_param(self, log_param):
         token = None
         destination = None
-        if 'token' in log_param.keys():
+        if 'token' in list(log_param.keys()):
             token = log_param['token']
-        if 'destination' in log_param.keys():
+        if 'destination' in list(log_param.keys()):
             destination = log_param['destination']
         if token == TaskDefConstants.LEAVE_LOG_TOKEN and destination == TaskDefConstants.LEAVE_LOG_DESTINATION:
             return True
@@ -412,7 +413,7 @@ class Protocol(object):
             return False
 
     def is_evnt_filter_step(self, project_mode, task_config):
-        return project_mode.evntFilterEff or 'evntFilterEff' in task_config.keys()
+        return project_mode.evntFilterEff or 'evntFilterEff' in list(task_config.keys())
 
     def serialize_task(self, task):
         return json.dumps(task, sort_keys=True)
@@ -421,9 +422,7 @@ class Protocol(object):
         return json.loads(task_string)
 
 
-class TaskDefConstants(object):
-    __metaclass__ = Constants
-
+class TaskDefConstants(object, metaclass=Constants):
     DEFAULT_PROD_SOURCE = Constant('managed')
     DEFAULT_DEBUG_PROJECT_NAME = Constant('mc12_valid')
     DEFAULT_PROJECT_MODE = Constant({'cmtconfig': 'i686-slc5-gcc43-opt', 'spacetoken': 'ATLASDATADISK'})

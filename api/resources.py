@@ -81,7 +81,7 @@ class InstanceResource(Resource):
     def obj_get(self, bundle, **kwargs):
         pk = str(kwargs['pk'])
         try:
-            return (item for item in instances if item.name == pk).next()
+            return next((item for item in instances if item.name == pk))
         except StopIteration:
             raise NotFound("DEFT instance '%s' is not registered" % pk)
 
@@ -98,6 +98,12 @@ class InstanceResource(Resource):
         raise BadRequest()
 
     def rollback(self, bundles):
+        pass
+
+    def apply_filters(self, request, applicable_filters):
+        pass
+
+    def obj_delete_list_for_update(self, bundle, **kwargs):
         pass
 
 
@@ -128,19 +134,23 @@ class RequestResource(ModelResource):
 
     def prepend_urls(self):
         return [
-            url(r'^(?P<resource_name>%s)/actions%s$' % (self._meta.resource_name, trailing_slash()),
+            url(r'^(?P<resource_name>{0})/actions{1}$'.format(self._meta.resource_name,
+                                                              trailing_slash()),
                 self.wrap_view('get_action_list'),
                 name="list of actions"),
-            url(r'^(?P<resource_name>%s)/action/(?P<action_name>\w[\w/-]*)%s$' % \
-                (self._meta.resource_name, trailing_slash()),
+
+            url(r'^(?P<resource_name>{0})/action/(?P<action_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
+                                                                                        trailing_slash()),
                 self.wrap_view('perform_action'),
                 name='perform action'),
-            url(r'^(?P<resource_name>%s)/tag/(?P<tag_name>\w[\w/-]*)%s$' % \
-                (self._meta.resource_name, trailing_slash()),
+
+            url(r'^(?P<resource_name>{0})/tag/(?P<tag_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
+                                                                                  trailing_slash()),
                 self.wrap_view('view_tag'),
                 name='view configuration tag'),
-            url(r'^(?P<resource_name>%s)/project_mode/((?P<step_id>\w[\w/-]*)%s|)$' % \
-                (self._meta.resource_name, trailing_slash()),
+
+            url(r'^(?P<resource_name>{0})/project_mode/((?P<step_id>\w[\w/-]*){1}|)$'.format(self._meta.resource_name,
+                                                                                             trailing_slash()),
                 self.wrap_view('check_project_mode'),
                 name='check project_mode of given step'),
         ]
@@ -156,7 +166,7 @@ class RequestResource(ModelResource):
         self.throttle_check(request)
 
         action_name = kwargs['action_name']
-        if not action_name in [e[0] for e in Request.ACTION_LIST]:
+        if action_name not in [e[0] for e in Request.ACTION_LIST]:
             return self.create_response(request, {'result': "Invalid action name: %s" % action_name})
 
         params = request.GET.dict()
@@ -210,6 +220,7 @@ class RequestResource(ModelResource):
                                                   'result': ex.message})
 
 
+# noinspection PyBroadException
 class TaskResource(ModelResource):
     jedi_task_params = fields.DictField(attribute='jedi_task_params', null=True)
     jedi_task_status = fields.CharField(attribute='jedi_task_status', null=True)
@@ -246,7 +257,7 @@ class TaskResource(ModelResource):
             timestamp_days = None
             try:
                 timestamp_days = int(request.GET.get('timestamp_days', None))
-            except Exception as ex:
+            except Exception:
                 pass
             if timestamp_days:
                 timestamp_offset = timezone.now().date() - timedelta(days=timestamp_days)

@@ -16,6 +16,7 @@ class InvalidArgumentError(ValueError):
     pass
 
 
+# noinspection PyUnresolvedReferences
 class TaskActionHandler(object):
     def parse_jedi_result(self, result):
         return_code = None
@@ -150,7 +151,7 @@ class TaskActionHandler(object):
 
     def _construct_pp_command(self, pp_command):
         pp_command_list = list()
-        for key in pp_command.keys():
+        for key in list(pp_command.keys()):
             if pp_command[key]:
                 pp_command_list.append('{0} : {1};'.format(key, ', '.join(pp_command[key])))
         return ''.join(pp_command_list)
@@ -160,7 +161,7 @@ class TaskActionHandler(object):
         task = ProductionTask.objects.get(id=task_id)
         # 'trainCC : DAOD, ESD; merge : HITS;'
         pp_command = self._parse_pp_command(task.postproduction)
-        if 'trainCC' in pp_command.keys():
+        if 'trainCC' in list(pp_command.keys()):
             for e in output_formats.split('.'):
                 if not e in pp_command['trainCC']:
                     pp_command['trainCC'].append(e)
@@ -189,7 +190,7 @@ class TaskActionHandler(object):
         return {'result': 'Success'}
 
     def set_ttcj(self, ttcj_dict):
-        for task_id in ttcj_dict.keys():
+        for task_id in list(ttcj_dict.keys()):
             task = ProductionTask.objects.get(id=task_id)
             task.ttcj_timestamp = datetime.fromtimestamp(ttcj_dict[task_id])
             task.ttcj_update_time = timezone.now()
@@ -233,11 +234,11 @@ class TaskActionHandler(object):
             trtf = TTrfConfig.objects.all().filter(tag=tag.strip()[0], cid=int(tag.strip()[1:]))
             if trtf:
                 tr = trtf[0]
-                if (formats):
+                if formats:
                     output_formats = formats
                 else:
                     output_formats = tr.formats
-                if (ram):
+                if ram:
                     memory = ram
                 else:
                     memory = int(tr.memory)

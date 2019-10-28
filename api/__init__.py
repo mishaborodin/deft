@@ -10,9 +10,8 @@ from taskengine.protocol import Protocol, TaskStatus
 logger = Logger().get()
 
 
-class ApiServer(object):
-    __metaclass__ = Singleton
-
+# noinspection PyBroadException, PyUnresolvedReferences
+class ApiServer(object, metaclass=Singleton):
     def _process_api_request(self, request):
         try:
             from taskengine.models import ProductionTask
@@ -33,7 +32,7 @@ class ApiServer(object):
                         task = ProductionTask.objects.get(id=task_id)
                         task.status = Protocol().TASK_STATUS[TaskStatus.TOABORT]
                         task.save()
-                except:
+                except Exception:
                     logger.exception("Exception occurred: %s" % get_exception_string())
                 request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
                 handler.add_task_comment(task_id, request.create_default_task_comment(body))
@@ -151,7 +150,7 @@ class ApiServer(object):
                         task = ProductionTask.objects.get(id=task_id)
                         task.status = Protocol().TASK_STATUS[TaskStatus.TORETRY]
                         task.save()
-                except:
+                except Exception:
                     logger.exception("Exception occurred: %s" % get_exception_string())
                 request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
                 handler.add_task_comment(task_id, request.create_default_task_comment(body))

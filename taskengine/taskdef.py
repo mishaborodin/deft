@@ -2475,7 +2475,7 @@ class TaskDefinition(object):
                                 self.protocol.render_param(TaskParamName.FIRST_EVENT, param_dict)
                             )
                         else:
-                            logger.warning("firstEvents parameter is omitted" % step.id)
+                            logger.warning('firstEvents parameter is omitted (step={0})'.format(step.id))
                         continue
                     param_dict = {'name': name, 'value': param_value}
                     param_dict.update(trf_options)

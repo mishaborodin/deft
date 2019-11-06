@@ -7,7 +7,7 @@ import re
 from django.template import Context, Template
 from django.template.defaultfilters import stringfilter
 from django import template
-from deftcore.helpers import Enum
+from enum import Enum, auto
 from deftcore.log import Logger
 
 logger = Logger.get()
@@ -61,56 +61,58 @@ class Constants(type):
 
 
 class TaskParamName(Enum):
-    values = ['CONSTANT',
-              'SKIP_EVENTS',
-              'MAX_EVENTS',
-              'RANDOM_SEED',
-              'RANDOM_SEED_MC',
-              'FIRST_EVENT',
-              'DB_RELEASE',
-              'INPUT',
-              'INPUT_DIRECT_IO',
-              'OUTPUT',
-              'TXT_OUTPUT',
-              'SECONDARY_INPUT_MINBIAS',
-              'SECONDARY_INPUT_CAVERN',
-              'SECONDARY_INPUT_ZERO_BIAS_BS',
-              'LOG',
-              'JOB_NUMBER',
-              'FILTER_FILE',
-              'TRAIN_DAOD_FILE',
-              'TRAIN_DAOD_FILE_JEDI_MERGE',
-              'TRAIN_OUTPUT',
-              'TXT_EVENTID_OUTPUT',
-              'TAR_CONFIG_OUTPUT',
-              'ZIP_OUTPUT',
-              'ZIP_MAP',
-              'OVERLAY_FILTER_FILE',
-              'HITAR_FILE']
+    CONSTANT = auto()
+    SKIP_EVENTS = auto()
+    MAX_EVENTS = auto()
+    RANDOM_SEED = auto()
+    RANDOM_SEED_MC = auto()
+    FIRST_EVENT = auto()
+    DB_RELEASE = auto()
+    INPUT = auto()
+    INPUT_DIRECT_IO = auto()
+    OUTPUT = auto()
+    TXT_OUTPUT = auto()
+    SECONDARY_INPUT_MINBIAS = auto()
+    SECONDARY_INPUT_CAVERN = auto()
+    SECONDARY_INPUT_ZERO_BIAS_BS = auto()
+    LOG = auto()
+    JOB_NUMBER = auto()
+    FILTER_FILE = auto()
+    TRAIN_DAOD_FILE = auto()
+    TRAIN_DAOD_FILE_JEDI_MERGE = auto()
+    TRAIN_OUTPUT = auto()
+    TXT_EVENTID_OUTPUT = auto()
+    TAR_CONFIG_OUTPUT = auto()
+    ZIP_OUTPUT = auto()
+    ZIP_MAP = auto()
+    OVERLAY_FILTER_FILE = auto()
+    HITAR_FILE = auto()
 
 
 class TaskStatus(Enum):
-    values = ['TESTING',
-              'WAITING',
-              'FAILED',
-              'BROKEN',
-              'OBSOLETE',
-              'ABORTED',
-              'TOABORT',
-              'RUNNING',
-              'FINISHED',
-              'DONE',
-              'TORETRY']
+    TESTING = auto()
+    WAITING = auto()
+    FAILED = auto()
+    BROKEN = auto()
+    OBSOLETE = auto()
+    ABORTED = auto()
+    TOABORT = auto()
+    RUNNING = auto()
+    FINISHED = auto()
+    DONE = auto()
+    TORETRY = auto()
 
 
 class StepStatus(Enum):
-    values = ['APPROVED',
-              'NOTCHECKED',
-              'WAITING']
+    APPROVED = auto(),
+    NOTCHECKED = auto(),
+    WAITING = auto()
 
 
 class RequestStatus(Enum):
-    values = ['APPROVED', 'PROCESSED', 'WORKING']
+    APPROVED = auto(),
+    PROCESSED = auto()
+    WORKING = auto()
 
 
 # noinspection PyBroadException, PyUnresolvedReferences

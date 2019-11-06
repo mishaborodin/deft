@@ -7,7 +7,6 @@ from django.utils.dateparse import parse_datetime
 from django.dispatch import receiver
 from django.db.models.signals import post_init
 from django.utils import timezone
-from deftcore.helpers import OracleClob
 from deftcore.log import Logger, get_exception_string
 
 logger = Logger.get()
@@ -59,7 +58,7 @@ class TRequest(models.Model):
 
 class TRequestStatus(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='REQ_S_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     comment = models.CharField(max_length=256, db_column='COMMENT', null=True)
     owner = models.CharField(max_length=32, db_column='OWNER', null=False)
     status = models.CharField(max_length=32, db_column='STATUS', null=False)
@@ -77,7 +76,7 @@ class TRequestStatus(models.Model):
 
 class InputRequestList(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='IND_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     slice = models.DecimalField(decimal_places=0, max_digits=12, db_column='SLICE', null=False)
     brief = models.CharField(max_length=150, db_column='BRIEF')
     phys_comment = models.CharField(max_length=256, db_column='PHYSCOMMENT')
@@ -126,10 +125,10 @@ class StepTemplate(models.Model):
 
 class StepExecution(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='STEP_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
-    step_template = models.ForeignKey(StepTemplate, db_column='STEP_T_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
+    step_template = models.ForeignKey(StepTemplate, db_column='STEP_T_ID', on_delete=models.DO_NOTHING)
     status = models.CharField(max_length=12, db_column='STATUS', null=False)
-    slice = models.ForeignKey(InputRequestList, db_column='IND_ID', null=False)
+    slice = models.ForeignKey(InputRequestList, db_column='IND_ID', null=False, on_delete=models.DO_NOTHING)
     priority = models.DecimalField(decimal_places=0, max_digits=5, db_column='PRIORITY', null=False)
     step_def_time = models.DateTimeField(db_column='STEP_DEF_TIME', null=False)
     step_appr_time = models.DateTimeField(db_column='STEP_APPR_TIME', null=True)
@@ -190,8 +189,8 @@ class ProductionContainer(models.Model):
 
 class ProductionTask(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='TASKID', primary_key=True)
-    step = models.ForeignKey(StepExecution, db_column='STEP_ID')
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    step = models.ForeignKey(StepExecution, db_column='STEP_ID', on_delete=models.DO_NOTHING)
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     parent_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='PARENT_TID', null=False)
     name = models.CharField(max_length=130, db_column='TASKNAME', null=True)
     project = models.CharField(max_length=60, db_column='PROJECT', null=True)
@@ -372,8 +371,8 @@ class HashTag(models.Model):
 
 
 class HashTagToTask(models.Model):
-    task = models.ForeignKey(ProductionTask, db_column='TASKID')
-    hashtag = models.ForeignKey(HashTag, db_column='HT_ID')
+    task = models.ForeignKey(ProductionTask, db_column='TASKID', on_delete=models.DO_NOTHING)
+    hashtag = models.ForeignKey(HashTag, db_column='HT_ID', on_delete=models.DO_NOTHING)
 
     def save(self, *args, **kwargs):
         raise NotImplementedError()
@@ -409,8 +408,6 @@ class TTask(models.Model):
     def save(self, *args, **kwargs):
         if not self.id:
             self.id = self.get_id()
-        if self.jedi_task_param:
-            self.jedi_task_param = OracleClob(self.jedi_task_param)
         super(TTask, self).save(*args, **kwargs)
 
     def _get_task_params(self):
@@ -780,7 +777,7 @@ class AuthUser(models.Model):
 
 class OpenEnded(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='OE_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     status = models.CharField(max_length=20, db_column='STATUS', null=True)
 
     class Meta:

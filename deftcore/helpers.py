@@ -1,6 +1,5 @@
 __author__ = 'Dmitry Golubkov'
 
-import cx_Oracle
 from django.contrib import admin
 
 
@@ -41,19 +40,3 @@ class ImportHelper(object):
         for component in self.module_name.split('.')[1:]:
             module = getattr(module, component)
         return module
-
-
-class Enum(object):
-    values = []
-
-    class __metaclass__(type):
-        def __getattr__(self, name):
-            return self.values.index(name)
-
-
-# todo: remove
-class OracleClob(str):
-    def __new__(cls, *args, **kwargs):
-        obj = str.__new__(cls, *args, **kwargs)
-        obj.input_size = cx_Oracle.CLOB
-        return obj

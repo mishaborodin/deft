@@ -2,10 +2,11 @@ __author__ = 'Dmitry Golubkov'
 
 import os
 import subprocess
-import datetime
-import gridproxy
-import gridproxy.voms
+from OpenSSL.crypto import load_certificate, FILETYPE_PEM
 from deftcore.settings import VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH, X509_PROXY_PATH
+from deftcore.log import Logger
+
+logger = Logger.get()
 
 
 class NoProxyException(Exception):
@@ -47,15 +48,15 @@ class VOMSClient(object):
     def _is_proxy_valid(self):
         if not os.path.isfile(self.proxy_file_path):
             return False
-        voms_client = gridproxy.voms.VOMS()
-        with open(self.proxy_file_path, 'r') as proxy_file:
+        with open(self.proxy_file_path, 'rb') as proxy_file:
             try:
-                _, chain = gridproxy.load_proxy(proxy_file.read())
-                voms_client.from_x509_stack(chain)
-            except Exception:
+                cert_pem = proxy_file.read()
+                proxy_file.close()
+                x509 = load_certificate(FILETYPE_PEM, cert_pem)
+                return not x509.has_expired()
+            except Exception as ex:
+                logger.warning('_is_proxy_valid failed: {0}'.format(ex))
                 return False
-        not_after = voms_client.not_after.replace(tzinfo=None)
-        return not_after >= datetime.datetime.now()
 
     @property
     def valid(self):

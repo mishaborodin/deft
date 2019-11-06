@@ -1,7 +1,7 @@
 __author__ = 'Dmitry Golubkov'
 
 import os
-import imp
+import types
 import sys
 from deftcore.settings import JEDI_CLIENT_PATH
 from deftcore.security.voms import VOMSClient
@@ -22,7 +22,7 @@ def _x509():
 
 with open(JEDI_CLIENT_PATH, 'r') as fp:
     client_data = fp.read()
-jedi_client_module = imp.new_module('Client')
+jedi_client_module = types.ModuleType('Client')
 exec(client_data, jedi_client_module.__dict__)
 jedi_client_module.__dict__['_x509'] = _x509
 

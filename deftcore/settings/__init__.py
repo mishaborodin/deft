@@ -216,6 +216,7 @@ VOMS_CERT_FILE_PATH = os.path.join(BASE_DIR, '../../usercert.pem')
 VOMS_KEY_FILE_PATH = os.path.join(BASE_DIR, '../../userkey.pem')
 X509_PROXY_PATH = os.path.join(BASE_DIR, '../../proxy')
 
+JEDI_CORE_UTILS_PATH = os.path.join(BASE_DIR, '../../panda-server/pandaserver/srvcore/CoreUtils.py')
 JEDI_CLIENT_PATH = os.path.join(BASE_DIR, '../../panda-server/pandaserver/userinterface/Client.py')
 
 if DEBUG:

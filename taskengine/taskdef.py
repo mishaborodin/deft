@@ -839,6 +839,7 @@ class TaskDefinition(object):
     def _check_task_number_of_jobs(self, task, nevents, step):
         number_of_jobs = 0
         nevents_per_job = task.get('nEventsPerJob', 0)
+        nfiles_per_job = task.get('nFilesPerJob', 0)
 
         primary_input = self._get_primary_input(task['jobParameters'])
         if not primary_input:
@@ -848,25 +849,32 @@ class TaskDefinition(object):
         if not dsn:
             return
 
+        requested_nevents = 0
+
         if nevents > 0:
             number_of_jobs = nevents / nevents_per_job
+            requested_nevents = nevents
         else:
             total_nevents = 0
             try:
                 total_nevents = self.rucio_client.get_number_events(dsn)
                 if not total_nevents:
                     raise EmptyDataset()
-            except Exception:
+            except:
                 chain_input_events = self._extract_chain_input_events(step)
                 if chain_input_events > 0:
                     total_nevents = chain_input_events
-            number_of_jobs = total_nevents / nevents_per_job
+            requested_nevents = total_nevents
+            if nevents_per_job != 0:
+                number_of_jobs = total_nevents / nevents_per_job
+            else:
+                number_of_jobs = total_nevents / nfiles_per_job
 
         if number_of_jobs >= TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK / 5 or \
-                number_of_jobs < TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS / nevents_per_job:
+                requested_nevents < TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS:
             task['esConvertible'] = False
 
-        if number_of_jobs >= TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS / nevents_per_job:
+        if requested_nevents >= TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS:
             task['skipShortInput'] = True
 
     def _check_task_merged_input(self, task, step, prod_step):
@@ -2483,7 +2491,7 @@ class TaskDefinition(object):
                                 self.protocol.render_param(TaskParamName.FIRST_EVENT, param_dict)
                             )
                         else:
-                            logger.warning("firstEvents parameter is omitted" % step.id)
+                            logger.warning('firstEvents parameter is omitted (step={0})'.format(step.id))
                         continue
                     param_dict = {'name': name, 'value': param_value}
                     param_dict.update(trf_options)
@@ -3437,7 +3445,6 @@ class TaskDefinition(object):
                     task_proto_dict.update({'respect_split_rule': True})
 
             if use_real_nevents:
-                task_proto_dict.update({'number_of_files_per_job': None})
                 if 'number_of_max_files_per_job' not in list(task_proto_dict.keys()):
                     task_proto_dict.update({'number_of_max_files_per_job': 200})
 

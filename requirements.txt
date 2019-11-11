@@ -3,8 +3,6 @@ daemonize~=2.5.0
 cx-Oracle~=7.2.3
 django-tastypie~=0.14.2
 pyopenssl~=19.0.0
-pyAMI-core==5.0.8.1
-pyAMI-atlas==5.0.7
 pycurl~=7.43.0.2
 requests~=2.21.0
 rucio-clients~=1.20.8

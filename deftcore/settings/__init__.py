@@ -230,9 +230,10 @@ SESSION_ENGINE = 'taskengine.sessions'
 
 RUCIO_ACCOUNT_NAME = 'prodsys'
 
-AMI_ENDPOINTS = ['atlas', 'atlas-replica']
+AMI_API_V2_BASE_URL = 'https://ami.in2p3.fr/AMI2/api/'
+AMI_API_V2_BASE_URL_REPLICA = 'https://atlas-ami.cern.ch/AMI2/api/'
 
-AGIS_API_BASE_URI = 'http://atlas-agis-api.cern.ch'
+AGIS_API_BASE_URL = 'http://atlas-agis-api.cern.ch'
 
 MONITORING_REQUEST_LINK_FORMAT = 'https://prodtask-dev.cern.ch/prodtask/inputlist_with_request/%d/'
 

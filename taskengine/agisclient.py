@@ -2,7 +2,7 @@ __author__ = 'Dmitry Golubkov'
 
 import requests
 import urllib.parse
-from deftcore.settings import AGIS_API_BASE_URI
+from deftcore.settings import AGIS_API_BASE_URL
 from deftcore.log import Logger
 
 logger = Logger.get()
@@ -10,26 +10,26 @@ logger = Logger.get()
 
 class AGISClient(object):
     def __init__(self):
-        self.base_uri = AGIS_API_BASE_URI
+        self.base_url = AGIS_API_BASE_URL
 
     def _list_panda_resources(self):
-        url = urllib.parse.urljoin(self.base_uri, 'request/pandaresource/query/list/?json')
+        url = urllib.parse.urljoin(self.base_url, 'request/pandaresource/query/list/?json')
         r = requests.get(url)
         return r.json()
 
     def _list_swreleases(self):
-        url = urllib.parse.urljoin(self.base_uri, 'request/swrelease/query/list/?json')
+        url = urllib.parse.urljoin(self.base_url, 'request/swrelease/query/list/?json')
         try:
             r = requests.get(url)
             return r.json()
         except requests.exceptions.RequestException as ex:
             logger.warning('_list_swreleases failed. Using failover url to list SW releases: {0}'.format(ex))
-            failover_url = urllib.parse.urljoin(self.base_uri, 'jsoncache/list_swreleases.json')
+            failover_url = urllib.parse.urljoin(self.base_url, 'jsoncache/list_swreleases.json')
             r = requests.get(failover_url)
             return r.json()
 
     def _list_blacklisted_rses(self):
-        url = urllib.parse.urljoin(self.base_uri, 'request/ddmendpointstatus/query/list/?json')
+        url = urllib.parse.urljoin(self.base_url, 'request/ddmendpointstatus/query/list/?json')
         r = requests.get(url)
         return r.json()
 

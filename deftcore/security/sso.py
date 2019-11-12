@@ -11,11 +11,13 @@ import html.parser
 
 # noinspection PyUnresolvedReferences
 class SSOCookies(object):
-    def __init__(self, url, krb=True, pem_cert_file_path=None, pem_cert_key_path=None, cert_key_password=None):
+    def __init__(self, url, krb=True, pem_cert_file_path=None, pem_cert_key_path=None, cert_key_password=None,
+                 encoding='utf-8'):
         self.user_agent_krb = 'curl-sso-kerberos/{0} (Mozilla)'.format(__version__)
         self.user_agent_cert = 'curl-sso-certificate/{0} (Mozilla)'.format(__version__)
         self.adfs_ep = '/adfs/ls'
         self.auth_error = 'HTTP Error 401.2 - Unauthorized'
+        self.encoding = encoding
 
         if not krb and (not pem_cert_file_path or not pem_cert_key_path):
             raise Exception('SSOCookies: certificate and/or private key file is not specified')
@@ -50,7 +52,7 @@ class SSOCookies(object):
         self.curl.setopt(self.curl.SSL_VERIFYHOST, 0)
         self.curl.setopt(self.curl.URL, url)
 
-        response, effective_url = self._request()
+        _, effective_url = self._request()
 
         if self.adfs_ep not in effective_url:
             raise Exception('SSOCookies: the service does not support CERN SSO')
@@ -77,10 +79,10 @@ class SSOCookies(object):
         self.cookie_list = self.curl.getinfo(self.curl.INFO_COOKIELIST)
 
     def _request(self):
-        response = io.StringIO()
+        response = io.BytesIO()
         self.curl.setopt(self.curl.WRITEFUNCTION, response.write)
         self.curl.perform()
-        response = response.getvalue()
+        response = response.getvalue().decode(self.encoding)
         effective_url = self.curl.getinfo(self.curl.EFFECTIVE_URL)
         return response, effective_url
 

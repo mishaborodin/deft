@@ -1,16 +1,11 @@
 __author__ = 'Dmitry Golubkov'
 
-# howTo install Rucio client
-# source env/bin/activate
-# pip install rucio-clients-atlas
-
 import os
 import re
 from deftcore.log import Logger
 from deftcore.settings import RUCIO_ACCOUNT_NAME
 from rucio.client import Client
-from rucio.common.exception import CannotAuthenticate, DataIdentifierAlreadyExists, DataIdentifierNotFound, Duplicate, \
-    RucioException, InputValidationError
+from rucio.common.exception import CannotAuthenticate, DataIdentifierNotFound
 from deftcore.security.voms import VOMSClient
 
 logger = Logger.get()
@@ -29,8 +24,13 @@ class RucioClient(object):
         except Exception as ex:
             logger.critical('RucioClient: initialization failed: {0}'.format(str(ex)))
 
-    def _get_proxy(self):
+    @staticmethod
+    def _get_proxy():
         return VOMSClient().get()
+
+    @staticmethod
+    def _round_up(number):
+        return int(number + 1) if int(number) != number else int(number)
 
     def verify(self):
         try:
@@ -44,7 +44,8 @@ class RucioClient(object):
             logger.exception('RucioClient: exception occurred during verifying: {0}'.format(str(ex)))
             return False
 
-    def extract_scope(self, dsn):
+    @staticmethod
+    def extract_scope(dsn):
         if dsn.find(':') > -1:
             scope, name = dsn.split(':')[0], dsn.split(':')[1]
             if name.endswith('/'):
@@ -226,8 +227,7 @@ class RucioClient(object):
         number_events = self.get_number_events(dsn)
         if not number_files:
             raise ValueError('Dataset {0} has no events or corresponding metadata (nEvents)'.format(dsn))
-        round_up = lambda num: int(num + 1) if int(num) != num else int(num)
-        return round_up(float(number_events) / float(number_files))
+        return self._round_up(float(number_events) / float(number_files))
 
     def get_datasets_and_containers(self, input_data_name, datasets_contained_only=False):
         data_dict = {'containers': list(), 'datasets': list()}

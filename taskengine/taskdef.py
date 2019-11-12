@@ -2047,7 +2047,8 @@ class TaskDefinition(object):
                 use_evnt_txt = False
                 if 'Ph' in input_data_name or 'Powheg' in input_data_name:
                     if (trf_cache == 'AtlasProduction' and LooseVersion(trf_release) >= LooseVersion('19.2.4.11')) or \
-                            (trf_cache == 'MCProd' and LooseVersion(trf_release) >= LooseVersion('19.2.4.9.3')):
+                            (trf_cache == 'MCProd' and LooseVersion(trf_release) >= LooseVersion('19.2.4.9.3')) or \
+                            (trf_cache == 'AthGeneration'):
                         if 'inputGenConfFile' in input_params.keys():
                             use_evnt_txt = True
                         elif not 'inputGenConfFile' in input_params.keys() and \

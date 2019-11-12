@@ -164,7 +164,8 @@ class BlacklistedInputException(Exception):
 
 # noinspection PyBroadException, PyUnresolvedReferences
 class TaskDefinition(object):
-    def __init__(self):
+    def __init__(self, evgen_csv_encoding='utf-8'):
+        self.evgen_csv_encoding = evgen_csv_encoding
         self.protocol = Protocol()
         self.task_reg = TaskRegistration()
         self.ami_client = AMIClient()
@@ -377,7 +378,7 @@ class TaskDefinition(object):
                 return {}
             try:
                 with open(path, 'rb') as fp:
-                    evgen_input_content = fp.read()
+                    evgen_input_content = fp.read().decode(self.evgen_csv_encoding)
             except IOError:
                 logger.warning("Evgen input content file %s is not found" % path)
                 evgen_input_content = ''
@@ -2406,7 +2407,7 @@ class TaskDefinition(object):
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
                 elif re.match(r'^(--)?skipEvents$', name, re.IGNORECASE):
-                    if skip_events_forced >= 0:
+                    if (skip_events_forced is not None) and (skip_events_forced >= 0):
                         param_dict = {'name': name, 'value': skip_events_forced}
                         param_dict.update(trf_options)
                         job_parameters.append(

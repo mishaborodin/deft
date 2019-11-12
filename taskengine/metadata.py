@@ -34,8 +34,7 @@ class AMIException(Exception):
 class AMIClient(object):
     def __init__(self, cert=(VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH),
                  base_url=AMI_API_V2_BASE_URL,
-                 base_url_replica=AMI_API_V2_BASE_URL_REPLICA,
-                 verify_server_cert=False):
+                 base_url_replica=AMI_API_V2_BASE_URL_REPLICA):
         """Initializes new instance of AMIClient class
 
         :param cert: a tuple of certificate and private key file paths, ('/path/usercert.pem', '/path/userkey.pem')
@@ -44,12 +43,13 @@ class AMIClient(object):
         """
 
         try:
-            self._verify_server_cert = verify_server_cert
+            self._verify_server_cert = True
             current_base_url = base_url
             response = requests.get('{0}token/certificate'.format(current_base_url), cert=cert,
                                     verify=self._verify_server_cert)
             if response.status_code != requests.codes.ok:
                 logger.warning('Access token acquisition error ({0})'.format(response.status_code))
+                self._verify_server_cert = False
                 current_base_url = base_url_replica
                 response = requests.get('{0}token/certificate'.format(current_base_url), cert=cert,
                                         verify=self._verify_server_cert)

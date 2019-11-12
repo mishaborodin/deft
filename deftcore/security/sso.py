@@ -67,7 +67,7 @@ class SSOCookies(object):
         result = re.search('form .+?action="([^"]+)"', response)
         service_provider_url = result.groups()[0]
         form_params = re.findall('input type="hidden" name="([^"]+)" value="([^"]+)"', response)
-        form_params = [(item[0], html.parser.HTMLParser().unescape(item[1])) for item in form_params]
+        form_params = [(item[0], html.unescape(item[1])) for item in form_params]
 
         self.curl.setopt(self.curl.URL, service_provider_url)
         self.curl.setopt(self.curl.POSTFIELDS, urllib.parse.urlencode(form_params))

@@ -209,7 +209,11 @@ class AMIClient(object):
         if re.match(r'^.*{0}$'.format(tid_pattern), dataset):
             dataset = re.sub(tid_pattern, '', dataset)
         result = self._post_command('AMIGetDatasetInfo', logicalDatasetName=dataset)
-        return self._round_up(float(result[0]['totalEvents']) / float(result[0]['nFiles']))
+        nfiles = float(result[0]['nFiles'])
+        if nfiles == 0:
+            return 0
+        total_events = float(result[0]['totalEvents'])
+        return self._round_up(total_events / nfiles)
 
     @staticmethod
     def get_types():

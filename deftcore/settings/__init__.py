@@ -13,7 +13,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['aipanda015.cern.ch',
                  'aipanda076.cern.ch',
                  'aipanda034.cern.ch',
-                 'deft-api.cern.ch'
+                 'deft-api.cern.ch',
                  'localhost']
 
 # Application definition

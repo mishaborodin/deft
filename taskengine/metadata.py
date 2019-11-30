@@ -7,6 +7,7 @@ import sys
 import time
 import json
 import requests
+from requests.exceptions import ConnectionError
 from string import Template
 from deftcore.log import Logger
 from deftcore.settings import AMI_API_V2_BASE_URL, AMI_API_V2_BASE_URL_REPLICA, \
@@ -45,9 +46,15 @@ class AMIClient(object):
         try:
             self._verify_server_cert = True
             current_base_url = base_url
-            response = requests.get('{0}token/certificate'.format(current_base_url), cert=cert,
-                                    verify=self._verify_server_cert)
-            if response.status_code != requests.codes.ok:
+            response = None
+            use_replica = False
+            try:
+                response = requests.get('{0}token/certificate'.format(current_base_url), cert=cert,
+                                        verify=self._verify_server_cert)
+            except ConnectionError as ex:
+                logger.exception('AMI authentication error: {0}'.format(str(ex)))
+                use_replica = True
+            if (response is not None and response.status_code != requests.codes.ok) or use_replica:
                 logger.warning('Access token acquisition error ({0})'.format(response.status_code))
                 self._verify_server_cert = False
                 current_base_url = base_url_replica

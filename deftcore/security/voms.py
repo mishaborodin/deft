@@ -21,7 +21,7 @@ class VOMSClient(object):
         self.voms = 'atlas:/atlas/Role=production'
         self.proxy_file_path = X509_PROXY_PATH
 
-    def get(self, force=False):
+    def get(self, force=False, log_std_streams=False):
         if (not self._is_proxy_valid()) or force:
             proxy_init_command = 'voms-proxy-init -valid {0}:00 -voms {1} -cert {2} -key {3} -out {4}'.format(
                 int(self.lifetime / 3600),
@@ -33,9 +33,12 @@ class VOMSClient(object):
             try:
                 process = subprocess.Popen(proxy_init_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                            shell=True)
-                stdout, stderr = process.communicate()
-                logger.info('stdout={0}{1}'.format(os.linesep, stdout))
-                logger.info('stderr={0}{1}'.format(os.linesep, stderr))
+                if log_std_streams:
+                    stdout, stderr = process.communicate()
+                    logger.info('stdout={0}{1}'.format(os.linesep, stdout))
+                    logger.info('stderr={0}{1}'.format(os.linesep, stderr))
+                else:
+                    process.communicate()
             except Exception as ex:
                 raise Exception('voms-proxy-init process failed: {0}'.format(str(ex)))
 

@@ -24,7 +24,7 @@ class VOMSClient(object):
     def get(self, force=False):
         if (not self._is_proxy_valid()) or force:
             proxy_init_command = 'voms-proxy-init -valid {0}:00 -voms {1} -cert {2} -key {3} -out {4}'.format(
-                self.lifetime / 3600,
+                int(self.lifetime / 3600),
                 self.voms,
                 VOMS_CERT_FILE_PATH,
                 VOMS_KEY_FILE_PATH,

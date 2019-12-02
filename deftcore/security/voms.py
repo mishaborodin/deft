@@ -33,7 +33,8 @@ class VOMSClient(object):
             try:
                 process = subprocess.Popen(proxy_init_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                            shell=True)
-                process.communicate()
+                stdout = process.communicate()[0]
+                logger.info('stdout={0}{1}'.format(os.linesep, stdout))
             except Exception as ex:
                 raise Exception('voms-proxy-init process failed: {0}'.format(str(ex)))
 

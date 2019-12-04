@@ -2134,7 +2134,7 @@ class TaskDefinition(object):
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('split_slice',))
-                    random_seed_offset = self._get_number_events_processed(step) / events_per_job
+                    random_seed_offset = int(self._get_number_events_processed(step) / events_per_job)
                     first_event_offset = random_seed_offset * events_per_job
                     skip_check_input = True
                     if number_of_events > 0:
@@ -2150,13 +2150,13 @@ class TaskDefinition(object):
                         evgen_number_input_files_requested = number_of_events / task_config['nEventsPerInputFile']
                         if evgen_number_input_files_requested < evgen_number_input_files and not use_evnt_filter and \
                                 not use_lhe_filter:
-                            task_config['nFiles'] = evgen_number_input_files_requested
+                            task_config['nFiles'] = int(evgen_number_input_files_requested)
                 elif evgen_number_input_files == 0:
                     skip_check_input_ne = True
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('split_slice',))
-                    random_seed_offset = self._get_number_events_processed(step) / events_per_job
+                    random_seed_offset = int(self._get_number_events_processed(step) / events_per_job)
                     first_event_offset = random_seed_offset * events_per_job
 
                 if 'nEventsPerJob' in list(task_config.keys()) and number_of_events > 0:
@@ -3094,7 +3094,7 @@ class TaskDefinition(object):
                             "Number of requested input files is null (Input events=%d, nEventsPerInputFile=%d)" %
                             (int(number_of_events), int(task_config['nEventsPerInputFile']))
                         )
-                    task_proto_dict.update({'number_of_files': number_input_files_requested})
+                    task_proto_dict.update({'number_of_files': int(number_input_files_requested)})
                 elif prod_step.lower() != 'evgen'.lower() and 'nEventsPerInputFile' not in list(task_config.keys()):
                     task_proto_dict.update({'number_of_events': number_of_events})
 
@@ -3138,7 +3138,7 @@ class TaskDefinition(object):
                 number_of_max_files_per_job = \
                     int(task_config['nEventsPerJob']) / int(task_config['nEventsPerInputFile'])
                 if number_of_max_files_per_job > TaskDefConstants.DEFAULT_MAX_FILES_PER_JOB:
-                    task_proto_dict.update({'number_of_max_files_per_job': number_of_max_files_per_job})
+                    task_proto_dict.update({'number_of_max_files_per_job': int(number_of_max_files_per_job)})
 
             if 'nGBPerJob' in list(task_config.keys()):
                 number_of_gb_per_job = int(task_config['nGBPerJob'])
@@ -4031,8 +4031,10 @@ class TaskDefinition(object):
                     if number_events:
                         if step.id not in list(splitting_dict.keys()):
                             splitting_dict[step.id] = list()
-                        splitting_dict[step.id].append({'dataset': dataset_name, 'offset': offset / events_per_file,
-                                                        'number_events': number_events, 'container': input_data_name})
+                        splitting_dict[step.id].append({'dataset': dataset_name,
+                                                        'offset': int(offset / events_per_file),
+                                                        'number_events': number_events,
+                                                        'container': input_data_name})
         return splitting_dict
 
     def _get_evgen_input_list(self, step):
@@ -4083,7 +4085,7 @@ class TaskDefinition(object):
                 input_params_split['nevents'] = round_up(float(nfiles * nevents_per_job) / float(nfiles_per_job))
                 input_params_split['nfiles'] = nfiles
                 input_params_split['offset'] = offset
-                input_params_split['event_offset'] = offset * nevents_per_job / nfiles_per_job
+                input_params_split['event_offset'] = int(offset * nevents_per_job / nfiles_per_job)
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
             return evgen_input_list
@@ -4166,22 +4168,22 @@ class TaskDefinition(object):
             input_params_split = copy.deepcopy(input_params)
             files_requested_count -= nfiles_in_ds
             if files_requested_count > 0:
-                input_params_split['nevents'] = nfiles_in_ds * nevents_per_job / nfiles_per_job
+                input_params_split['nevents'] = int(nfiles_in_ds * nevents_per_job / nfiles_per_job)
                 input_params_split['nfiles'] = nfiles_in_ds
                 input_params_split['offset'] = nfiles_used + nfiles
                 nfiles += nfiles_in_ds
                 input_params_split['event_offset'] = \
-                    input_params_split['offset'] * nevents_per_job / nfiles_per_job
+                    int(input_params_split['offset'] * nevents_per_job / nfiles_per_job)
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
             else:
                 input_params_split['nevents'] = \
-                    (nfiles_requested - nfiles) * nevents_per_job / nfiles_per_job
+                    int((nfiles_requested - nfiles) * nevents_per_job / nfiles_per_job)
                 input_params_split['nfiles'] = (nfiles_requested - nfiles)
                 input_params_split['offset'] = nfiles_used + nfiles
                 nfiles += (nfiles_requested - nfiles)
                 input_params_split['event_offset'] = \
-                    input_params_split['offset'] * nevents_per_job / nfiles_per_job
+                    int(input_params_split['offset'] * nevents_per_job / nfiles_per_job)
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
                 break

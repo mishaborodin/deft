@@ -1955,7 +1955,7 @@ class TaskDefinition(object):
                             #     input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
-                    min_events = int(input_params.get('nEventsPerJob', None))
+                    min_events = int(input_params.get('nEventsPerJob', 0))
                     if min_events:
                         project_mode.nEventsPerInputFile = min_events
 

@@ -106,7 +106,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'default': {
-            'format': '[%(asctime)s] [%(levelname)s] [%(module)s] [%(funcName)s:%(lineno)d] - %(message)s'
+            'format': '[%(asctime)s] [%(process)d] [%(levelname)s] [%(module)s] [%(funcName)s:%(lineno)d] - %(message)s'
         }
     },
     'handlers': {

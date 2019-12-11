@@ -18,6 +18,7 @@ from django.db.models import Q, ObjectDoesNotExist
 from api.models import Request
 from taskengine.models import Task, TRequestProxy, TStepProxy, StepExecution
 from taskengine.projectmode import ProjectMode, UnknownProjectModeOption, InvalidProjectModeOptionValue
+from taskengine.metadata import AMIClient
 
 
 class DefaultSerializer(Serializer):
@@ -107,6 +108,7 @@ class InstanceResource(Resource):
         pass
 
 
+# noinspection PyBroadException
 class RequestResource(ModelResource):
     class Meta:
         limit = 100
@@ -153,6 +155,10 @@ class RequestResource(ModelResource):
                                                                                              trailing_slash()),
                 self.wrap_view('check_project_mode'),
                 name='check project_mode of given step'),
+            url(r'^(?P<resource_name>{0})/tags/(?P<trf_name>\w[\w\./-]*)/(?P<trf_release>\d[\d\./-]*){1}'.format(
+                self._meta.resource_name, trailing_slash()),
+                self.wrap_view('list_tags'),
+                name='list configuration tags'),
         ]
 
     def get_action_list(self, request, **kwargs):
@@ -218,6 +224,25 @@ class RequestResource(ModelResource):
             return self.create_response(request, {'project_mode': None,
                                                   'status': False,
                                                   'result': ex.message})
+
+    def list_tags(self, request, **kwargs):
+        self.method_check(request, allowed=['get'])
+
+        self.is_authenticated(request)
+        self.throttle_check(request)
+
+        trf_name = kwargs['trf_name']
+        trf_release = kwargs['trf_release']
+        tags = list()
+
+        try:
+            if trf_name and trf_release:
+                cli = AMIClient()
+                tags.extend(cli.ami_list_tags(trf_name, trf_release))
+
+            return self.create_response(request, {'tags': tags, 'status': True, 'result': None})
+        except Exception as ex:
+            return self.create_response(request, {'tags': tags, 'status': False, 'result': ex.message})
 
 
 # noinspection PyBroadException

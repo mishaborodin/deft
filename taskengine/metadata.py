@@ -210,6 +210,15 @@ class AMIClient(object):
                                   entity='DATA_TYPE',
                                   sql='{0}'.format(query))
 
+    def ami_list_tags(self, trf_name, trf_release):
+        query = \
+            "SELECT * WHERE (`transformationName` = '{0}') and (`cacheName` = '{1}')".format(trf_name, trf_release)
+
+        return self._post_command('SearchQuery',
+                                  catalog='AMITags:production',
+                                  entity='V_AMITags',
+                                  mql='{0}'.format(query))
+
     def get_nevents_per_file(self, dataset):
         dataset = dataset.split(':')[-1].strip('/')
         tid_pattern = r'(?P<tid>_tid\d+_\d{2})'

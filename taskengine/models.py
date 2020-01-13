@@ -1,6 +1,7 @@
 __author__ = 'Dmitry Golubkov'
 
 import json
+import math
 from django.db import models
 from django.db import connections
 from django.utils.dateparse import parse_datetime
@@ -451,9 +452,8 @@ class TTask(models.Model):
         if params:
             value = params.get('nEventsPerJob', 0)
         if not value:
-            round_up = lambda num: int(num + 1) if int(num) != num else int(num)
             if self.total_done_jobs:
-                value = round_up(float(self.total_events) / float(self.total_done_jobs))
+                value = math.ceil(float(self.total_events) / float(self.total_done_jobs))
         return value
 
     @property

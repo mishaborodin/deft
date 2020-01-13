@@ -8,6 +8,7 @@ import io
 import ast
 import datetime
 import copy
+import math
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.template import Context, Template
@@ -1227,7 +1228,7 @@ class TaskDefinition(object):
                                                                         dataset_name__contains=primary_input['dataset'])
                             number_files_finished = int(jedi_dataset_info.number_files_finished)
                             number_of_input_files = \
-                                self._round_up(float(task_existing['nEventsPerJob']) / float(
+                                math.ceil(float(task_existing['nEventsPerJob']) / float(
                                     task_existing['nEventsPerInputFile']) * number_files_finished)
                             number_of_input_files_used += int(number_of_input_files)
                         except ObjectDoesNotExist:
@@ -1270,7 +1271,7 @@ class TaskDefinition(object):
                                                                         dataset_name__contains=primary_input['dataset'])
                             nfiles = int(jedi_dataset_info.nfiles)
                             number_of_input_files = \
-                                self._round_up(float(task_existing['nEventsPerJob']) / float(
+                                math.ceil(float(task_existing['nEventsPerJob']) / float(
                                     task_existing['nEventsPerInputFile']) * nfiles)
                             number_of_input_files_used += int(number_of_input_files)
                         except ObjectDoesNotExist:
@@ -1320,7 +1321,7 @@ class TaskDefinition(object):
             logger.debug(log_msg)
 
         if number_of_events > 0:
-            number_input_files_requested = self._round_up(number_of_events / int(task_config['nEventsPerInputFile']))
+            number_input_files_requested = math.ceil(number_of_events / int(task_config['nEventsPerInputFile']))
             if 'nFiles' in task and task['nFiles'] > 0 and task['nFiles'] > number_input_files_requested:
                 number_input_files_requested = task['nFiles']
         else:
@@ -2148,7 +2149,7 @@ class TaskDefinition(object):
                     if 'nEventsPerInputFile' in list(task_config.keys()) and task_config['nEventsPerInputFile'] > 0 \
                             and number_of_events > 0:
                         evgen_number_input_files_requested = \
-                            self._round_up(number_of_events / task_config['nEventsPerInputFile'])
+                            math.ceil(number_of_events / task_config['nEventsPerInputFile'])
                         if evgen_number_input_files_requested < evgen_number_input_files and not use_evnt_filter and \
                                 not use_lhe_filter:
                             task_config['nFiles'] = int(evgen_number_input_files_requested)
@@ -3090,7 +3091,7 @@ class TaskDefinition(object):
             elif not no_input and number_of_events > 0:
                 if prod_step.lower() != 'evgen'.lower() and 'nEventsPerInputFile' in list(task_config.keys()):
                     number_input_files_requested = \
-                        self._round_up(number_of_events / int(task_config['nEventsPerInputFile']))
+                        math.ceil(number_of_events / int(task_config['nEventsPerInputFile']))
                     if number_input_files_requested == 0:
                         raise Exception(
                             "Number of requested input files is null (Input events=%d, nEventsPerInputFile=%d)" %
@@ -3745,10 +3746,6 @@ class TaskDefinition(object):
 
         return None
 
-    @staticmethod
-    def _round_up(number):
-        return int(number + 1) if int(number) != number else int(number)
-
     def verify_container_consistency(self, input_name):
         if not self.rucio_client.is_dsn_container(input_name):
             return True
@@ -3762,7 +3759,7 @@ class TaskDefinition(object):
         for dataset_name in dataset_list:
             number_files = self.rucio_client.get_number_files(dataset_name)
             number_events = self.rucio_client.get_number_events(dataset_name)
-            events_per_file = self._round_up(float(number_events) / float(number_files))
+            events_per_file = math.ceil(float(number_events) / float(number_files))
             if previous_events_per_file == 0:
                 previous_events_per_file = events_per_file
             else:
@@ -3797,7 +3794,7 @@ class TaskDefinition(object):
             number_files = self.rucio_client.get_number_files(dataset_name)
             number_events = self.rucio_client.get_number_events(dataset_name)
             if number_events > 0:
-                events_per_file = self._round_up(float(number_events) / float(number_files))
+                events_per_file = math.ceil(float(number_events) / float(number_files))
 
             if not events_per_file:
                 continue
@@ -4085,7 +4082,7 @@ class TaskDefinition(object):
                     raise Exception(
                         'Necessary task parameters are missing in the previous task')
                 input_params_split = copy.deepcopy(input_params)
-                input_params_split['nevents'] = self._round_up(float(nfiles * nevents_per_job) / float(nfiles_per_job))
+                input_params_split['nevents'] = math.ceil(float(nfiles * nevents_per_job) / float(nfiles_per_job))
                 input_params_split['nfiles'] = nfiles
                 input_params_split['offset'] = offset
                 input_params_split['event_offset'] = int(offset * nevents_per_job / nfiles_per_job)

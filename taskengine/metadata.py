@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import json
+import math
 import requests
 from requests.exceptions import ConnectionError
 from string import Template
@@ -91,10 +92,6 @@ class AMIClient(object):
                 errors.append(error)
         if len(errors) > 0:
             raise AMIException(errors)
-
-    @staticmethod
-    def _round_up(number):
-        return int(number + 1) if int(number) != number else int(number)
 
     def _post_command(self, command, rowset_type=None, **kwargs):
         url = self._get_url(command)
@@ -229,7 +226,7 @@ class AMIClient(object):
         if nfiles == 0:
             return 0
         total_events = float(result[0]['totalEvents'])
-        return self._round_up(total_events / nfiles)
+        return math.ceil(total_events / nfiles)
 
     @staticmethod
     def get_types():

@@ -2,6 +2,7 @@ __author__ = 'Dmitry Golubkov'
 
 import os
 import re
+import math
 from deftcore.log import Logger
 from deftcore.settings import RUCIO_ACCOUNT_NAME
 from rucio.client import Client
@@ -27,10 +28,6 @@ class RucioClient(object):
     @staticmethod
     def _get_proxy():
         return VOMSClient().get()
-
-    @staticmethod
-    def _round_up(number):
-        return int(number + 1) if int(number) != number else int(number)
 
     def verify(self):
         try:
@@ -227,7 +224,7 @@ class RucioClient(object):
         number_events = self.get_number_events(dsn)
         if not number_files:
             raise ValueError('Dataset {0} has no events or corresponding metadata (nEvents)'.format(dsn))
-        return self._round_up(float(number_events) / float(number_files))
+        return math.ceil(float(number_events) / float(number_files))
 
     def get_datasets_and_containers(self, input_data_name, datasets_contained_only=False):
         data_dict = {'containers': list(), 'datasets': list()}

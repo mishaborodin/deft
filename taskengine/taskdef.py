@@ -324,7 +324,7 @@ class TaskDefinition(object):
         if evgen_input_container:
             result = self.rucio_client.get_datasets_and_containers(evgen_input_container,
                                                                    datasets_contained_only=True)
-            params.update({'inputGeneratorFile': result['datasets']})
+            params.update({'inputGeneratorFile': result['containers']})
 
         events_per_job = self._read_events_per_job_from_jo(job_options_file_content)
         if events_per_job is not None:

@@ -84,7 +84,7 @@ class MaxJobsPerTaskLimitExceededException(Exception):
     def __init__(self, number_of_jobs):
         message = 'The task is rejected. The limit of number of jobs per task ({0}) is exceeded. '.format(
             TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK) + \
-                  'Expected number of jobs for this task is {0}'.format(number_of_jobs)
+                  'Expected number of jobs for this task is {0}'.format(int(number_of_jobs))
         super(MaxJobsPerTaskLimitExceededException, self).__init__(message)
 
 

@@ -345,7 +345,8 @@ class Protocol(object):
                 param.pop(key, None)
         return param
 
-    def render_task(self, task_dict):
+    @staticmethod
+    def render_task(task_dict):
         path = '{0}{1}task.json'.format(os.path.dirname(__file__), os.path.sep)
         with open(path, 'r') as fp:
             task_template = Template(fp.read())
@@ -358,21 +359,24 @@ class Protocol(object):
             task[key] = ast.literal_eval(proto_task[key])
         return task
 
-    def is_dynamic_jobdef_enabled(self, task):
+    @staticmethod
+    def is_dynamic_jobdef_enabled(task):
         keys = [k.lower() for k in list(task.keys())]
         if 'nEventsPerJob'.lower() in keys or 'nFilesPerJob'.lower() in keys:
             return False
         else:
             return True
 
-    def is_pileup_task(self, task):
+    @staticmethod
+    def is_pileup_task(task):
         job_params = task['jobParameters']
         for job_param in job_params:
             if re.match(r'^.*(PtMinbias|Cavern).*File.*$', str(job_param['value']), re.IGNORECASE):
                 return True
         return False
 
-    def get_simulation_type(self, step):
+    @staticmethod
+    def get_simulation_type(step):
         if step.request.request_type.lower() == 'MC'.lower():
             if step.step_template.step.lower() == 'evgen'.lower():
                 return 'notMC'
@@ -382,10 +386,11 @@ class Protocol(object):
                 return 'full'
         return 'notMC'
 
-    def get_primary_input(self, task):
+    @staticmethod
+    def get_primary_input(task):
         job_params = task['jobParameters']
         for job_param in job_params:
-            if not 'param_type' in list(job_param.keys()) or job_param['param_type'].lower() != 'input'.lower():
+            if 'param_type' not in list(job_param.keys()) or job_param['param_type'].lower() != 'input'.lower():
                 continue
             if re.match(r'^(--)?input.*File', job_param['value'], re.IGNORECASE):
                 result = re.match(r'^(--)?input(?P<intype>.*)File', job_param['value'], re.IGNORECASE)
@@ -397,12 +402,14 @@ class Protocol(object):
                 return job_param
         return None
 
-    def set_leave_log_param(self, log_param):
+    @staticmethod
+    def set_leave_log_param(log_param):
         log_param['token'] = TaskDefConstants.LEAVE_LOG_TOKEN
         log_param['destination'] = TaskDefConstants.LEAVE_LOG_DESTINATION
         log_param['transient'] = TaskDefConstants.LEAVE_LOG_TRANSIENT_FLAG
 
-    def is_leave_log_param(self, log_param):
+    @staticmethod
+    def is_leave_log_param(log_param):
         token = None
         destination = None
         if 'token' in list(log_param.keys()):
@@ -414,13 +421,16 @@ class Protocol(object):
         else:
             return False
 
-    def is_evnt_filter_step(self, project_mode, task_config):
+    @staticmethod
+    def is_evnt_filter_step(project_mode, task_config):
         return project_mode.evntFilterEff or 'evntFilterEff' in list(task_config.keys())
 
-    def serialize_task(self, task):
+    @staticmethod
+    def serialize_task(task):
         return json.dumps(task, sort_keys=True)
 
-    def deserialize_task(self, task_string):
+    @staticmethod
+    def deserialize_task(task_string):
         return json.loads(task_string)
 
 
@@ -461,14 +471,14 @@ class TaskDefConstants(object, metaclass=Constants):
 
     INVALID_TASK_ID = Constant(4000000)
     DEFAULT_MAX_FILES_PER_JOB = Constant(20)
-    DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK = Constant(200000)
+    DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK = Constant(50000)
     DEFAULT_MEMORY = Constant(2000)
     DEFAULT_MEMORY_BASE = Constant(0)
     DEFAULT_SCOUT_SUCCESS_RATE = Constant(5)
     NO_ES_MIN_NUMBER_OF_EVENTS = Constant(50000)
 
     LEAVE_LOG_TOKEN = Constant('ddd:.*DATADISK')
-    LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\(dontkeeplog=True)')
+    LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\\(dontkeeplog=True)')
     LEAVE_LOG_TRANSIENT_FLAG = Constant(False)
 
     DEFAULT_CLOUD = Constant('WORLD')

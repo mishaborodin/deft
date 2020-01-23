@@ -7,9 +7,11 @@ import re
 import urllib.parse
 import pycurl
 import html.parser
+import base64
+import getpass
 
 
-# noinspection PyUnresolvedReferences
+# noinspection PyUnresolvedReferences, PyBroadException
 class SSOCookies(object):
     def __init__(self, url, krb=True, pem_cert_file_path=None, pem_cert_key_path=None, cert_key_password=None,
                  encoding='utf-8'):
@@ -93,3 +95,10 @@ class SSOCookies(object):
             value = item.split('\t')[6]
             cookies.update({name: value})
         return cookies
+
+    def extract_username(self):
+        try:
+            cookies = self.get()
+            return base64.b64decode(cookies['FedAuth']).split(',')[1].split('\\')[-1]
+        except Exception:
+            return getpass.getuser()

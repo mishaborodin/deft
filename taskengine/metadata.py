@@ -511,8 +511,8 @@ class AMIClient(object):
                                            timestamp=timestamp)
                     new_project.save()
                     logger.info(
-                        'The project \"{0}\" is registered (timestamp={1})'.format(ami_project['tag'.upper()],
-                                                                                   timestamp))
+                        'The project \"{0}\" is registered (timestamp = {1})'.format(ami_project['tag'.upper()],
+                                                                                     timestamp))
         except Exception as ex:
             logger.exception('sync_ami_projects, exception occurred: {0}'.format(str(ex)))
 
@@ -544,19 +544,20 @@ class AMIClient(object):
             new_datasets = self._ami_list_phys_containers(created_after=last_created)
             if new_datasets:
                 for dataset in new_datasets:
-                    logger.info('new physics container: {0}'.format(dataset['logicalDatasetName'.upper()]))
                     if not PhysicsContainer.objects.filter(pk=dataset['logicalDatasetName'.upper()]).exists():
-                        phys_cont = PhysicsContainer()
-                        phys_cont.name = dataset['logicalDatasetName'.upper()]
-                        phys_cont.created = dataset['created'.upper()]
-                        phys_cont.last_modified = dataset['lastModified'.upper()]
-                        phys_cont.username = dataset['createdBy'.upper()]
-                        phys_cont.project = dataset['projectName'.upper()]
-                        phys_cont.data_type = dataset['dataType'.upper()]
-                        phys_cont.run_number = dataset['runNumber'.upper()]
-                        phys_cont.stream_name = dataset['streamName'.upper()]
-                        phys_cont.prod_step = dataset['prodStep'.upper()]
-                        phys_cont.save()
+                        new_phys_cont = PhysicsContainer()
+                        new_phys_cont.name = dataset['logicalDatasetName'.upper()]
+                        new_phys_cont.created = dataset['created'.upper()]
+                        new_phys_cont.last_modified = dataset['lastModified'.upper()]
+                        new_phys_cont.username = dataset['createdBy'.upper()]
+                        new_phys_cont.project = dataset['projectName'.upper()]
+                        new_phys_cont.data_type = dataset['dataType'.upper()]
+                        new_phys_cont.run_number = dataset['runNumber'.upper()]
+                        new_phys_cont.stream_name = dataset['streamName'.upper()]
+                        new_phys_cont.prod_step = dataset['prodStep'.upper()]
+                        new_phys_cont.save()
+                        logger.info(
+                            'New physics container \"{0}\" is registered'.format(dataset['logicalDatasetName'.upper()]))
         except Exception as ex:
             logger.exception('sync_ami_phys_containers, exception occurred: {0}'.format(str(ex)))
 
@@ -581,19 +582,20 @@ class AMIClient(object):
                 except ObjectDoesNotExist:
                     continue
                 if not ProductionTag.objects.filter(pk=tag_name).exists():
-                    tag = ProductionTag()
-                    tag.name = tag_name
-                    tag.task_id = task.id
-                    tag.step_template_id = step_template['id']
+                    new_tag = ProductionTag()
+                    new_tag.name = tag_name
+                    new_tag.task_id = task.id
+                    new_tag.step_template_id = step_template['id']
                     try:
                         ami_tag = self.get_ami_tag(tag_name)
-                        tag.username, tag.created = self.get_ami_tag_owner(tag_name)
+                        new_tag.username, new_tag.created = self.get_ami_tag_owner(tag_name)
                     except Exception:
                         continue
-                    tag.trf_name = ami_tag['transformation']
-                    tag.trf_cache = ami_tag['SWReleaseCache'].split('_')[0]
-                    tag.trf_release = ami_tag['SWReleaseCache'].split('_')[1]
-                    tag.tag_parameters = json.dumps(ami_tag)
-                    tag.save()
+                    new_tag.trf_name = ami_tag['transformation']
+                    new_tag.trf_cache = ami_tag['SWReleaseCache'].split('_')[0]
+                    new_tag.trf_release = ami_tag['SWReleaseCache'].split('_')[1]
+                    new_tag.tag_parameters = json.dumps(ami_tag)
+                    new_tag.save()
+                    logger.info('New tag \"{0}\" is registered'.format(tag_name))
         except Exception as ex:
             logger.exception('sync_ami_tags, exception occurred: {0}'.format(str(ex)))

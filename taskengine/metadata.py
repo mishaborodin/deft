@@ -526,7 +526,7 @@ class AMIClient(object):
                 if not ami_type['name'.upper()] in format_names:
                     description = None
                     if str(ami_type['description'.upper()]) != '@NULL':
-                        description = str(ami_type['description'])
+                        description = str(ami_type['description'.upper()])
                     new_format = TDataFormat(name=ami_type['name'.upper()],
                                              description=description)
                     new_format.save()

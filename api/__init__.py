@@ -5,7 +5,7 @@ import threading
 from django.utils import timezone
 from deftcore.helpers import Singleton
 from deftcore.log import Logger, get_exception_string
-from taskengine.protocol import Protocol, TaskStatus
+from taskengine.protocol import Protocol, TaskStatus, TaskDefConstants
 
 logger = Logger().get()
 
@@ -196,7 +196,7 @@ class ApiServer(object, metaclass=Singleton):
             elif request.action == request.ACTION_ABORT_UNFINISHED_JOBS:
                 body = json.loads(request.body)
                 task_id = int(body['task_id'])
-                code = body.get('code', 9)
+                code = body.get('code', TaskDefConstants.DEFAULT_KILL_JOB_CODE)
                 handler_status = handler.abort_unfinished_jobs(task_id, code)
                 request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
                 handler.add_task_comment(task_id, request.create_default_task_comment(body))
@@ -223,9 +223,20 @@ class ApiServer(object, metaclass=Singleton):
                 body = json.loads(request.body)
                 task_id = body['task_id']
                 job_id = body['job_id']
-                code = body.get('code', 9)
+                code = body.get('code', TaskDefConstants.DEFAULT_KILL_JOB_CODE)
                 keep_unmerged = bool(body.get('keep_unmerged', False))
                 handler_status = handler.kill_job(job_id, code=code, keep_unmerged=keep_unmerged)
+                request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
+                status_code = handler_status['jedi_info']['status_code']
+                body.update({'status_code': status_code})
+                handler.add_task_comment(task_id, request.create_default_task_comment(body))
+            elif request.action == request.ACTION_KILL_JOBS:
+                body = json.loads(request.body)
+                task_id = body['task_id']
+                jobs = [int(e) for e in str(body['jobs']).split(',')]
+                code = body.get('code', TaskDefConstants.DEFAULT_KILL_JOB_CODE)
+                keep_unmerged = bool(body.get('keep_unmerged', False))
+                handler_status = handler.kill_jobs(jobs, code=code, keep_unmerged=keep_unmerged)
                 request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
                 status_code = handler_status['jedi_info']['status_code']
                 body.update({'status_code': status_code})

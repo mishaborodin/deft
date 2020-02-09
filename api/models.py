@@ -29,6 +29,7 @@ class Request(models.Model):
     ACTION_OBSOLETE_TASK = 'obsolete_task'
     ACTION_CLEAN_TASK_CARRIAGES = 'clean_task_carriages'
     ACTION_KILL_JOB = 'kill_job'
+    ACTION_KILL_JOBS = 'kill_jobs'
     ACTION_SET_JOB_DEBUG_MODE = 'set_job_debug_mode'
     ACTION_CHANGE_TASK_CPU_TIME = 'change_task_cpu_time'
     ACTION_CHANGE_TASK_SPLIT_RULE = 'change_task_split_rule'
@@ -60,7 +61,8 @@ class Request(models.Model):
         (ACTION_CREATE_SLICE_TIER0, 'Create slice in last Tier Zero request'),
         (ACTION_OBSOLETE_TASK, 'Obsolete task'),
         (ACTION_CLEAN_TASK_CARRIAGES, 'Delete task outputs with specified types'),
-        (ACTION_KILL_JOB, 'Force kill single job with code=9'),
+        (ACTION_KILL_JOB, 'Force kill single job with specified code'),
+        (ACTION_KILL_JOBS, 'Force kill jobs with specified code'),
         (ACTION_SET_JOB_DEBUG_MODE, 'Setting debug mode for a job'),
         (ACTION_CHANGE_TASK_CPU_TIME, 'Change task CPU time'),
         (ACTION_CHANGE_TASK_SPLIT_RULE, 'Change split rule for task'),

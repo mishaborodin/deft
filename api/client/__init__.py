@@ -2,11 +2,11 @@ __author__ = 'Dmitry Golubkov'
 
 import json
 import requests
-import urllib
+import urllib.parse
 
 
 class Client(object):
-    def __init__(self, auth_user, auth_key, verify_ssl_cert=False, base_url='https://aipanda015.cern.ch'):
+    def __init__(self, auth_user, auth_key, verify_ssl_cert=False, base_url='https://deft-api.cern.ch'):
         self.base_url = base_url
         self.verify_ssl_cert = verify_ssl_cert
         self.api_url = '/api/v1/request/'
@@ -24,7 +24,7 @@ class Client(object):
 
     def _create_request(self, action, owner, body):
         action_list = self._get_action_list()
-        if not action in action_list:
+        if action not in action_list:
             raise Exception('Invalid action: {0} ({1})'.format(action, str(action_list)))
 
         url = "%s%s" % (self.base_url, self.api_url)
@@ -161,14 +161,21 @@ class Client(object):
         body = {'task_id': task_id, 'job_id': job_id, 'code': code, 'keep_unmerged': keep_unmerged}
         return self._create_request('kill_job', owner, body)
 
+    def kill_jobs(self, owner, task_id, jobs, code=None, keep_unmerged=False):
+        body = {'task_id': task_id,
+                'jobs': ','.join([str(e) for e in jobs]),
+                'code': code,
+                'keep_unmerged': keep_unmerged}
+        return self._create_request('kill_jobs', owner, body)
+
     def set_job_debug_mode(self, owner, task_id, job_id, debug_mode=True):
         body = {'task_id': task_id, 'job_id': job_id, 'debug_mode': debug_mode}
         return self._create_request('set_job_debug_mode', owner, body)
 
     def _search_task(self, filter_dict):
-        if len(filter_dict.keys()):
+        if len(list(filter_dict.keys())):
             filter_dict.update({'limit': 0})
-        filter_string = urllib.urlencode(filter_dict)
+        filter_string = urllib.parse.urlencode(filter_dict)
         url = '{0}{1}?{2}'.format(self.base_url, self.api_search_task_url, filter_string)
         response = requests.get(url, headers=self.headers, verify=self.verify_ssl_cert)
         if response.status_code == requests.codes.ok:
@@ -178,25 +185,25 @@ class Client(object):
 
     def search_task_by_id(self, task_id):
         filter_dict = dict()
-        if not task_id is None:
+        if task_id is not None:
             filter_dict.update({'id': task_id})
         return self._search_task(filter_dict)
 
     def search_task_by_parent_id(self, parent_id):
         filter_dict = dict()
-        if not parent_id is None:
+        if parent_id is not None:
             filter_dict.update({'parent_id': parent_id})
         return self._search_task(filter_dict)
 
     def search_task_by_chain_id(self, chain_id):
         filter_dict = dict()
-        if not chain_id is None:
+        if chain_id is not None:
             filter_dict.update({'chain_id': chain_id})
         return self._search_task(filter_dict)
 
     def search_task_by_name(self, taskname):
         filter_dict = dict()
-        if not taskname is None:
+        if taskname is not None:
             filter_dict.update({'name__icontains': taskname})
         return self._search_task(filter_dict)
 

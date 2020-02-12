@@ -16,7 +16,8 @@ class Manager(object):
             if info[0] == socket.AF_INET6:
                 continue
             hostname = info[4][0]
-            self._logger.info('Creating messaging client on hostname={0}, port={1}'.format(hostname, MessagingConfig.PORT))
+            self._logger.info(
+                'Creating messaging client on hostname={0}, port={1}'.format(hostname, MessagingConfig.PORT))
             self._client_list.append(Client(hostname, MessagingConfig.PORT, self._logger, no_db_log=self._no_db_log))
 
         for client in self._client_list:

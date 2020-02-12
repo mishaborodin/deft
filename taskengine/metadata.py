@@ -1,117 +1,143 @@
 __author__ = 'Dmitry Golubkov'
 
-import re
-import json
-import httplib
 import ast
+import re
 import os
 import sys
 import time
+import json
+import math
+import requests
+from requests.exceptions import ConnectionError
+from string import Template
 from deftcore.log import Logger
-from deftcore.settings import AMI_ENDPOINTS
-import pyAMI.client
-import pyAMI_atlas
-import pyAMI.exception
-import pyAMI_atlas.api
+from deftcore.settings import AMI_API_V2_BASE_URL, AMI_API_V2_BASE_URL_REPLICA, \
+    VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH
 from django.core.exceptions import ObjectDoesNotExist
 from taskengine.models import TTrfConfig, TProject, TDataFormat, PhysicsContainer, \
     ProductionTask, ProductionTag, StepExecution, StepTemplate
-from string import Template
-from deftcore.security.voms import VOMSClient
 
 logger = Logger.get()
 
 
+class AMIException(Exception):
+    def __init__(self, errors):
+        self.errors = errors
+        self.message = '\n'.join(errors)
+        super(AMIException, self).__init__(self.message)
+
+    def has_error(self, error):
+        for e in self.errors or []:
+            if str(error).lower() in e.lower():
+                return True
+
+
+# noinspection PyBroadException
 class AMIClient(object):
-    def __init__(self):
+    def __init__(self, cert=(VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH),
+                 base_url=AMI_API_V2_BASE_URL,
+                 base_url_replica=AMI_API_V2_BASE_URL_REPLICA):
+        """Initializes new instance of AMIClient class
+
+        :param cert: a tuple of certificate and private key file paths, ('/path/usercert.pem', '/path/userkey.pem')
+        :param base_url: AMI REST API base url
+        :param base_url_replica: AMI REST API base url (CERN replica)
+        """
+
         try:
-            self.client = pyAMI.client.Client(
-                AMI_ENDPOINTS,
-                # key_file=self._get_proxy(),
-                # cert_file=self._get_proxy(),
-                ignore_proxy=True
-            )
-            logger.info('AMIClient, currentUser={0}'.format(self._get_current_user()))
+            self._verify_server_cert = True
+            current_base_url = base_url
+            response = None
+            use_replica = False
+            try:
+                response = requests.get('{0}token/certificate'.format(current_base_url), cert=cert,
+                                        verify=self._verify_server_cert)
+            except ConnectionError as ex:
+                logger.exception('AMI authentication error: {0}'.format(str(ex)))
+                use_replica = True
+            if (response is not None and response.status_code != requests.codes.ok) or use_replica:
+                logger.warning('Access token acquisition error ({0})'.format(response.status_code))
+                self._verify_server_cert = False
+                current_base_url = base_url_replica
+                response = requests.get('{0}token/certificate'.format(current_base_url), cert=cert,
+                                        verify=self._verify_server_cert)
+                if response.status_code != requests.codes.ok:
+                    response.raise_for_status()
+            self._headers = {'Content-Type': 'application/json', 'AMI-Token': response.text}
+            self._base_url = current_base_url
+            logger.info('AMIClient, currentUser={0}'.format(self.get_current_user()))
         except Exception as ex:
-            logger.critical('AMI initialization failed: {0}'.format(str(ex)))
+            logger.exception('AMI initialization failed: {0}'.format(str(ex)))
+
+    def _get_url(self, command):
+        return '{0}command/{1}/json'.format(self._base_url, command)
+
+    @staticmethod
+    def _get_rows(content, rowset_type=None):
+        rows = list()
+        for rowset in content['AMIMessage']['rowset']:
+            if rowset_type is None or rowset.get('@type') == rowset_type:
+                for row in rowset['row']:
+                    row_dict = dict()
+                    for field in row.get('field', []):
+                        row_dict.update({field['@name']: field.get('$', 'NULL')})
+                    rows.append(row_dict)
+        return rows
+
+    @staticmethod
+    def raise_for_errors(content):
+        errors = list()
+        for error in [e.get('$') for e in content['AMIMessage'].get('error', [])]:
+            if error is not None:
+                errors.append(error)
+        if len(errors) > 0:
+            raise AMIException(errors)
+
+    def _post_command(self, command, rowset_type=None, **kwargs):
+        url = self._get_url(command)
+        response = requests.post(url, headers=self._headers, data=json.dumps(kwargs), verify=self._verify_server_cert)
+        if response.status_code != requests.codes.ok:
+            response.raise_for_status()
+        content = json.loads(response.content)
+        self.raise_for_errors(content)
+        return self._get_rows(content, rowset_type)
+
+    def get_current_user(self):
+        result = self._post_command('GetUserInfo')
+        return str(result[0]['AMIUser'])
 
     def list_containers_for_hashtag(self, scope, name):
         containers = list()
-
-        command = [
-            'DatasetWBListDatasetsForHashtag',
-            ' -scope="{0}"'.format(scope),
-            '-name="{0}"'.format(name)
-        ]
-
-        for row in self.client.execute(command, format='dom_object').get_rows():
+        result = self._post_command('DatasetWBListDatasetsForHashtag', scope=scope, name=name)
+        for row in result:
             containers.append(row['ldn'])
-
         return containers
 
     def add_hashtag_for_container(self, scope, name, dsn, comment=None, pattern='AMI_GLOBAL_SCOPE'):
-        command = [
-            'DatasetWBAddHashtag',
-            '-pattern="{0}"'.format(pattern),
-            '-scope="{0}"'.format(scope),
-            '-name="{0}"'.format(name),
-            '-ldn="{0}"'.format(dsn)
-        ]
-
-        if not comment is None:
-            command.append('-comment="{0}"'.format(comment))
-
-        row_id = int(self.client.execute(command, format='dom_object').get_rows()[0]['id'])
-
+        if comment is None:
+            result = self._post_command('DatasetWBAddHashtag', pattern=pattern, scope=scope, name=name, ldn=dsn)
+        else:
+            result = self._post_command('DatasetWBAddHashtag', pattern=pattern, scope=scope, name=name, ldn=dsn,
+                                        comment=comment)
+        row_id = int(result[0]['id'])
         return row_id != 0
 
-    def _get_current_user(self):
-        command = ['GetSessionInfo']
-        result = self.client.execute(command, format='dom_object').get_rows('user')
-        if len(result) > 0:
-            return result[0].get('AMIUser', None)
-        else:
-            return None
-
     def _ami_get_tag(self, tag_name):
-        command = [
-            'AMIGetAMITagInfo',
-            '-newStructure',
-            '-amiTag="%s"' % tag_name,
-        ]
-
-        return self.client.execute(command, format='dom_object').get_rows('amiTagInfo')
+        return self._post_command('AMIGetAMITagInfo', 'amiTagInfo', newStructure=True, amiTag=tag_name)
 
     def _ami_get_tag_old(self, tag_name):
-        command = [
-            'AMIGetAMITagInfo',
-            '-oldStructure',
-            '-amiTag="%s"' % tag_name,
-        ]
-
-        return self.client.execute(command, format='dom_object').get_rows('amiTagInfo')
+        return self._post_command('AMIGetAMITagInfo', 'amiTagInfo', oldStructure=True, amiTag=tag_name)
 
     def _ami_get_tag_new(self, tag_name):
-        command = [
-            'AMIGetAMITagInfo',
-            '-hierarchicalView',
-            '-amiTag="%s"' % tag_name,
-        ]
-
-        return self.client.execute(command, format='dom_object').get_rows('amiTagInfo')
+        return self._post_command('AMIGetAMITagInfo', 'amiTagInfo', hierarchicalView=True, amiTag=tag_name)
 
     def _ami_get_tag_flat(self, tag_name):
-        command = [
-            'AMIGetAMITagInfoNew',
-            '-amiTag="%s"' % tag_name,
-        ]
-
-        result = self.client.execute(command, format='dom_object').get_rows('amiTagInfo')
+        result = self._post_command('AMIGetAMITagInfoNew', 'amiTagInfo', amiTag=tag_name)
         ami_tag = result[0]
         ami_tag['transformationName'] = ami_tag['transformName']
         return [ami_tag, ]
 
-    def _ami_list_phys_container(self, created_after=None):
+    def _ami_list_phys_containers(self, created_after=None):
         fields = [
             'logicalDatasetName',
             'created',
@@ -126,47 +152,91 @@ class AMIClient(object):
 
         if created_after:
             conditions = \
-                'WHERE dataset.amiStatus=\'VALID\' AND dataset.created >= \'%s\' ' % created_after.strftime('%Y-%m-%d')
+                'WHERE (`ATLAS_AMI_DATASUPER_01`.`DATASET`.`AMISTATUS`=\'VALID\') ' + \
+                'AND (`ATLAS_AMI_DATASUPER_01`.`DATASET`.`CREATED` >= TO_DATE(\'{0}\', \'YYYY-MM-DD\')) '.format(
+                    created_after.strftime('%Y-%m-%d'))
         else:
-            conditions = 'WHERE dataset.amiStatus=\'VALID\' '
+            conditions = 'WHERE `ATLAS_AMI_DATASUPER_01`.`DATASET`.`AMISTATUS`=\'VALID\' '
 
         query = \
-            '"SELECT %s ' % ','.join(['dataset.%s' % e for e in fields]) + \
+            'SELECT {0} FROM `ATLAS_AMI_DATASUPER_01`.`DATASET` '.format(','.join(
+                ['`ATLAS_AMI_DATASUPER_01`.`DATASET`.`{0}`'.format(field.upper()) for field in fields])) + \
             conditions + \
-            'ORDER BY dataset.created ASC"'
+            'ORDER BY `ATLAS_AMI_DATASUPER_01`.`DATASET`.`CREATED` ASC'
 
-        command = [
-            'SearchQuery',
-            '-entity="dataset"',
-            '-processingStep="real_data"',
-            '-project="dataSuper_001"',
-            '-glite=%s' % query
-        ]
+        return self._post_command('SearchQuery',
+                                  catalog='dataSuper_001:real_data',
+                                  entity='dataset',
+                                  sql='{0}'.format(query))
 
-        return self.client.execute(command, format='dom_object').get_rows()
+    def _ami_list_projects(self, patterns):
+        conditions = ' OR '.join(
+            ['`ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`PROJECTTAG` like \'{0}\''.format(p) for p in patterns or []])
+
+        if conditions:
+            conditions = '({0}) AND '.format(conditions)
+
+        query = \
+            'SELECT `ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`PROJECTTAG` AS tag, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`DESCRIPTION` AS description, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`WRITESTATUS` AS write_status ' + \
+            'FROM `ATLAS_AMI_PRODUCTION_01`.`PROJECTS` WHERE {0}'.format(conditions) + \
+            '(`ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`READSTATUS`=\'valid\') ' + \
+            'ORDER BY `ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`PROJECTTAG`, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`DESCRIPTION`, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`PROJECTS`.`WRITESTATUS`'
+
+        return self._post_command('SearchQuery',
+                                  catalog='Atlas_Production:Atlas_Production',
+                                  entity='projects',
+                                  sql='{0}'.format(query))
+
+    def _ami_list_types(self):
+        query = \
+            'SELECT `ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`DATATYPE` AS name, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`DESCRIPTION` AS description, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`WRITESTATUS` AS write_status ' + \
+            'FROM `ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE` ' + \
+            'WHERE `ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`READSTATUS`=\'valid\' ' + \
+            'ORDER BY `ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`DATATYPE`, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`DESCRIPTION`, ' + \
+            '`ATLAS_AMI_PRODUCTION_01`.`DATA_TYPE`.`WRITESTATUS`'
+
+        return self._post_command('SearchQuery',
+                                  catalog='Atlas_Production:Atlas_Production',
+                                  entity='DATA_TYPE',
+                                  sql='{0}'.format(query))
+
+    def ami_list_tags(self, trf_name, trf_release):
+        query = \
+            "SELECT * WHERE (`transformationName` = '{0}') and (`cacheName` = '{1}')".format(trf_name, trf_release)
+
+        return self._post_command('SearchQuery',
+                                  catalog='AMITags:production',
+                                  entity='V_AMITags',
+                                  mql='{0}'.format(query))
 
     def get_nevents_per_file(self, dataset):
         dataset = dataset.split(':')[-1].strip('/')
         tid_pattern = r'(?P<tid>_tid\d+_\d{2})'
-        if re.match(r"^.*%s$" % tid_pattern, dataset):
+        if re.match(r'^.*{0}$'.format(tid_pattern), dataset):
             dataset = re.sub(tid_pattern, '', dataset)
-        pyAMI_atlas.api.init()
-        result = pyAMI_atlas.api.get_dataset_info(self.client, dataset)
-        round_up = lambda num: int(num + 1) if int(num) != num else int(num)
-        return round_up(float(result[0]['totalEvents']) / float(result[0]['nFiles']))
+        result = self._post_command('AMIGetDatasetInfo', logicalDatasetName=dataset)
+        nfiles = float(result[0]['nFiles'])
+        if nfiles == 0:
+            return 0
+        total_events = float(result[0]['totalEvents'])
+        return math.ceil(total_events / nfiles)
 
-    def get_types(self):
+    @staticmethod
+    def get_types():
         return [e.name for e in TDataFormat.objects.all()]
 
     def ami_get_params(self, cache, release, trf_name):
-        command = [
-            'GetParamsForTransform',
-            '-releaseName="{0}_{1}"'.format(cache, release),
-            '-transformName={0}'.format(trf_name)
-        ]
-
-        result = self.client.execute(command, format='dom_object').get_rows('params')
-
+        result = self._post_command('GetParamsForTransform',
+                                    'params',
+                                    releaseName='{0}_{1}'.format(cache, release),
+                                    transformName=trf_name)
         trf_params = list()
         for param in result:
             name = param['paramName']
@@ -176,19 +246,21 @@ class AMIClient(object):
 
         return trf_params
 
-    def is_new_ami_tag(self, ami_tag):
-        if 'notAKTR' in ami_tag.keys() and ami_tag['notAKTR']:
+    @staticmethod
+    def is_new_ami_tag(ami_tag):
+        if 'notAKTR' in list(ami_tag.keys()) and ami_tag['notAKTR']:
             return True
         else:
             return False
 
-    def apply_phconfig_ami_tag(self, ami_tag):
+    @staticmethod
+    def apply_phconfig_ami_tag(ami_tag):
         if 'phconfig' in ami_tag:
             phconfig_dict = eval(ami_tag['phconfig'])
-            for config_key in phconfig_dict.keys():
+            for config_key in list(phconfig_dict.keys()):
                 if isinstance(phconfig_dict[config_key], dict):
                     value_list = list()
-                    for key in phconfig_dict[config_key].keys():
+                    for key in list(phconfig_dict[config_key].keys()):
                         if isinstance(phconfig_dict[config_key][key], list):
                             for value in ['{0}:{1}'.format(key, ss) for ss in phconfig_dict[config_key][key]]:
                                 value_list.append(value)
@@ -201,7 +273,7 @@ class AMIClient(object):
                 else:
                     config_value = json.dumps(phconfig_dict[config_key])
                 logger.debug("apply phconfig key=value: %s=%s" % (config_key, config_value))
-                for key in ami_tag.keys():
+                for key in list(ami_tag.keys()):
                     if key.lower() == config_key.lower():
                         ami_tag[key] = config_value
                 ami_tag.update({config_key: config_value})
@@ -214,7 +286,6 @@ class AMIClient(object):
         return [ami_tag['createdBy'], ami_tag['created']]
 
     def get_ami_tag_tzero(self, tag_name):
-        tzero_tag = dict()
         result = self._ami_get_tag_new(tag_name)
         tzero_tag = result[0]['dict']
         return tzero_tag
@@ -225,8 +296,8 @@ class AMIClient(object):
         try:
             result = self._ami_get_tag_old(tag_name)
             ami_tag = result[0]
-        except pyAMI.exception.Error as ex:
-            if 'Invalid amiTag found'.lower() in ex.message.lower():
+        except AMIException as ex:
+            if ex.has_error('Invalid amiTag found'):
                 try:
                     if tag_name.startswith('z500'):
                         result = self._ami_get_tag_flat(tag_name)
@@ -234,44 +305,43 @@ class AMIClient(object):
                         result = self._ami_get_tag(tag_name)
                     ami_tag = result[0]
                     if str(ami_tag['transformationName']).endswith('.py'):
-                        ami_tag['transformation'] = "%s" % ami_tag['transformationName']
+                        ami_tag['transformation'] = '{0}'.format(ami_tag['transformationName'])
                     else:
-                        ami_tag['transformation'] = "%s.py" % ami_tag['transformationName']
-                    ami_tag['SWReleaseCache'] = "%s_%s" % (ami_tag['groupName'], ami_tag['cacheName'])
+                        ami_tag['transformation'] = '{0}.py'.format(ami_tag['transformationName'])
+                    ami_tag['SWReleaseCache'] = '{0}_{1}'.format(ami_tag['groupName'], ami_tag['cacheName'])
                 except Exception as ex:
-                    logger.exception("[1] Exception: %s" % str(ex))
-            elif '[Errno 111] Connection refused'.lower() in ex.message.lower():
-                raise Exception(ex.message)
+                    logger.exception('[1] Exception: {0}'.format(str(ex)))
+            elif ex.has_error('[Errno 111] Connection refused'):
+                raise
             else:
-                logger.exception('pyAMI.exception.Error: {0}'.format(ex.message))
-        except httplib.BadStatusLine as ex:
-            raise Exception('pyAMI.exception: {0}'.format(type(ex).__name__))
+                logger.exception('AMIException: {0}'.format(ex.message))
         except Exception as ex:
-            logger.exception("[2] Exception: %s" % str(ex))
+            logger.exception('[2] Exception: {0}'.format(str(ex)))
 
         try:
             prodsys_tag = TTrfConfig.objects.get(tag=tag_name[0], cid=int(tag_name[1:]))
 
             if not ami_tag:
                 ami_tag['transformation'] = prodsys_tag.trf
-                ami_tag['SWReleaseCache'] = "%s_%s" % (prodsys_tag.cache, prodsys_tag.trf_version)
-                ami_tag.update(dict(zip(prodsys_tag.lparams.split(','), prodsys_tag.vparams.split(','))))
+                ami_tag['SWReleaseCache'] = '{0}_{1}'.format(prodsys_tag.cache, prodsys_tag.trf_version)
+                ami_tag.update(dict(list(zip(prodsys_tag.lparams.split(','), prodsys_tag.vparams.split(',')))))
 
             ami_tag['productionStep'] = prodsys_tag.prod_step
             ami_tag['notAKTR'] = False
-        except ObjectDoesNotExist as ex:
-            logger.info("The tag %s is not found in AKTR" % tag_name)
+        except ObjectDoesNotExist:
+            logger.info('The tag {0} is not found in AKTR'.format(tag_name))
             if ami_tag:
                 ami_tag['notAKTR'] = True
         except Exception as ex:
-            logger.exception("Exception: %s" % str(ex))
+            logger.exception('Exception: {0}'.format(str(ex)))
 
         if not ami_tag:
-            raise Exception("The configuration tag \"%s\" is not registered" % tag_name)
+            raise Exception('The configuration tag \"{0}\" is not registered'.format(tag_name))
 
         return ami_tag
 
-    def _read_trf_params(self, fp):
+    @staticmethod
+    def _read_trf_params(fp):
         trf_params = list()
         for source_line in fp.read().splitlines():
             source_line = source_line.replace(' ', '')
@@ -280,7 +350,8 @@ class AMIClient(object):
                 break
         return trf_params
 
-    def _trf_dump_args(self, list_known_path, trf_transform_path):
+    @staticmethod
+    def _trf_dump_args(list_known_path, trf_transform_path):
         list_known_python_path = list()
         for path in list_known_path:
             old_str_pattern = re.compile(re.escape('share/bin'), re.IGNORECASE)
@@ -294,7 +365,7 @@ class AMIClient(object):
         sys.path.append(os.path.dirname(trf_transform_path))
         trf_module = __import__(os.path.splitext(trf_transform)[0])
         if not hasattr(trf_module, 'getTransform'):
-            raise Exception("The module %s does not support for dumpArgs" % trf_transform)
+            raise Exception('The module {0} does not support for dumpArgs'.format(trf_transform))
         get_transform_method = getattr(trf_module, 'getTransform')
         trf = get_transform_method()
         list_key = ['--' + str(key) for key in trf.parser.allArgs if
@@ -302,7 +373,8 @@ class AMIClient(object):
         list_key.sort()
         return list_key
 
-    def _trf_retrieve_sub_steps(self, list_known_path, trf_transform_path):
+    @staticmethod
+    def _trf_retrieve_sub_steps(list_known_path, trf_transform_path):
         list_known_python_path = list()
         for path in list_known_path:
             old_str_pattern = re.compile(re.escape('share/bin'), re.IGNORECASE)
@@ -316,11 +388,11 @@ class AMIClient(object):
         sys.path.append(os.path.dirname(trf_transform_path))
         trf_module = __import__(os.path.splitext(trf_transform)[0])
         if not hasattr(trf_module, 'getTransform'):
-            raise Exception("The module %s does not support for dumpArgs" % trf_transform)
+            raise Exception('The module {0} does not support for dumpArgs'.format(trf_transform))
         get_transform_method = getattr(trf_module, 'getTransform')
         trf = get_transform_method()
         if not hasattr(trf, 'executors'):
-            raise Exception("The module %s does not support for executors list" % trf_transform)
+            raise Exception('The module {0} does not support for executors list'.format(trf_transform))
         executor_list = list()
         for executor in trf.executors:
             if executor.name:
@@ -404,7 +476,7 @@ class AMIClient(object):
             except Exception as ex:
                 logger.exception("ami_get_params failed: %s" % str(ex))
 
-        if not sub_step_list is None:
+        if sub_step_list is not None:
             # old way from PS1
             if trf_transform.lower() in [e.lower() for e in ['AtlasG4_tf.py', 'Sim_tf.py', 'StoppedParticleG4_tf.py',
                                                              'TrigFTKMergeReco_tf.py', 'Reco_tf.py',
@@ -421,52 +493,44 @@ class AMIClient(object):
 
         return trf_params
 
-    def _get_proxy(self):
-        return VOMSClient().get()
-
     def sync_ami_projects(self):
         try:
-            pyAMI_atlas.api.init()
-            ami_projects = pyAMI_atlas.api.list_projects(self.client,
-                                                         patterns=['valid%', 'data%', 'mc%', 'user%'],
-                                                         fields=['description', 'write_status'])
+            ami_projects = self._ami_list_projects(['valid%', 'data%', 'mc%', 'user%'])
             project_names = [e.project for e in TProject.objects.all()]
             for ami_project in ami_projects:
-                if ami_project['write_status'] != 'valid':
+                if ami_project['write_status'.upper()] != 'valid':
                     continue
-                if not ami_project['tag'] in project_names:
+                if not ami_project['tag'.upper()] in project_names:
                     description = None
-                    if str(ami_project['description']) != 'NULL':
-                        description = str(ami_project['description'])
+                    if str(ami_project['description'.upper()]) != '@NULL':
+                        description = str(ami_project['description'.upper()])
                     timestamp = int(time.time())
-                    new_project = TProject(project=ami_project['tag'],
+                    new_project = TProject(project=ami_project['tag'.upper()],
                                            status='active',
                                            description=description,
                                            timestamp=timestamp)
                     new_project.save()
-                    logger.info('The project \"{0}\" is registered (timestamp={1})'.format(
-                        new_project.project,
-                        timestamp)
-                    )
+                    logger.info(
+                        'The project \"{0}\" is registered (timestamp = {1})'.format(ami_project['tag'.upper()],
+                                                                                     timestamp))
         except Exception as ex:
             logger.exception('sync_ami_projects, exception occurred: {0}'.format(str(ex)))
 
     def sync_ami_types(self):
         try:
-            pyAMI_atlas.api.init()
-            ami_types = pyAMI_atlas.api.list_types(self.client, fields=['description', 'write_status'])
+            ami_types = self._ami_list_types()
             format_names = [e.name for e in TDataFormat.objects.all()]
             for ami_type in ami_types:
-                if ami_type['write_status'] != 'valid':
+                if ami_type['write_status'.upper()] != 'valid':
                     continue
-                if not ami_type['name'] in format_names:
+                if not ami_type['name'.upper()] in format_names:
                     description = None
-                    if str(ami_type['description']) != 'NULL':
-                        description = str(ami_type['description'])
-                    new_format = TDataFormat(name=ami_type['name'],
+                    if str(ami_type['description'.upper()]) != '@NULL':
+                        description = str(ami_type['description'.upper()])
+                    new_format = TDataFormat(name=ami_type['name'.upper()],
                                              description=description)
                     new_format.save()
-                    logger.info('The data format \"{0}\" is registered'.format(new_format.name))
+                    logger.info('The data format \"{0}\" is registered'.format(ami_type['name'.upper()]))
         except Exception as ex:
             logger.exception('sync_ami_types, exception occurred: {0}'.format(str(ex)))
 
@@ -477,21 +541,23 @@ class AMIClient(object):
                 last_created = PhysicsContainer.objects.latest('created').created
             except ObjectDoesNotExist:
                 pass
-            new_datasets = self._ami_list_phys_container(created_after=last_created)
+            new_datasets = self._ami_list_phys_containers(created_after=last_created)
             if new_datasets:
                 for dataset in new_datasets:
-                    if not PhysicsContainer.objects.filter(pk=dataset['logicalDatasetName']).exists():
-                        phys_cont = PhysicsContainer()
-                        phys_cont.name = dataset['logicalDatasetName']
-                        phys_cont.created = dataset['created']
-                        phys_cont.last_modified = dataset['lastModified']
-                        phys_cont.username = dataset['createdBy']
-                        phys_cont.project = dataset['projectName']
-                        phys_cont.data_type = dataset['dataType']
-                        phys_cont.run_number = dataset['runNumber']
-                        phys_cont.stream_name = dataset['streamName']
-                        phys_cont.prod_step = dataset['prodStep']
-                        phys_cont.save()
+                    if not PhysicsContainer.objects.filter(pk=dataset['logicalDatasetName'.upper()]).exists():
+                        new_phys_cont = PhysicsContainer()
+                        new_phys_cont.name = dataset['logicalDatasetName'.upper()]
+                        new_phys_cont.created = dataset['created'.upper()]
+                        new_phys_cont.last_modified = dataset['lastModified'.upper()]
+                        new_phys_cont.username = dataset['createdBy'.upper()]
+                        new_phys_cont.project = dataset['projectName'.upper()]
+                        new_phys_cont.data_type = dataset['dataType'.upper()]
+                        new_phys_cont.run_number = dataset['runNumber'.upper()]
+                        new_phys_cont.stream_name = dataset['streamName'.upper()]
+                        new_phys_cont.prod_step = dataset['prodStep'.upper()]
+                        new_phys_cont.save()
+                        logger.info(
+                            'New physics container \"{0}\" is registered'.format(dataset['logicalDatasetName'.upper()]))
         except Exception as ex:
             logger.exception('sync_ami_phys_containers, exception occurred: {0}'.format(str(ex)))
 
@@ -502,8 +568,8 @@ class AMIClient(object):
                 last_step_template_id = ProductionTag.objects.latest('step_template_id').step_template_id
             except ObjectDoesNotExist:
                 pass
-            result = \
-                StepTemplate.objects.filter(id__gt=last_step_template_id).order_by('id').values('id', 'ctag').distinct()
+            result = StepTemplate.objects.filter(
+                id__gt=last_step_template_id).order_by('id').values('id', 'ctag').distinct()
             for step_template in result:
                 try:
                     step = StepExecution.objects.filter(step_template__id=step_template['id']).first()
@@ -516,19 +582,20 @@ class AMIClient(object):
                 except ObjectDoesNotExist:
                     continue
                 if not ProductionTag.objects.filter(pk=tag_name).exists():
-                    tag = ProductionTag()
-                    tag.name = tag_name
-                    tag.task_id = task.id
-                    tag.step_template_id = step_template['id']
+                    new_tag = ProductionTag()
+                    new_tag.name = tag_name
+                    new_tag.task_id = task.id
+                    new_tag.step_template_id = step_template['id']
                     try:
                         ami_tag = self.get_ami_tag(tag_name)
-                        tag.username, tag.created = self.get_ami_tag_owner(tag_name)
+                        new_tag.username, new_tag.created = self.get_ami_tag_owner(tag_name)
                     except Exception:
                         continue
-                    tag.trf_name = ami_tag['transformation']
-                    tag.trf_cache = ami_tag['SWReleaseCache'].split('_')[0]
-                    tag.trf_release = ami_tag['SWReleaseCache'].split('_')[1]
-                    tag.tag_parameters = json.dumps(ami_tag)
-                    tag.save()
+                    new_tag.trf_name = ami_tag['transformation']
+                    new_tag.trf_cache = ami_tag['SWReleaseCache'].split('_')[0]
+                    new_tag.trf_release = ami_tag['SWReleaseCache'].split('_')[1]
+                    new_tag.tag_parameters = json.dumps(ami_tag)
+                    new_tag.save()
+                    logger.info('New tag \"{0}\" is registered'.format(tag_name))
         except Exception as ex:
             logger.exception('sync_ami_tags, exception occurred: {0}'.format(str(ex)))

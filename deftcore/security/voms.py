@@ -2,10 +2,11 @@ __author__ = 'Dmitry Golubkov'
 
 import os
 import subprocess
-import datetime
-import gridproxy
-import gridproxy.voms
+from OpenSSL.crypto import load_certificate, FILETYPE_PEM
 from deftcore.settings import VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH, X509_PROXY_PATH
+from deftcore.log import Logger
+
+logger = Logger.get()
 
 
 class NoProxyException(Exception):
@@ -13,16 +14,17 @@ class NoProxyException(Exception):
         super(NoProxyException, self).__init__('Unable to initialize the valid VOMS proxy')
 
 
+# noinspection PyBroadException, PyUnresolvedReferences
 class VOMSClient(object):
     def __init__(self):
         self.lifetime = 43200
         self.voms = 'atlas:/atlas/Role=production'
         self.proxy_file_path = X509_PROXY_PATH
 
-    def get(self, force=False):
+    def get(self, force=False, log_std_streams=False):
         if (not self._is_proxy_valid()) or force:
             proxy_init_command = 'voms-proxy-init -valid {0}:00 -voms {1} -cert {2} -key {3} -out {4}'.format(
-                self.lifetime / 3600,
+                int(self.lifetime / 3600),
                 self.voms,
                 VOMS_CERT_FILE_PATH,
                 VOMS_KEY_FILE_PATH,
@@ -31,7 +33,12 @@ class VOMSClient(object):
             try:
                 process = subprocess.Popen(proxy_init_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                            shell=True)
-                process.communicate()
+                if log_std_streams:
+                    stdout, stderr = process.communicate()
+                    logger.info('stdout={0}{1}'.format(os.linesep, stdout))
+                    logger.info('stderr={0}{1}'.format(os.linesep, stderr))
+                else:
+                    process.communicate()
             except Exception as ex:
                 raise Exception('voms-proxy-init process failed: {0}'.format(str(ex)))
 
@@ -46,15 +53,15 @@ class VOMSClient(object):
     def _is_proxy_valid(self):
         if not os.path.isfile(self.proxy_file_path):
             return False
-        voms_client = gridproxy.voms.VOMS()
-        with open(self.proxy_file_path, 'r') as proxy_file:
+        with open(self.proxy_file_path, 'rb') as proxy_file:
             try:
-                _, chain = gridproxy.load_proxy(proxy_file.read())
-                voms_client.from_x509_stack(chain)
-            except Exception:
+                cert_pem = proxy_file.read()
+                proxy_file.close()
+                x509 = load_certificate(FILETYPE_PEM, cert_pem)
+                return not x509.has_expired()
+            except Exception as ex:
+                logger.warning('_is_proxy_valid failed: {0}'.format(ex))
                 return False
-        not_after = voms_client.not_after.replace(tzinfo=None)
-        return not_after >= datetime.datetime.now()
 
     @property
     def valid(self):

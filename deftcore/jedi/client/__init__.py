@@ -3,7 +3,7 @@ __author__ = 'Dmitry Golubkov'
 import os
 import types
 import sys
-from deftcore.settings import JEDI_PANDA_SERVER_PATH, JEDI_CLIENT_PATH
+from deftcore.settings import JEDI_CORE_UTILS_PATH, JEDI_CLIENT_PATH
 from deftcore.security.voms import VOMSClient
 from deftcore.log import Logger
 
@@ -29,7 +29,7 @@ def import_module(path, name):
     return module
 
 
-sys.path.insert(0, JEDI_PANDA_SERVER_PATH)
+import_module(JEDI_CORE_UTILS_PATH, 'pandaserver.srvcore.CoreUtils')
 jedi_client_module = import_module(JEDI_CLIENT_PATH, 'Client')
 jedi_client_module.__dict__['_x509'] = _x509
 exec('from {0} import *'.format(jedi_client_module.__name__))

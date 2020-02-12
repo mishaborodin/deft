@@ -1,5 +1,5 @@
 PRODSYS_BASE_DIR=/data/prodsys
-PYTHON_PATH=/usr/local/bin/python2.7
+PYTHON_PATH=/usr/local/bin/python3.7
 
 */5 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR MC > /tmp/$USER.process_requests.sh.log 2>&1
 */5 * * * * /bin/nice -n 0 $PRODSYS_BASE_DIR/deftcore/process_requests.sh $PRODSYS_BASE_DIR GROUP > /tmp/$USER.process_requests.sh.log 2>&1

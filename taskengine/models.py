@@ -1,16 +1,13 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 __author__ = 'Dmitry Golubkov'
 
 import json
+import math
 from django.db import models
 from django.db import connections
 from django.utils.dateparse import parse_datetime
 from django.dispatch import receiver
 from django.db.models.signals import post_init
 from django.utils import timezone
-from deftcore.helpers import OracleClob
 from deftcore.log import Logger, get_exception_string
 
 logger = Logger.get()
@@ -52,17 +49,17 @@ class TRequest(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_PRODMANAGER_REQUEST_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_PRODMANAGER_REQUEST_ID_SEQ')
         super(TRequest, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODMANAGER_REQUEST"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODMANAGER_REQUEST"'
 
 
 class TRequestStatus(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='REQ_S_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     comment = models.CharField(max_length=256, db_column='COMMENT', null=True)
     owner = models.CharField(max_length=32, db_column='OWNER', null=False)
     status = models.CharField(max_length=32, db_column='STATUS', null=False)
@@ -70,17 +67,17 @@ class TRequestStatus(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_PRODMANAGER_REQ_STAT_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_PRODMANAGER_REQ_STAT_ID_SEQ')
         super(TRequestStatus, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODMANAGER_REQUEST_STATUS"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODMANAGER_REQUEST_STATUS"'
 
 
 class InputRequestList(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='IND_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     slice = models.DecimalField(decimal_places=0, max_digits=12, db_column='SLICE', null=False)
     brief = models.CharField(max_length=150, db_column='BRIEF')
     phys_comment = models.CharField(max_length=256, db_column='PHYSCOMMENT')
@@ -94,12 +91,12 @@ class InputRequestList(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_INPUT_DATASET_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_INPUT_DATASET_ID_SEQ')
         super(InputRequestList, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_INPUT_DATASET"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_INPUT_DATASET"'
 
 
 class StepTemplate(models.Model):
@@ -119,20 +116,20 @@ class StepTemplate(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_STEP_TEMPLATE_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_STEP_TEMPLATE_ID_SEQ')
         super(StepTemplate, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_STEP_TEMPLATE"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_STEP_TEMPLATE"'
 
 
 class StepExecution(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='STEP_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
-    step_template = models.ForeignKey(StepTemplate, db_column='STEP_T_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
+    step_template = models.ForeignKey(StepTemplate, db_column='STEP_T_ID', on_delete=models.DO_NOTHING)
     status = models.CharField(max_length=12, db_column='STATUS', null=False)
-    slice = models.ForeignKey(InputRequestList, db_column='IND_ID', null=False)
+    slice = models.ForeignKey(InputRequestList, db_column='IND_ID', null=False, on_delete=models.DO_NOTHING)
     priority = models.DecimalField(decimal_places=0, max_digits=5, db_column='PRIORITY', null=False)
     step_def_time = models.DateTimeField(db_column='STEP_DEF_TIME', null=False)
     step_appr_time = models.DateTimeField(db_column='STEP_APPR_TIME', null=True)
@@ -144,14 +141,14 @@ class StepExecution(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_PRODUCTION_STEP_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_PRODUCTION_STEP_ID_SEQ')
         if not self.step_parent_id:
             self.step_parent_id = self.id
         super(StepExecution, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODUCTION_STEP"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODUCTION_STEP"'
 
 
 class ProductionDataset(models.Model):
@@ -171,8 +168,8 @@ class ProductionDataset(models.Model):
     ddm_status = models.CharField(max_length=32, db_column='ddm_status', null=True)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODUCTION_DATASET"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODUCTION_DATASET"'
 
 
 class ProductionContainer(models.Model):
@@ -187,14 +184,14 @@ class ProductionContainer(models.Model):
     ddm_timestamp = models.DateTimeField(db_column='DDM_TIMESTAMP', null=True)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODUCTION_CONTAINER"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODUCTION_CONTAINER"'
 
 
 class ProductionTask(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='TASKID', primary_key=True)
-    step = models.ForeignKey(StepExecution, db_column='STEP_ID')
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    step = models.ForeignKey(StepExecution, db_column='STEP_ID', on_delete=models.DO_NOTHING)
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     parent_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='PARENT_TID', null=False)
     name = models.CharField(max_length=130, db_column='TASKNAME', null=True)
     project = models.CharField(max_length=60, db_column='PROJECT', null=True)
@@ -248,7 +245,7 @@ class ProductionTask(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_PRODUCTION_TASK_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_PRODUCTION_TASK_ID_SEQ')
         super(ProductionTask, self).save(*args, **kwargs)
 
     @property
@@ -347,8 +344,8 @@ class ProductionTask(models.Model):
                 cursor.close()
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODUCTION_TASK"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODUCTION_TASK"'
 
 
 class HashTag(models.Model):
@@ -363,20 +360,20 @@ class HashTag(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_HASHTAG_ID_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_HASHTAG_ID_SEQ')
         super(HashTag, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.hashtag
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_HASHTAG"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_HASHTAG"'
 
 
 class HashTagToTask(models.Model):
-    task = models.ForeignKey(ProductionTask, db_column='TASKID')
-    hashtag = models.ForeignKey(HashTag, db_column='HT_ID')
+    task = models.ForeignKey(ProductionTask, db_column='TASKID', on_delete=models.DO_NOTHING)
+    hashtag = models.ForeignKey(HashTag, db_column='HT_ID', on_delete=models.DO_NOTHING)
 
     def save(self, *args, **kwargs):
         raise NotImplementedError()
@@ -385,8 +382,8 @@ class HashTagToTask(models.Model):
         pass
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_HT_TO_TASK"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_HT_TO_TASK"'
 
 
 class TTask(models.Model):
@@ -407,13 +404,11 @@ class TTask(models.Model):
     total_events = models.DecimalField(decimal_places=0, max_digits=10, db_column='TOTAL_EVENTS', null=True)
 
     def get_id(self):
-        return prefetch_id(self._meta.db_name, u'ATLAS_DEFT.PRODSYS2_TASK_ID_SEQ')
+        return prefetch_id(self._meta.db_name, 'ATLAS_DEFT.PRODSYS2_TASK_ID_SEQ')
 
     def save(self, *args, **kwargs):
         if not self.id:
             self.id = self.get_id()
-        if self.jedi_task_param:
-            self.jedi_task_param = OracleClob(self.jedi_task_param)
         super(TTask, self).save(*args, **kwargs)
 
     def _get_task_params(self):
@@ -432,21 +427,19 @@ class TTask(models.Model):
                 return dataset
         return
 
-    def _get_job_parameter(self, value, parameter_key):
+    def get_job_parameter(self, value, parameter_key):
         params = self._get_task_params()
         job_params = params.get('jobParameters')
         if not job_params:
             return None
         for param in job_params:
-            if ('value' in param) and ('%s='%value in param['value']) and (parameter_key in param):
-                    return param[parameter_key]
+            if ('value' in param) and ('%s=' % value in param['value']) and (parameter_key in param):
+                return param[parameter_key]
         return None
 
     @property
     def input_dataset(self):
         return self._get_dataset('input')
-
-
 
     @property
     def output_dataset(self):
@@ -459,9 +452,8 @@ class TTask(models.Model):
         if params:
             value = params.get('nEventsPerJob', 0)
         if not value:
-            round_up = lambda num: int(num + 1) if int(num) != num else int(num)
             if self.total_done_jobs:
-                value = round_up(float(self.total_events) / float(self.total_done_jobs))
+                value = math.ceil(float(self.total_events) / float(self.total_done_jobs))
         return value
 
     @property
@@ -493,8 +485,8 @@ class TTask(models.Model):
         return value
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_TASK"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_TASK"'
 
 
 class TTrfConfig(models.Model):
@@ -518,8 +510,8 @@ class TTrfConfig(models.Model):
     comment = models.CharField(max_length=2048, db_column='COMMENT_', null=True)
 
     class Meta:
-        db_name = u'grisli_adcr_panda'
-        db_table = u'"ATLAS_GRISLI"."T_TRF_CONFIG"'
+        db_name = 'grisli_adcr_panda'
+        db_table = '"ATLAS_GRISLI"."T_TRF_CONFIG"'
 
 
 class TTaskRequest(models.Model):
@@ -537,10 +529,11 @@ class TTaskRequest(models.Model):
     ctag = models.CharField(max_length=8, db_column='CTAG', null=True)
 
     class Meta:
-        db_name = u'grisli_adcr_panda'
-        db_table = u'"ATLAS_GRISLI"."T_TASK_REQUEST"'
+        db_name = 'grisli_adcr_panda'
+        db_table = '"ATLAS_GRISLI"."T_TASK_REQUEST"'
 
 
+# noinspection PyBroadException
 class Task(ProductionTask):
     def _get_jedi_task_params(self):
         if self.jedi_task:
@@ -566,7 +559,7 @@ class Task(ProductionTask):
     def _get_destination_token(self):
         try:
             task_config = json.loads(self.step.task_config)
-            if 'token' in task_config.keys():
+            if 'token' in list(task_config.keys()):
                 token = task_config['token']
                 if 'dst:' in token:
                     return token.split('dst:')[-1]
@@ -581,7 +574,7 @@ class Task(ProductionTask):
         return bool(self.step.slice.hided)
 
     def _get_has_pileup(self):
-        if not self.pileup is None:
+        if self.pileup is not None:
             return bool(self.pileup)
         else:
             return self.pileup
@@ -620,27 +613,28 @@ class Task(ProductionTask):
     class Meta:
         ordering = ["-id"]
         proxy = True
-        db_name = u'deft_adcr'
+        db_name = 'deft_adcr'
 
 
+# noinspection PyBroadException
 @receiver(post_init, sender=Task)
 def task_post_init(sender, **kwargs):
     self = kwargs['instance']
 
     try:
         self.jedi_task = TTask.objects.get(id=self.id)
-    except:
+    except Exception:
         self.jedi_task = None
 
     try:
         if not self.total_req_events:
             self.total_req_events = int(self.step.input_events or 0)
-    except:
+    except Exception:
         self.total_req_events = 0
 
     try:
         self.slice_input_events = int(self.step.slice.input_events or 0)
-    except:
+    except Exception:
         self.slice_input_events = 0
 
 
@@ -648,7 +642,7 @@ class TRequestProxy(TRequest):
     class Meta:
         ordering = ['-id']
         proxy = True
-        db_name = u'deft_adcr'
+        db_name = 'deft_adcr'
 
 
 @receiver(post_init, sender=TRequestProxy)
@@ -703,8 +697,8 @@ class TProject(models.Model):
     timestamp = models.DecimalField(decimal_places=0, max_digits=10, db_column='TIMESTAMP')
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PROJECTS"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PROJECTS"'
 
 
 class TDataFormat(models.Model):
@@ -712,15 +706,15 @@ class TDataFormat(models.Model):
     description = models.CharField(max_length=256, db_column='DESCRIPTION', null=True)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_DATA_FORMAT"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_DATA_FORMAT"'
 
 
 class TStepProxy(StepExecution):
     class Meta:
         ordering = ['-id']
         proxy = True
-        db_name = u'deft_adcr'
+        db_name = 'deft_adcr'
 
 
 @receiver(post_init, sender=TStepProxy)
@@ -741,8 +735,8 @@ class JEDIDataset(models.Model):
     nfiles = models.DecimalField(decimal_places=0, max_digits=10, db_column='NFILES')
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_PANDA"."JEDI_DATASETS"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_PANDA"."JEDI_DATASETS"'
 
 
 class JEDIDatasetContent(models.Model):
@@ -755,8 +749,8 @@ class JEDIDatasetContent(models.Model):
         return
 
     class Meta:
-        db_name = u'panda_adcr'
-        db_table = u'"ATLAS_PANDA"."JEDI_DATASET_CONTENTS"'
+        db_name = 'panda_adcr'
+        db_table = '"ATLAS_PANDA"."JEDI_DATASET_CONTENTS"'
 
 
 class InstalledSW(models.Model):
@@ -767,8 +761,8 @@ class InstalledSW(models.Model):
     cmtconfig = models.CharField(max_length=40, db_column='CMTCONFIG', null=True)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_PANDAMETA"."INSTALLEDSW"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_PANDAMETA"."INSTALLEDSW"'
 
 
 class AuthUser(models.Model):
@@ -777,18 +771,18 @@ class AuthUser(models.Model):
     email = models.CharField(max_length=100, db_column='EMAIL')
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."AUTH_USER"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."AUTH_USER"'
 
 
 class OpenEnded(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='OE_ID', primary_key=True)
-    request = models.ForeignKey(TRequest, db_column='PR_ID')
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=models.DO_NOTHING)
     status = models.CharField(max_length=20, db_column='STATUS', null=True)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_OPEN_ENDED"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_OPEN_ENDED"'
 
 
 class PhysicsContainer(models.Model):
@@ -803,8 +797,8 @@ class PhysicsContainer(models.Model):
     prod_step = models.CharField(max_length=15, db_column='PROD_STEP', null=True)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PHYSICS_CONTAINER"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PHYSICS_CONTAINER"'
 
 
 class ProductionTag(models.Model):
@@ -819,8 +813,8 @@ class ProductionTag(models.Model):
     step_template_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='STEP_T_ID', null=False)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_PRODUCTION_TAG"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_PRODUCTION_TAG"'
 
 
 class TConfig(models.Model):
@@ -847,7 +841,7 @@ class TConfig(models.Model):
 
     @staticmethod
     def set_ttcr(offsets):
-        for key in offsets.keys():
+        for key in list(offsets.keys()):
             if type(offsets[key]) != int:
                 raise Exception('Wrong format of TTCR time offsets package')
             param = TConfig(app='deftcore', component='ttcr', key=key, value=offsets[key])
@@ -864,8 +858,8 @@ class TConfig(models.Model):
 
     class Meta:
         unique_together = (('app', 'component', 'key'),)
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_CONFIG"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_CONFIG"'
 
 
 class DatasetStaging(models.Model):
@@ -882,9 +876,9 @@ class DatasetStaging(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = prefetch_id(self._meta.db_name, u'ATLAS_DEFT.T_DATASET_STAGING_SEQ')
+            self.id = prefetch_id(self._meta.db_name, 'ATLAS_DEFT.T_DATASET_STAGING_SEQ')
         super(DatasetStaging, self).save(*args, **kwargs)
 
     class Meta:
-        db_name = u'deft_adcr'
-        db_table = u'"ATLAS_DEFT"."T_DATASET_STAGING"'
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_DATASET_STAGING"'

@@ -1,5 +1,6 @@
 __author__ = 'Dmitry Golubkov'
 
+import json
 import collections
 from datetime import datetime
 from django.utils import timezone
@@ -16,8 +17,10 @@ class InvalidArgumentError(ValueError):
     pass
 
 
+# noinspection PyUnresolvedReferences, PyBroadException
 class TaskActionHandler(object):
-    def parse_jedi_result(self, result):
+    @staticmethod
+    def parse_jedi_result(result):
         return_code = None
         return_info = None
         status_code, status_tuple_or_str = result
@@ -117,11 +120,13 @@ class TaskActionHandler(object):
         result = jedi_client.increaseAttemptNr(task_id, increment)
         return self.parse_jedi_result(result)
 
-    def abort_unfinished_jobs(self, task_id, code):
+    @staticmethod
+    def abort_unfinished_jobs(task_id, code):
         result = jedi_client.killUnfinishedJobs(task_id, code=code)
         return {'jedi_info': {'status_code': result[0], 'return_code': None, 'return_info': None}}
 
-    def add_task_comment(self, task_id, comment_body):
+    @staticmethod
+    def add_task_comment(task_id, comment_body):
         if not task_id:
             return
         try:
@@ -137,7 +142,8 @@ class TaskActionHandler(object):
         except Exception:
             logger.info('add_task_comment, exception occurred: {0}'.format(get_exception_string()))
 
-    def _parse_pp_command(self, pp_command_str):
+    @staticmethod
+    def _parse_pp_command(pp_command_str):
         pp_command = dict()
         if pp_command_str:
             for e in pp_command_str.split(';'):
@@ -148,9 +154,10 @@ class TaskActionHandler(object):
                 pp_command.update({key: values})
         return pp_command
 
-    def _construct_pp_command(self, pp_command):
+    @staticmethod
+    def _construct_pp_command(pp_command):
         pp_command_list = list()
-        for key in pp_command.keys():
+        for key in list(pp_command.keys()):
             if pp_command[key]:
                 pp_command_list.append('{0} : {1};'.format(key, ', '.join(pp_command[key])))
         return ''.join(pp_command_list)
@@ -160,9 +167,9 @@ class TaskActionHandler(object):
         task = ProductionTask.objects.get(id=task_id)
         # 'trainCC : DAOD, ESD; merge : HITS;'
         pp_command = self._parse_pp_command(task.postproduction)
-        if 'trainCC' in pp_command.keys():
+        if 'trainCC' in list(pp_command.keys()):
             for e in output_formats.split('.'):
-                if not e in pp_command['trainCC']:
+                if e not in pp_command['trainCC']:
                     pp_command['trainCC'].append(e)
                     is_updated = True
         else:
@@ -174,22 +181,29 @@ class TaskActionHandler(object):
             task.save()
         return {'result': task.postproduction}
 
-    def kill_job(self, job_id, code=9, keep_unmerged=False):
+    def kill_job(self, job_id, code, keep_unmerged=False):
         result = jedi_client.killJobs([job_id, ], code=code, keepUnmerged=keep_unmerged)
         return self.parse_jedi_result(result)
 
-    def set_job_debug_mode(self, job_id, debug_mode):
+    def kill_jobs(self, jobs, code, keep_unmerged=False):
+        result = jedi_client.killJobs(jobs, code=code, keepUnmerged=keep_unmerged)
+        return self.parse_jedi_result(result)
+
+    @staticmethod
+    def set_job_debug_mode(job_id, debug_mode):
         result = jedi_client.setDebugMode(job_id, debug_mode)
         # FIXME
         status_code, return_info = result
         return {'jedi_info': {'status_code': status_code, 'return_code': None, 'return_info': return_info}}
 
-    def set_ttcr(self, offsets):
+    @staticmethod
+    def set_ttcr(offsets):
         TConfig.set_ttcr(offsets)
         return {'result': 'Success'}
 
-    def set_ttcj(self, ttcj_dict):
-        for task_id in ttcj_dict.keys():
+    @staticmethod
+    def set_ttcj(ttcj_dict):
+        for task_id in list(ttcj_dict.keys()):
             task = ProductionTask.objects.get(id=task_id)
             task.ttcj_timestamp = datetime.fromtimestamp(ttcj_dict[task_id])
             task.ttcj_update_time = timezone.now()
@@ -197,47 +211,51 @@ class TaskActionHandler(object):
         return {'result': 'Success'}
 
     # FIXME: to delete
-    def _fill_template(self, step_name, tag, priority, formats=None, ram=None):
-        STEP_FORMAT = {'Evgen': 'EVNT', 'Simul': 'HITS', 'Merge': 'HITS', 'Rec TAG': 'TAG',
-                       'Atlf Merge': 'AOD', 'Atlf TAG': 'TAG'
-                       }
+    @staticmethod
+    def _fill_template(step_name, tag, priority, formats=None, ram=None):
+        step_format = {'Evgen': 'EVNT',
+                       'Simul': 'HITS',
+                       'Merge': 'HITS',
+                       'Rec TAG': 'TAG',
+                       'Atlf Merge': 'AOD',
+                       'Atlf TAG': 'TAG'}
         st = None
         try:
             if not step_name:
                 if (not formats) and (not ram):
                     st = StepTemplate.objects.all().filter(ctag=tag)[0]
-                if (not formats) and (ram):
+                if (not formats) and ram:
                     st = StepTemplate.objects.all().filter(ctag=tag, memory=ram)[0]
-                if (formats) and (not ram):
+                if formats and (not ram):
                     st = StepTemplate.objects.all().filter(ctag=tag, output_formats=formats)[0]
-                if (formats) and (ram):
+                if formats and ram:
                     st = StepTemplate.objects.all().filter(ctag=tag, output_formats=formats, memory=ram)[0]
             else:
                 if (not formats) and (not ram):
                     st = StepTemplate.objects.all().filter(ctag=tag, step=step_name)[0]
-                if (not formats) and (ram):
+                if (not formats) and ram:
                     st = StepTemplate.objects.all().filter(ctag=tag, memory=ram, step=step_name)[0]
-                if (formats) and (not ram):
+                if formats and (not ram):
                     st = StepTemplate.objects.all().filter(ctag=tag, output_formats=formats, step=step_name)[0]
-                if (formats) and (ram):
+                if formats and ram:
                     st = \
                         StepTemplate.objects.all().filter(ctag=tag, output_formats=formats, memory=ram, step=step_name)[
                             0]
-        except:
+        except Exception:
             pass
         finally:
             if st:
                 if (st.status == 'Approved') or (st.status == 'dummy'):
                     return st
 
-            trtf = TTrfConfig.objects.all().filter(tag=tag.strip()[0], cid=int(tag.strip()[1:]))
-            if trtf:
-                tr = trtf[0]
-                if (formats):
+            trs = TTrfConfig.objects.all().filter(tag=tag.strip()[0], cid=int(tag.strip()[1:]))
+            if trs:
+                tr = trs[0]
+                if formats:
                     output_formats = formats
                 else:
                     output_formats = tr.formats
-                if (ram):
+                if ram:
                     memory = ram
                 else:
                     memory = int(tr.memory)
@@ -263,7 +281,7 @@ class TaskActionHandler(object):
                 else:
                     if st:
                         return st
-                    output_formats = STEP_FORMAT.get(step_name, '')
+                    output_formats = step_format.get(step_name, '')
                     if formats:
                         output_formats = formats
                     memory = 0
@@ -278,24 +296,24 @@ class TaskActionHandler(object):
                     return st
 
     # FIXME: to delete
-    def _fill_dataset(self, ds):
+    @staticmethod
+    def _fill_dataset(dsn):
         dataset = None
         try:
-            dataset = ProductionDataset.objects.all().filter(name=ds)[0]
-        except:
+            dataset = ProductionDataset.objects.all().filter(name=dsn)[0]
+        except Exception:
             pass
         finally:
             if dataset:
                 return dataset
             else:
-                dataset = ProductionDataset.objects.create(name=ds, files=-1, timestamp=timezone.now())
+                dataset = ProductionDataset.objects.create(name=dsn, files=-1, timestamp=timezone.now())
                 dataset.save()
                 return dataset
 
     # FIXME: to delete
-    def _set_step_task_config(self, step, update_dict):
-        import json
-
+    @staticmethod
+    def _set_step_task_config(step, update_dict):
         if not step.task_config:
             step.task_config = ''
             current_dict = {}
@@ -305,7 +323,8 @@ class TaskActionHandler(object):
         step.task_config = json.dumps(current_dict)
 
     # FIXME: to delete
-    def _save_step_with_current_time(self, step, *args, **kwargs):
+    @staticmethod
+    def _save_step_with_current_time(step, *args, **kwargs):
         if not step.step_def_time:
             step.step_def_time = timezone.now()
         if step.status == 'Approved':
@@ -314,43 +333,53 @@ class TaskActionHandler(object):
         step.save(*args, **kwargs)
 
     # FIXME: to delete
-    def _save_rs_with_current_time(self, rs, *args, **kwargs):
+    @staticmethod
+    def _save_rs_with_current_time(rs, *args, **kwargs):
         if not rs.timestamp:
             rs.timestamp = timezone.now()
         rs.save(*args, **kwargs)
 
+    @staticmethod
+    def _make_new_slice(slice_dict, last_request):
+        if InputRequestList.objects.filter(request=last_request).count() == 0:
+            new_slice_number = 0
+        else:
+            new_slice_number = \
+                (InputRequestList.objects.filter(request=last_request).order_by('-slice')[0]).slice + 1
+        new_slice = InputRequestList()
+        if slice_dict.get('dataset', ''):
+            dataset = self._fill_dataset(slice_dict['dataset'])
+            new_slice.input_dataset = dataset.name
+        else:
+            raise ValueError('Dataset has to be defined')
+        new_slice.input_events = -1
+        new_slice.slice = new_slice_number
+        new_slice.request = last_request
+        new_slice.comment = slice_dict.get('comment', '')
+        new_slice.priority = slice_dict.get('priority', 950)
+        new_slice.brief = ' '
+        new_slice.save()
+        return new_slice
+
     # FIXME: to delete
     def create_slice_tier0(self, slice_dict, steps_list):
-        TASK_CONFIG_PARAMS = ['input_format', 'nEventsPerJob', 'token', 'merging_tag',
-                              'nFilesPerMergeJob', 'nGBPerMergeJob', 'nMaxFilesPerMergeJob', 'project_mode',
-                              'nFilesPerJob', 'nGBPerJob', 'maxAttempt']
-
-        def make_new_slice(slice_dict, last_request):
-            if InputRequestList.objects.filter(request=last_request).count() == 0:
-                new_slice_number = 0
-            else:
-                new_slice_number = \
-                    (InputRequestList.objects.filter(request=last_request).order_by('-slice')[0]).slice + 1
-            new_slice = InputRequestList()
-            if slice_dict.get('dataset', ''):
-                dataset = self._fill_dataset(slice_dict['dataset'])
-                new_slice.input_dataset = dataset.name
-            else:
-                raise ValueError('Dataset has to be defined')
-            new_slice.input_events = -1
-            new_slice.slice = new_slice_number
-            new_slice.request = last_request
-            new_slice.comment = slice_dict.get('comment', '')
-            new_slice.priority = slice_dict.get('priority', 950)
-            new_slice.brief = ' '
-            new_slice.save()
-            return new_slice
+        task_config_params = ['input_format',
+                              'nEventsPerJob',
+                              'token',
+                              'merging_tag',
+                              'nFilesPerMergeJob',
+                              'nGBPerMergeJob',
+                              'nMaxFilesPerMergeJob',
+                              'project_mode',
+                              'nFilesPerJob',
+                              'nGBPerJob',
+                              'maxAttempt']
 
         last_request = (TRequest.objects.filter(request_type='TIER0').order_by('-id'))[0]
 
         parent = None
         output_slice_step = {}
-        current_slice = make_new_slice(slice_dict, last_request)
+        current_slice = self._make_new_slice(slice_dict, last_request)
         slice_last_step = {}
 
         for step_dict in steps_list:
@@ -369,7 +398,7 @@ class TaskActionHandler(object):
                 else:
                     if slice_last_step[output_slice_step[step_dict['input_format']][0].slice] != \
                             output_slice_step[step_dict['input_format']][1]:
-                        current_slice = make_new_slice(slice_dict, last_request)
+                        current_slice = self._make_new_slice(slice_dict, last_request)
                     else:
                         current_slice = output_slice_step[step_dict['input_format']][0]
                     parent = output_slice_step[step_dict['input_format']][1]
@@ -383,7 +412,7 @@ class TaskActionHandler(object):
             new_step.step_template = self._fill_template('Reco', ctag, new_step.priority, output_formats, memory)
             if ('nFilesPerJob' not in step_dict) and ('nGBPerJob' not in step_dict):
                 raise ValueError('nFilesPerJob or nGBPerJob have to be defined')
-            for parameter in TASK_CONFIG_PARAMS:
+            for parameter in task_config_params:
                 if parameter in step_dict:
                     self._set_step_task_config(new_step, {parameter: step_dict[parameter]})
             if parent:

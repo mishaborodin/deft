@@ -7,7 +7,7 @@ import re
 from django.template import Context, Template
 from django.template.defaultfilters import stringfilter
 from django import template
-from deftcore.helpers import Enum
+from enum import Enum, auto
 from deftcore.log import Logger
 
 logger = Logger.get()
@@ -26,17 +26,17 @@ class Constant(object):
         self.format_arg_names = format_arg_names or tuple()
 
     def is_dynamic(self):
-        return not self.format_arg_names is tuple()
+        return self.format_arg_names is not tuple()
 
 
 class Constants(type):
     def __new__(mcs, name, bases, namespace):
         attributes = dict()
 
-        for attr_name in namespace.keys():
+        for attr_name in list(namespace.keys()):
             attr = namespace[attr_name]
             if isinstance(attr, Constant):
-                if isinstance(attr.format_or_value, str) or isinstance(attr.format_or_value, unicode):
+                if isinstance(attr.format_or_value, str) or isinstance(attr.format_or_value, str):
                     args = list()
                     for arg_name in attr.format_arg_names:
                         arg_attr = namespace[arg_name]
@@ -49,7 +49,7 @@ class Constants(type):
                 # FIXME: implement support for protocol fixes
                 attributes[attr_name] = attr_value
 
-        for attr_name in attributes.keys():
+        for attr_name in list(attributes.keys()):
             namespace[attr_name] = attributes[attr_name]
 
         cls = super(Constants, mcs).__new__(mcs, name, bases, namespace)
@@ -61,58 +61,61 @@ class Constants(type):
 
 
 class TaskParamName(Enum):
-    values = ['CONSTANT',
-              'SKIP_EVENTS',
-              'MAX_EVENTS',
-              'RANDOM_SEED',
-              'RANDOM_SEED_MC',
-              'FIRST_EVENT',
-              'DB_RELEASE',
-              'INPUT',
-              'INPUT_DIRECT_IO',
-              'OUTPUT',
-              'TXT_OUTPUT',
-              'SECONDARY_INPUT_MINBIAS',
-              'SECONDARY_INPUT_CAVERN',
-              'SECONDARY_INPUT_ZERO_BIAS_BS',
-              'LOG',
-              'JOB_NUMBER',
-              'FILTER_FILE',
-              'TRAIN_DAOD_FILE',
-              'TRAIN_DAOD_FILE_JEDI_MERGE',
-              'TRAIN_OUTPUT',
-              'TXT_EVENTID_OUTPUT',
-              'TAR_CONFIG_OUTPUT',
-              'ZIP_OUTPUT',
-              'ZIP_MAP',
-              'OVERLAY_FILTER_FILE',
-              'HITAR_FILE']
+    CONSTANT = auto()
+    SKIP_EVENTS = auto()
+    MAX_EVENTS = auto()
+    RANDOM_SEED = auto()
+    RANDOM_SEED_MC = auto()
+    FIRST_EVENT = auto()
+    DB_RELEASE = auto()
+    INPUT = auto()
+    INPUT_DIRECT_IO = auto()
+    OUTPUT = auto()
+    TXT_OUTPUT = auto()
+    SECONDARY_INPUT_MINBIAS = auto()
+    SECONDARY_INPUT_CAVERN = auto()
+    SECONDARY_INPUT_ZERO_BIAS_BS = auto()
+    LOG = auto()
+    JOB_NUMBER = auto()
+    FILTER_FILE = auto()
+    TRAIN_DAOD_FILE = auto()
+    TRAIN_DAOD_FILE_JEDI_MERGE = auto()
+    TRAIN_OUTPUT = auto()
+    TXT_EVENTID_OUTPUT = auto()
+    TAR_CONFIG_OUTPUT = auto()
+    ZIP_OUTPUT = auto()
+    ZIP_MAP = auto()
+    OVERLAY_FILTER_FILE = auto()
+    HITAR_FILE = auto()
 
 
 class TaskStatus(Enum):
-    values = ['TESTING',
-              'WAITING',
-              'FAILED',
-              'BROKEN',
-              'OBSOLETE',
-              'ABORTED',
-              'TOABORT',
-              'RUNNING',
-              'FINISHED',
-              'DONE',
-              'TORETRY']
+    TESTING = auto()
+    WAITING = auto()
+    FAILED = auto()
+    BROKEN = auto()
+    OBSOLETE = auto()
+    ABORTED = auto()
+    TOABORT = auto()
+    RUNNING = auto()
+    FINISHED = auto()
+    DONE = auto()
+    TORETRY = auto()
 
 
 class StepStatus(Enum):
-    values = ['APPROVED',
-              'NOTCHECKED',
-              'WAITING']
+    APPROVED = auto(),
+    NOTCHECKED = auto(),
+    WAITING = auto()
 
 
 class RequestStatus(Enum):
-    values = ['APPROVED', 'PROCESSED', 'WORKING']
+    APPROVED = auto(),
+    PROCESSED = auto()
+    WORKING = auto()
 
 
+# noinspection PyBroadException, PyUnresolvedReferences
 class Protocol(object):
     VERSION = '2.0'
 
@@ -327,49 +330,53 @@ class Protocol(object):
     }
 
     def render_param(self, proto_key, param_dict):
-        for key in param_dict.keys():
-            if not isinstance(param_dict[key], (str, unicode, int)):
+        for key in list(param_dict.keys()):
+            if not isinstance(param_dict[key], (str, int)):
                 try:
                     param_dict[key] = json.dumps(param_dict[key])
-                except:
+                except Exception:
                     param_dict[key] = param_dict[key]
         default_param_dict = {'separator': '='}
         default_param_dict.update(param_dict)
         t = Template(self.TASK_PARAM_TEMPLATES[proto_key])
         param = json.loads(t.render(Context(default_param_dict, autoescape=False)))
-        for key in param.keys()[:]:
+        for key in list(param.keys())[:]:
             if param[key] == 'None':
                 param.pop(key, None)
         return param
 
-    def render_task(self, task_dict):
+    @staticmethod
+    def render_task(task_dict):
         path = '{0}{1}task.json'.format(os.path.dirname(__file__), os.path.sep)
         with open(path, 'r') as fp:
             task_template = Template(fp.read())
         proto_task = json.loads(task_template.render(Context(task_dict, autoescape=False)))
         task = {}
-        for key in proto_task.keys():
+        for key in list(proto_task.keys()):
             if proto_task[key] == "" or proto_task[key] == "''" or proto_task[key].lower() == 'None'.lower() or \
                     proto_task[key].lower() == '\'None\''.lower():
                 continue
             task[key] = ast.literal_eval(proto_task[key])
         return task
 
-    def is_dynamic_jobdef_enabled(self, task):
-        keys = [k.lower() for k in task.keys()]
+    @staticmethod
+    def is_dynamic_jobdef_enabled(task):
+        keys = [k.lower() for k in list(task.keys())]
         if 'nEventsPerJob'.lower() in keys or 'nFilesPerJob'.lower() in keys:
             return False
         else:
             return True
 
-    def is_pileup_task(self, task):
+    @staticmethod
+    def is_pileup_task(task):
         job_params = task['jobParameters']
         for job_param in job_params:
             if re.match(r'^.*(PtMinbias|Cavern).*File.*$', str(job_param['value']), re.IGNORECASE):
                 return True
         return False
 
-    def get_simulation_type(self, step):
+    @staticmethod
+    def get_simulation_type(step):
         if step.request.request_type.lower() == 'MC'.lower():
             if step.step_template.step.lower() == 'evgen'.lower():
                 return 'notMC'
@@ -379,10 +386,11 @@ class Protocol(object):
                 return 'full'
         return 'notMC'
 
-    def get_primary_input(self, task):
+    @staticmethod
+    def get_primary_input(task):
         job_params = task['jobParameters']
         for job_param in job_params:
-            if not 'param_type' in job_param.keys() or job_param['param_type'].lower() != 'input'.lower():
+            if 'param_type' not in list(job_param.keys()) or job_param['param_type'].lower() != 'input'.lower():
                 continue
             if re.match(r'^(--)?input.*File', job_param['value'], re.IGNORECASE):
                 result = re.match(r'^(--)?input(?P<intype>.*)File', job_param['value'], re.IGNORECASE)
@@ -394,36 +402,39 @@ class Protocol(object):
                 return job_param
         return None
 
-    def set_leave_log_param(self, log_param):
+    @staticmethod
+    def set_leave_log_param(log_param):
         log_param['token'] = TaskDefConstants.LEAVE_LOG_TOKEN
         log_param['destination'] = TaskDefConstants.LEAVE_LOG_DESTINATION
         log_param['transient'] = TaskDefConstants.LEAVE_LOG_TRANSIENT_FLAG
 
-    def is_leave_log_param(self, log_param):
+    @staticmethod
+    def is_leave_log_param(log_param):
         token = None
         destination = None
-        if 'token' in log_param.keys():
+        if 'token' in list(log_param.keys()):
             token = log_param['token']
-        if 'destination' in log_param.keys():
+        if 'destination' in list(log_param.keys()):
             destination = log_param['destination']
         if token == TaskDefConstants.LEAVE_LOG_TOKEN and destination == TaskDefConstants.LEAVE_LOG_DESTINATION:
             return True
         else:
             return False
 
-    def is_evnt_filter_step(self, project_mode, task_config):
-        return project_mode.evntFilterEff or 'evntFilterEff' in task_config.keys()
+    @staticmethod
+    def is_evnt_filter_step(project_mode, task_config):
+        return project_mode.evntFilterEff or 'evntFilterEff' in list(task_config.keys())
 
-    def serialize_task(self, task):
+    @staticmethod
+    def serialize_task(task):
         return json.dumps(task, sort_keys=True)
 
-    def deserialize_task(self, task_string):
+    @staticmethod
+    def deserialize_task(task_string):
         return json.loads(task_string)
 
 
-class TaskDefConstants(object):
-    __metaclass__ = Constants
-
+class TaskDefConstants(object, metaclass=Constants):
     DEFAULT_PROD_SOURCE = Constant('managed')
     DEFAULT_DEBUG_PROJECT_NAME = Constant('mc12_valid')
     DEFAULT_PROJECT_MODE = Constant({'cmtconfig': 'i686-slc5-gcc43-opt', 'spacetoken': 'ATLASDATADISK'})
@@ -460,14 +471,14 @@ class TaskDefConstants(object):
 
     INVALID_TASK_ID = Constant(4000000)
     DEFAULT_MAX_FILES_PER_JOB = Constant(20)
-    DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK = Constant(200000)
+    DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK = Constant(50000)
     DEFAULT_MEMORY = Constant(2000)
     DEFAULT_MEMORY_BASE = Constant(0)
     DEFAULT_SCOUT_SUCCESS_RATE = Constant(5)
     NO_ES_MIN_NUMBER_OF_EVENTS = Constant(50000)
 
     LEAVE_LOG_TOKEN = Constant('ddd:.*DATADISK')
-    LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\(dontkeeplog=True)')
+    LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\\(dontkeeplog=True)')
     LEAVE_LOG_TRANSIENT_FLAG = Constant(False)
 
     DEFAULT_CLOUD = Constant('WORLD')
@@ -497,3 +508,5 @@ class TaskDefConstants(object):
         'MC16d': ['MC16:MC16d'],
         'MC16e': ['MC16:MC16e']
     }
+
+    DEFAULT_KILL_JOB_CODE = Constant(9)

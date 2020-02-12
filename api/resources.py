@@ -18,6 +18,7 @@ from django.db.models import Q, ObjectDoesNotExist
 from api.models import Request
 from taskengine.models import Task, TRequestProxy, TStepProxy, StepExecution
 from taskengine.projectmode import ProjectMode, UnknownProjectModeOption, InvalidProjectModeOptionValue
+from taskengine.metadata import AMIClient
 
 
 class DefaultSerializer(Serializer):
@@ -81,7 +82,7 @@ class InstanceResource(Resource):
     def obj_get(self, bundle, **kwargs):
         pk = str(kwargs['pk'])
         try:
-            return (item for item in instances if item.name == pk).next()
+            return next((item for item in instances if item.name == pk))
         except StopIteration:
             raise NotFound("DEFT instance '%s' is not registered" % pk)
 
@@ -100,7 +101,14 @@ class InstanceResource(Resource):
     def rollback(self, bundles):
         pass
 
+    def apply_filters(self, request, applicable_filters):
+        pass
 
+    def obj_delete_list_for_update(self, bundle, **kwargs):
+        pass
+
+
+# noinspection PyBroadException
 class RequestResource(ModelResource):
     class Meta:
         limit = 100
@@ -128,21 +136,29 @@ class RequestResource(ModelResource):
 
     def prepend_urls(self):
         return [
-            url(r'^(?P<resource_name>%s)/actions%s$' % (self._meta.resource_name, trailing_slash()),
+            url(r'^(?P<resource_name>{0})/actions{1}$'.format(self._meta.resource_name,
+                                                              trailing_slash()),
                 self.wrap_view('get_action_list'),
                 name="list of actions"),
-            url(r'^(?P<resource_name>%s)/action/(?P<action_name>\w[\w/-]*)%s$' % \
-                (self._meta.resource_name, trailing_slash()),
+
+            url(r'^(?P<resource_name>{0})/action/(?P<action_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
+                                                                                        trailing_slash()),
                 self.wrap_view('perform_action'),
                 name='perform action'),
-            url(r'^(?P<resource_name>%s)/tag/(?P<tag_name>\w[\w/-]*)%s$' % \
-                (self._meta.resource_name, trailing_slash()),
+
+            url(r'^(?P<resource_name>{0})/tag/(?P<tag_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
+                                                                                  trailing_slash()),
                 self.wrap_view('view_tag'),
                 name='view configuration tag'),
-            url(r'^(?P<resource_name>%s)/project_mode/((?P<step_id>\w[\w/-]*)%s|)$' % \
-                (self._meta.resource_name, trailing_slash()),
+
+            url(r'^(?P<resource_name>{0})/project_mode/((?P<step_id>\w[\w/-]*){1}|)$'.format(self._meta.resource_name,
+                                                                                             trailing_slash()),
                 self.wrap_view('check_project_mode'),
                 name='check project_mode of given step'),
+            url(r'^(?P<resource_name>{0})/tags/(?P<trf_name>\w[\w\./-]*)/(?P<trf_release>\d[\d\./-]*){1}'.format(
+                self._meta.resource_name, trailing_slash()),
+                self.wrap_view('list_tags'),
+                name='list configuration tags'),
         ]
 
     def get_action_list(self, request, **kwargs):
@@ -156,7 +172,7 @@ class RequestResource(ModelResource):
         self.throttle_check(request)
 
         action_name = kwargs['action_name']
-        if not action_name in [e[0] for e in Request.ACTION_LIST]:
+        if action_name not in [e[0] for e in Request.ACTION_LIST]:
             return self.create_response(request, {'result': "Invalid action name: %s" % action_name})
 
         params = request.GET.dict()
@@ -209,7 +225,27 @@ class RequestResource(ModelResource):
                                                   'status': False,
                                                   'result': ex.message})
 
+    def list_tags(self, request, **kwargs):
+        self.method_check(request, allowed=['get'])
 
+        self.is_authenticated(request)
+        self.throttle_check(request)
+
+        trf_name = kwargs['trf_name']
+        trf_release = kwargs['trf_release']
+        tags = list()
+
+        try:
+            if trf_name and trf_release:
+                cli = AMIClient()
+                tags.extend(cli.ami_list_tags(trf_name, trf_release))
+
+            return self.create_response(request, {'tags': tags, 'status': True, 'result': None})
+        except Exception as ex:
+            return self.create_response(request, {'tags': tags, 'status': False, 'result': ex.message})
+
+
+# noinspection PyBroadException
 class TaskResource(ModelResource):
     jedi_task_params = fields.DictField(attribute='jedi_task_params', null=True)
     jedi_task_status = fields.CharField(attribute='jedi_task_status', null=True)
@@ -246,7 +282,7 @@ class TaskResource(ModelResource):
             timestamp_days = None
             try:
                 timestamp_days = int(request.GET.get('timestamp_days', None))
-            except Exception as ex:
+            except Exception:
                 pass
             if timestamp_days:
                 timestamp_offset = timezone.now().date() - timedelta(days=timestamp_days)

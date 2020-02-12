@@ -2,19 +2,24 @@ __author__ = 'Dmitry Golubkov'
 __version__ = '0.5.5'
 
 import os.path
-import StringIO
+import io
 import re
-import urllib
+import urllib.parse
 import pycurl
-import HTMLParser
+import html.parser
+import base64
+import getpass
 
 
+# noinspection PyUnresolvedReferences, PyBroadException
 class SSOCookies(object):
-    def __init__(self, url, krb=True, pem_cert_file_path=None, pem_cert_key_path=None, cert_key_password=None):
+    def __init__(self, url, krb=True, pem_cert_file_path=None, pem_cert_key_path=None, cert_key_password=None,
+                 encoding='utf-8'):
         self.user_agent_krb = 'curl-sso-kerberos/{0} (Mozilla)'.format(__version__)
         self.user_agent_cert = 'curl-sso-certificate/{0} (Mozilla)'.format(__version__)
         self.adfs_ep = '/adfs/ls'
         self.auth_error = 'HTTP Error 401.2 - Unauthorized'
+        self.encoding = encoding
 
         if not krb and (not pem_cert_file_path or not pem_cert_key_path):
             raise Exception('SSOCookies: certificate and/or private key file is not specified')
@@ -49,7 +54,7 @@ class SSOCookies(object):
         self.curl.setopt(self.curl.SSL_VERIFYHOST, 0)
         self.curl.setopt(self.curl.URL, url)
 
-        response, effective_url = self._request()
+        _, effective_url = self._request()
 
         if self.adfs_ep not in effective_url:
             raise Exception('SSOCookies: the service does not support CERN SSO')
@@ -64,10 +69,10 @@ class SSOCookies(object):
         result = re.search('form .+?action="([^"]+)"', response)
         service_provider_url = result.groups()[0]
         form_params = re.findall('input type="hidden" name="([^"]+)" value="([^"]+)"', response)
-        form_params = [(item[0], HTMLParser.HTMLParser().unescape(item[1])) for item in form_params]
+        form_params = [(item[0], html.unescape(item[1])) for item in form_params]
 
         self.curl.setopt(self.curl.URL, service_provider_url)
-        self.curl.setopt(self.curl.POSTFIELDS, urllib.urlencode(form_params))
+        self.curl.setopt(self.curl.POSTFIELDS, urllib.parse.urlencode(form_params))
         self.curl.setopt(self.curl.POST, 1)
         # self.curl.setopt(self.curl.USERPWD, '');
 
@@ -76,10 +81,10 @@ class SSOCookies(object):
         self.cookie_list = self.curl.getinfo(self.curl.INFO_COOKIELIST)
 
     def _request(self):
-        response = StringIO.StringIO()
+        response = io.BytesIO()
         self.curl.setopt(self.curl.WRITEFUNCTION, response.write)
         self.curl.perform()
-        response = response.getvalue()
+        response = response.getvalue().decode(self.encoding)
         effective_url = self.curl.getinfo(self.curl.EFFECTIVE_URL)
         return response, effective_url
 
@@ -90,3 +95,10 @@ class SSOCookies(object):
             value = item.split('\t')[6]
             cookies.update({name: value})
         return cookies
+
+    def extract_username(self):
+        try:
+            cookies = self.get()
+            return base64.b64decode(cookies['FedAuth']).split(',')[1].split('\\')[-1]
+        except Exception:
+            return getpass.getuser()

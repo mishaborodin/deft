@@ -33,15 +33,15 @@ class ProjectMode(object):
 
         project_mode = dict()
         task_config = self.get_task_config(step)
-        if 'project_mode' in task_config.keys():
+        if 'project_mode' in list(task_config.keys()):
             project_mode.update(self._parse_project_mode(task_config['project_mode']))
 
         project_mode_options = self.get_options()
 
-        option_names = {key.lower(): key for key in project_mode_options.keys()}
+        option_names = {key.lower(): key for key in list(project_mode_options.keys())}
 
-        for key in project_mode.keys():
-            if not key in option_names.keys():
+        for key in list(project_mode.keys()):
+            if key not in list(option_names.keys()):
                 raise UnknownProjectModeOption(key)
             option_type = locate(project_mode_options[option_names[key]]['type'])
             option_value = project_mode[key]
@@ -72,7 +72,7 @@ class ProjectMode(object):
         task_config = dict()
         if step.task_config:
             content = json.loads(step.task_config)
-            for key in content.keys():
+            for key in list(content.keys()):
                 if content[key] is None or content[key] == '':
                     continue
                 task_config.update({key: content[key]})
@@ -98,7 +98,7 @@ class ProjectMode(object):
         for option in project_mode_string.replace(' ', '').split(';'):
             if not option:
                 continue
-            if not '=' in option:
+            if '=' not in option:
                 raise Exception('The project_mode option \"{0}\" has invalid format. '.format(option) +
                                 'Expected format is \"optionName=optionValue\"')
             project_mode_dict.update({option.split('=')[0].lower(): option.split('=')[1]})
@@ -158,7 +158,7 @@ class ProjectMode(object):
                         setattr(self, 'cmtconfig', 'x86_64-slc6-gcc47-opt')
                     else:
                         setattr(self, 'cmtconfig', 'x86_64-slc6-gcc48-opt')
-                    if not self.cmtconfig in cmtconfig_list:
+                    if self.cmtconfig not in cmtconfig_list:
                         if len(cmtconfig_list) > 0:
                             setattr(self, 'cmtconfig', cmtconfig_list[0])
                         else:

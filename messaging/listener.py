@@ -40,7 +40,7 @@ class Listener(stomp.ConnectionListener):
         name = payload.get('name', None)
         account = payload.get('account', None)
 
-        if not scope in self._scopes:
+        if scope not in self._scopes:
             return
 
         if event_type in (TaskDefConstants.DDM_ERASE_EVENT_TYPE.lower()):

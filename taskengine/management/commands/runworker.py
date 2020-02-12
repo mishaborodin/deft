@@ -53,7 +53,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options['worker_name'] == 'process_requests':
             request_types = None
-            if 'request_types' in options.keys():
+            if 'request_types' in list(options.keys()):
                 if options['request_types']:
                     request_types = options['request_types'].split(',')
             engine = TaskDefinition()
@@ -83,8 +83,8 @@ class Command(BaseCommand):
                     elif options['extra_param'] == '2':
                         query = "SELECT name, status, ddm_status, ddm_timestamp FROM t_production_dataset " + \
                                 "WHERE status is not NULL " + \
-                                "AND timestamp > TO_DATE('01-10-2018', 'DD-MM-YYYY') " + \
-                                "AND timestamp < TO_DATE('01-02-2019', 'DD-MM-YYYY') " + \
+                                "AND timestamp > TO_DATE('01-01-2019', 'DD-MM-YYYY') " + \
+                                "AND timestamp < TO_DATE('21-01-2020', 'DD-MM-YYYY') " + \
                                 "ORDER BY timestamp ASC"
                         logger.info('check_datasets, pid={0}, query=\"{1}\"'.format(os.getpid(), query))
                     elif options['extra_param'] == '3':
@@ -158,11 +158,8 @@ class Command(BaseCommand):
                             dataset.ddm_timestamp = timezone.now()
                             dataset.ddm_status = TaskDefConstants.DDM_LOST_STATUS
                             dataset.save()
-                            logger.info(
-                                'analyze_lost_files_report, updated dataset {0} with ddm_status="{1}" and ddm_timestamp="{2}"'.format(
-                                    dataset.name,
-                                    dataset.ddm_status,
-                                    dataset.ddm_timestamp)
-                            )
+                            logger.info('analyze_lost_files_report, ' +
+                                        'updated dataset {0} with ddm_status="{1}" and ddm_timestamp="{2}"'.format(
+                                            dataset.name, dataset.ddm_status, dataset.ddm_timestamp))
                         except ObjectDoesNotExist:
                             continue

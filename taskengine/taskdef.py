@@ -324,7 +324,12 @@ class TaskDefinition(object):
         if evgen_input_container:
             result = self.rucio_client.get_datasets_and_containers(evgen_input_container,
                                                                    datasets_contained_only=True)
-            params.update({'inputGeneratorFile': result['containers']})
+            if 'EVNT' in result['containers'][0]:
+                params.update({'inputEVNTFile': result['containers']})
+                params.update({'isEvntToEvnt':True})
+
+            else:
+                params.update({'inputGeneratorFile': result['containers']})
 
         events_per_job = self._read_events_per_job_from_jo(job_options_file_content)
         if events_per_job is not None:
@@ -1936,6 +1941,25 @@ class TaskDefinition(object):
                     task_config['nFiles'] = number_files
 
                     use_evnt_filter = True
+            if input_params.get('isEvntToEvnt') and prod_step.lower() == 'evgen'.lower():
+                input_types = list()
+                for key in list(input_params.keys()):
+                    result = re.match(r'^(--)?input(?P<intype>.*)File', key, re.IGNORECASE)
+                    if not result:
+                        continue
+                    in_type = result.groupdict()['intype']
+                    input_types.append(in_type)
+                if len(input_types) == 1 and 'EVNT' in input_types:
+                    if 'inputEVNTFile' in list(input_params.keys()):
+                        input_params['inputEVNT_PreFile'] = input_params['inputEVNTFile']
+                    ignore_trf_params.append('inputEVNTFile')
+                    ignore_trf_params.append('skipEvents')
+                    max_events_forced = input_params['nEventsPerJob']
+                    use_evnt_filter = True
+                    task_config['nFiles'] = int(number_of_events * input_params['nFilesPerJob'] / max_events_forced)
+                    project_mode.nEventsPerInputFile =  max_events_forced
+                    input_params['nEventsPerInputFile'] = max_events_forced
+                    task_config['nEventsPerInputFile'] = max_events_forced
 
             use_lhe_filter = None
             is_evnt = False

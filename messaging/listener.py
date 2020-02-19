@@ -77,8 +77,10 @@ class Listener(stomp.ConnectionListener):
             rule_id = payload.get('rule_id', None)
             progress = int(payload.get('progress', 0))
             current_timestamp = timezone.now()
-            # dsn = name.split(':')[-1]
-            dsn = name
+            if scope:
+                dsn = '{0}:{1}'.format(scope, name.split(':')[-1])
+            else:
+                dsn = name
             dataset_staging = DatasetStaging.objects.filter(dataset=dsn).first()
             if dataset_staging:
                 last_progress = int(dataset_staging.staged_files * 100 / dataset_staging.total_files)

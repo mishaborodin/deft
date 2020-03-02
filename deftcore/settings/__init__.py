@@ -10,9 +10,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['aipanda015.cern.ch',
-                 'aipanda076.cern.ch',
-                 'aipanda034.cern.ch',
+ALLOWED_HOSTS = ['aipanda034.cern.ch',
                  'deft-api.cern.ch',
                  'localhost']
 

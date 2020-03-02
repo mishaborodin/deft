@@ -3610,13 +3610,16 @@ class TaskDefinition(object):
                                               (Q(step__slice__input_dataset=input_data_name) |
                                                Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
                                                Q(step__slice__input_data=input_data_name) |
-                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
+                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1]) |
+                                               Q(inputdataset=input_data_name) |
+                                               Q(inputdataset__endswith=input_data_name.split(':')[-1])),
                                               project=step.request.project,
                                               step__step_template__ctag=step.step_template.ctag,
                                               step__step_template__output_formats=step.step_template.output_formats)
 
         max_by_offset = 0
         for ps2_task in ps2_task_list:
+            logger.info('previous task ID is {0}'.format(ps2_task.id))
 
             if split_slice:
                 # comparing output formats
@@ -3681,7 +3684,9 @@ class TaskDefinition(object):
                                               (Q(step__slice__input_dataset=input_data_name) |
                                                Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
                                                Q(step__slice__input_data=input_data_name) |
-                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
+                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1]) |
+                                               Q(inputdataset=input_data_name) |
+                                               Q(inputdataset__endswith=input_data_name.split(':')[-1])),
                                               project=step.request.project,
                                               step__step_template__ctag=step.step_template.ctag,
                                               step__step_template__output_formats=step.step_template.output_formats)

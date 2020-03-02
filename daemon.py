@@ -5,7 +5,6 @@ import logging
 import logging.handlers
 import os
 import time
-
 from daemonize import Daemonize
 
 pid = '../deftcore-daemon.pid'
@@ -25,8 +24,6 @@ logger = logging.getLogger('deftcore-daemon')
 logger.setLevel(logging.DEBUG)
 logger.addHandler(ch)
 logger.addHandler(fh)
-
-keep_fds = [fh.stream.fileno()]
 
 
 def main():
@@ -74,8 +71,8 @@ if __name__ == "__main__":
         app='deftcore daemon',
         pid=pid,
         action=main,
-        keep_fds=keep_fds,
         verbose=True,
+        keep_fds=[fh.stream.fileno()],
         logger=logger,
         foreground=args.foreground
     )

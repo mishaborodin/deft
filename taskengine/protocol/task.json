@@ -99,5 +99,6 @@
   "orderByLB": "{{order_by_lb}}",
   "useZipToPin": "{{use_zip_to_pin}}",
   "baseWalltime": "{{base_wall_time}}",
-  "toStaging": "{{to_staging}}"
+  "toStaging": "{{to_staging}}",
+  "inputPreStaging": "{{input_pre_staging}}"
 }

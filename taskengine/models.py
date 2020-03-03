@@ -645,6 +645,7 @@ class TRequestProxy(TRequest):
         db_name = 'deft_adcr'
 
 
+# noinspection PyBroadException
 @receiver(post_init, sender=TRequestProxy)
 def t_request_proxy_post_init(sender, **kwargs):
     self = kwargs['instance']

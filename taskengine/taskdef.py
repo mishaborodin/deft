@@ -326,7 +326,7 @@ class TaskDefinition(object):
                                                                    datasets_contained_only=True)
             if 'EVNT' in result['containers'][0]:
                 params.update({'inputEVNTFile': result['containers']})
-                params.update({'isEvntToEvnt':True})
+                params.update({'isEvntToEvnt': True})
 
             else:
                 params.update({'inputGeneratorFile': result['containers']})
@@ -1957,7 +1957,7 @@ class TaskDefinition(object):
                     max_events_forced = input_params['nEventsPerJob']
                     use_evnt_filter = True
                     task_config['nFiles'] = int(number_of_events * input_params['nFilesPerJob'] / max_events_forced)
-                    project_mode.nEventsPerInputFile =  max_events_forced
+                    project_mode.nEventsPerInputFile = max_events_forced
                     input_params['nEventsPerInputFile'] = max_events_forced
                     task_config['nEventsPerInputFile'] = max_events_forced
 
@@ -3607,38 +3607,39 @@ class TaskDefinition(object):
                                                Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
                                               project=step.request.project,
                                               step__step_template__ctag=step.step_template.ctag)
-            #check child
+            # check child
             child_tasks = []
             for dataset in requested_datasets:
-                child_tasks +=  list(ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
-                                              (Q(input_dataset=dataset) |
-                                               Q(input_dataset__endswith=dataset.split(':')[-1]) ),
-                                              project=step.request.project,
-                                              step__step_template__ctag=step.step_template.ctag))
+                child_tasks += list(ProductionTask.objects.filter(
+                    ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
+                    (Q(input_dataset=dataset) |
+                     Q(input_dataset__endswith=dataset.split(':')[-1])),
+                    project=step.request.project,
+                    step__step_template__ctag=step.step_template.ctag))
             ps2_task_list += [x for x in child_tasks if x not in ps2_task_list]
         else:
             ps2_task_list = \
-                list(ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
-                                              (Q(step__slice__input_dataset=input_data_name) |
-                                               Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
-                                               Q(step__slice__input_data=input_data_name) |
-                                               Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
-                                              project=step.request.project,
-                                              step__step_template__ctag=step.step_template.ctag,
-                                              step__step_template__output_formats=step.step_template.output_formats))
+                list(ProductionTask.objects.filter(
+                    ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
+                    (Q(step__slice__input_dataset=input_data_name) |
+                     Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
+                     Q(step__slice__input_data=input_data_name) |
+                     Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
+                    project=step.request.project,
+                    step__step_template__ctag=step.step_template.ctag,
+                    step__step_template__output_formats=step.step_template.output_formats))
 
-            #check child
+            # check child
             child_tasks = []
             for dataset in requested_datasets:
-
-                child_tasks += list(ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
-                                              (Q(inputdataset=dataset) |
-                                               Q(inputdataset__endswith=dataset.split(':')[-1]) ),
-                                              project=step.request.project,
-                                              step__step_template__ctag=step.step_template.ctag,
-                                                step__step_template__output_formats=step.step_template.output_formats))
+                child_tasks += list(ProductionTask.objects.filter(
+                    ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
+                    (Q(inputdataset=dataset) |
+                     Q(inputdataset__endswith=dataset.split(':')[-1])),
+                    project=step.request.project,
+                    step__step_template__ctag=step.step_template.ctag,
+                    step__step_template__output_formats=step.step_template.output_formats))
             ps2_task_list += [x for x in child_tasks if x not in ps2_task_list]
-
 
         max_by_offset = 0
         for ps2_task in ps2_task_list:
@@ -3682,7 +3683,7 @@ class TaskDefinition(object):
             if not number_events:
                 if ps2_task.parent_id != ps2_task.id and previous_dsn:
                     number_events = self.rucio_client.get_number_events(previous_dsn)
-                number_events = max(ps2_task.total_events,number_events)
+                number_events = max(ps2_task.total_events, number_events)
             number_events_processed += number_events
             offset = jedi_task_existing.get_job_parameter('firstEvent', 'offset')
             if offset and offset > 0:
@@ -4070,8 +4071,8 @@ class TaskDefinition(object):
                     return splitting_dict
                 number_events_in_dataset = events_per_file * self.rucio_client.get_number_files(dataset_name)
                 number_events_in_rucio_dataset = self.rucio_client.get_number_events(dataset_name)
-                if number_events_in_rucio_dataset>0:
-                    number_events_in_dataset = min(number_events_in_dataset,number_events_in_rucio_dataset)
+                if number_events_in_rucio_dataset > 0:
+                    number_events_in_dataset = min(number_events_in_dataset, number_events_in_rucio_dataset)
                 try:
                     if (start_offset + number_events_in_dataset) < number_events_processed:
                         # skip dataset, all events are processed

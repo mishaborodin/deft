@@ -3609,7 +3609,7 @@ class TaskDefinition(object):
                                               step__step_template__ctag=step.step_template.ctag)
             # check child
             child_tasks = []
-            for dataset in requested_datasets:
+            for dataset in requested_datasets or []:
                 child_tasks += list(ProductionTask.objects.filter(
                     ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
                     (Q(input_dataset=dataset) |
@@ -3631,7 +3631,7 @@ class TaskDefinition(object):
 
             # check child
             child_tasks = []
-            for dataset in requested_datasets:
+            for dataset in requested_datasets or []:
                 child_tasks += list(ProductionTask.objects.filter(
                     ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
                     (Q(inputdataset=dataset) |

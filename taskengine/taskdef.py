@@ -3599,14 +3599,14 @@ class TaskDefinition(object):
         split_slice = ProjectMode.get_task_config(step).get('split_slice')
 
         if split_slice:
-            ps2_task_list = \
+            ps2_task_list = list(
                 ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
                                               (Q(step__slice__input_dataset=input_data_name) |
                                                Q(step__slice__input_dataset__endswith=input_data_name.split(':')[-1]) |
                                                Q(step__slice__input_data=input_data_name) |
                                                Q(step__slice__input_data__endswith=input_data_name.split(':')[-1])),
                                               project=step.request.project,
-                                              step__step_template__ctag=step.step_template.ctag)
+                                              step__step_template__ctag=step.step_template.ctag))
             # check child
             child_tasks = []
             for dataset in requested_datasets or []:

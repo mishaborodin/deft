@@ -1980,12 +1980,12 @@ class TaskDefinition(object):
                             #     input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
-                    min_events = int(input_params.get('nEventsPerJob', 0))
+                    min_events = int(input_params.get('nEventsPerJob', 0)) or int(task_config.get('nEventsPerJob', 0))
                     if min_events:
                         project_mode.nEventsPerInputFile = min_events
 
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
-                        number_files = number_of_events * number_files_per_job / min_events
+                        number_files = math.ceil(number_of_events * number_files_per_job / min_events)
                         task_config['nFiles'] = number_files
                         if number_files_per_job > 1:
                             max_events_forced = min_events

@@ -2197,7 +2197,8 @@ class TaskDefinition(object):
             if train_production:
                 reduction_conf = list()
                 for output_type in output_types[:]:
-                    if output_type.lower().startswith('DAOD_'.lower()):
+                    if output_type.lower().startswith('DAOD_'.lower()) or \
+                            output_type.lower().startswith('D2AOD_'.lower()):
                         reduction_conf.append(output_type.split('_')[-1])
                         output_param_name = "--output{0}File".format(output_type)
                         if output_param_name not in trf_params:

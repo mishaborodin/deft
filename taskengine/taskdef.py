@@ -2194,12 +2194,15 @@ class TaskDefinition(object):
                     (not skip_check_input_ne) and not project_mode.nEventsPerInputFile:
                 self._check_task_events_consistency(task_config)
 
+            reduction_conf_base_output_types = list()
+
             if train_production:
                 reduction_conf = list()
                 for output_type in output_types[:]:
                     if output_type.lower().startswith('DAOD_'.lower()) or \
                             output_type.lower().startswith('D2AOD_'.lower()):
                         reduction_conf.append(output_type.split('_')[-1])
+                        reduction_conf_base_output_types.append(output_type.split('_')[0])
                         output_param_name = "--output{0}File".format(output_type)
                         if output_param_name not in trf_params:
                             trf_params.append(output_param_name)
@@ -2225,6 +2228,8 @@ class TaskDefinition(object):
                     trf_params.append('--inputHISTFile')
                 if '--outputHISTFile' not in trf_params:
                     trf_params.append('--outputHISTFile')
+            if 'D2AOD' in reduction_conf_base_output_types:
+                trf_params.remove('--inputAODFile')
 
             if 'log' not in output_types:
                 output_types.append('log')
@@ -2700,7 +2705,13 @@ class TaskDefinition(object):
                         input_param = self.protocol.render_param(TaskParamName.INPUT, param_dict)
                     job_parameters.append(input_param)
                     no_input = False
-                elif re.match(r'^(--)?outputDAODFile$', name, re.IGNORECASE) and train_production:
+                elif re.match(r'^(--)?output(DAOD|D2AOD)File$', name, re.IGNORECASE) and train_production:
+                    result = re.match(r'^(--)?output(?P<type>\w+)File$', name, re.IGNORECASE)
+                    if not result:
+                        continue
+                    reduction_conf_base_output_type = result.groupdict()['type']
+                    if reduction_conf_base_output_type not in reduction_conf_base_output_types:
+                        continue
                     param_dict = {'name': name,
                                   'task_id': task_proto_id}
                     param_dict.update(trf_options)

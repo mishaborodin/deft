@@ -3397,6 +3397,9 @@ class TaskDefinition(object):
             if project_mode.inputPreStaging is not None:
                 task_proto_dict.update({'input_pre_staging': project_mode.inputPreStaging or None})
 
+            if project_mode.containerName is not None:
+                task_proto_dict.update({'container_name': project_mode.containerName or None})
+
             if step.request.request_type.lower() == 'MC'.lower():
                 if 'nEventsPerJob' in list(task_config.keys()) and number_of_events > 0:
                     number_of_jobs = int(number_of_events) / int(task_config['nEventsPerJob'])

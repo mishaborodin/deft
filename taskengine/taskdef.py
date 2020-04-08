@@ -2802,6 +2802,8 @@ class TaskDefinition(object):
                         output_param['token'] = task_config['token']
                     if train_production and output_data_type.split('_')[0] == 'DAOD':
                         output_param['hidden'] = True
+                    if train_production and output_data_type.split('_')[0] == 'D2AOD':
+                        output_param['hidden'] = True
                     if is_not_transient_output:
                         output_param['transient'] = not is_not_transient_output
                     if allow_no_output_patterns:

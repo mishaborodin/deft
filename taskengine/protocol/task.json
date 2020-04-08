@@ -101,5 +101,5 @@
   "baseWalltime": "{{base_wall_time}}",
   "toStaging": "{{to_staging}}",
   "inputPreStaging": "{{input_pre_staging}}",
-  "container_name": "{{container_name}}"
+  "container_name": "'{{container_name}}'"
 }

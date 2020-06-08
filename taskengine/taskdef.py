@@ -2230,6 +2230,7 @@ class TaskDefinition(object):
                     trf_params.append('--outputHISTFile')
             if 'D2AOD' in reduction_conf_base_output_types:
                 trf_params.remove('--inputAODFile')
+                trf_params.remove('--preExec')
 
             if 'log' not in output_types:
                 output_types.append('log')

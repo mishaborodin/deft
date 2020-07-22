@@ -3190,6 +3190,15 @@ class TaskDefinition(object):
                 max_attempt = int(task_config['maxAttempt'])
                 task_proto_dict.update({'max_attempt': max_attempt})
 
+            if 'outputPostProcessing' in list(task_config.keys()):
+                task_proto_dict.update({'output_post_processing': task_config['outputPostProcessing']})
+
+            if 'container_name' in list(task_config.keys()):
+                task_proto_dict.update({'container_name': task_config['container_name']})
+
+            if 'onlyTagsForFC' in list(task_config.keys()):
+                task_proto_dict.update({'only_tags_for_fc': task_config['onlyTagsForFC']})
+
             if 'maxFailure' in list(task_config.keys()):
                 max_failure = int(task_config['maxFailure'])
                 task_proto_dict.update({'max_failure': max_failure})

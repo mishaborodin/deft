@@ -824,7 +824,8 @@ class TaskDefinition(object):
 
     def _enum_next_tasks(self, task_id, data_type, list_task_id):
         next_task_list = ProductionTask.objects.filter(primary_input__endswith='_tid{0}_00'.format(task_id),
-                                                       output_formats__contains=data_type)
+                                                       output_formats__contains=data_type,
+                                                       primary_input__contains=data_type)
         for next_task in next_task_list:
             list_task_id.append(int(next_task.id))
             self._enum_next_tasks(int(next_task.id), data_type, list_task_id)

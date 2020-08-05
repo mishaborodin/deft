@@ -666,8 +666,12 @@ def t_request_proxy_post_init(sender, **kwargs):
             for input_slice in input_slices:
                 try:
                     if input_slice.input_data and not input_slice.hided:
-                        dsid = int(input_slice.input_data.split('.')[1])
-                        brief = input_slice.input_data.split('.')[2]
+                        if '/' not in input_slice.input_data:
+                            dsid = int(input_slice.input_data.split('.')[1])
+                            brief = input_slice.input_data.split('.')[2]
+                        else:
+                            dsid = int(input_slice.input_data.split('/')[0])
+                            brief = input_slice.input_data.split('/')[1].split('.')[1]
                         evgen_steps = StepExecution.objects.filter(request__id=self.id,
                                                                    step_template__step__iexact='evgen',
                                                                    slice__slice=input_slice.slice)

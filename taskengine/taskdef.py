@@ -3198,7 +3198,8 @@ class TaskDefinition(object):
                 task_proto_dict.update({'container_name': task_config['container_name']})
 
             if 'onlyTagsForFC' in list(task_config.keys()):
-                task_proto_dict.update({'only_tags_for_fc': task_config['onlyTagsForFC']})
+                if task_config['onlyTagsForFC']:
+                    task_proto_dict.update({'only_tags_for_fc': task_config['onlyTagsForFC']})
 
             if 'maxFailure' in list(task_config.keys()):
                 max_failure = int(task_config['maxFailure'])

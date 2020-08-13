@@ -1,3 +1,5 @@
+from taskengine.metadata import AMIClient
+
 __author__ = 'Dmitry Golubkov'
 
 import os
@@ -32,9 +34,9 @@ class ProjectMode(object):
         self.agis_client = AGISClient()
 
         project_mode = dict()
-        task_config = self.get_task_config(step)
-        if 'project_mode' in list(task_config.keys()):
-            project_mode.update(self._parse_project_mode(task_config['project_mode']))
+        self.task_config = self.get_task_config(step)
+        if 'project_mode' in list(self.task_config.keys()):
+            project_mode.update(self._parse_project_mode(self.task_config['project_mode']))
 
         project_mode_options = self.get_options()
 
@@ -121,12 +123,23 @@ class ProjectMode(object):
         return list(cmtconfig_list)
 
     def set_cmtconfig(self):
+        if not self.container_name and 'container_name' in self.task_config:
+            self.container_name = self.task_config['container_name']
         if self.cmtconfig and self.cache and not self.skipCMTConfigCheck:
-            if not self._is_cmtconfig_exist(self.cache, self.cmtconfig):
-                available_cmtconfig_list = self._get_cmtconfig_list(self.cache)
-                raise Exception(
-                    'cmtconfig \"{0}\" specified by user is not exist in cache \"{1}\" (available: \"{2}\")'.format(
-                        self.cmtconfig, self.cache, str(', '.join(available_cmtconfig_list))))
+            if self.container_name:
+                ami_client = AMIClient()
+                if ami_client.ami_container_exists(self.container_name):
+                    ami_cmtconfig = ami_client.ami_cmtconfig_by_image_name(self.container_name)
+                    if self.cmtconfig != ami_cmtconfig:
+                        raise Exception(
+                            'cmtconfig \"{0}\" specified by the user does not correspond one in the container \"{1}\" '.format(
+                                self.cmtconfig, ami_cmtconfig))
+            else:
+                if not self._is_cmtconfig_exist(self.cache, self.cmtconfig):
+                    available_cmtconfig_list = self._get_cmtconfig_list(self.cache)
+                    raise Exception(
+                        'cmtconfig \"{0}\" specified by user is not exist in cache \"{1}\" (available: \"{2}\")'.format(
+                            self.cmtconfig, self.cache, str(', '.join(available_cmtconfig_list))))
 
         if not self.cmtconfig and self.use_nightly_release:
             raise Exception('cmtconfig parameter must be specified in project_mode when nightly release is used')
@@ -134,34 +147,42 @@ class ProjectMode(object):
         if not self.cmtconfig:
             setattr(self, 'cmtconfig', TaskDefConstants.DEFAULT_PROJECT_MODE['cmtconfig'])
             if self.cache:
-                cmtconfig_list = self._get_cmtconfig_list(self.cache)
-                if len(cmtconfig_list) == 1:
-                    setattr(self, 'cmtconfig', cmtconfig_list[0])
-                else:
-                    if len(cmtconfig_list) > 1:
-                        value = str(','.join(cmtconfig_list))
-                        raise Exception(
-                            'cmtconfig is not specified but more than one cmtconfig is available ({0}).'.format(
-                                value) + ' The task is rejected')
-                    # prodsys1
-                    # ver_parts = step.step_template.swrelease.split('.')
-                    release = self.cache.split('-')[-1]
-                    ver_parts = release.split('.')
-                    ver = int(ver_parts[0]) * 1000 + int(ver_parts[1]) * 100 + int(ver_parts[2])
-                    if int(ver_parts[0]) <= 13:
-                        setattr(self, 'cmtconfig', 'i686-slc3-gcc323-opt')
-                    elif ver < 15603:
-                        setattr(self, 'cmtconfig', 'i686-slc4-gcc34-opt')
-                    elif ver < 19003:
-                        setattr(self, 'cmtconfig', 'i686-slc5-gcc43-opt')
-                    elif ver < 20100:
-                        setattr(self, 'cmtconfig', 'x86_64-slc6-gcc47-opt')
-                    else:
-                        setattr(self, 'cmtconfig', 'x86_64-slc6-gcc48-opt')
-                    if self.cmtconfig not in cmtconfig_list:
-                        if len(cmtconfig_list) > 0:
-                            setattr(self, 'cmtconfig', cmtconfig_list[0])
+                if self.container_name:
+                        ami_client = AMIClient()
+                        if ami_client.ami_container_exists(self.container_name):
+                            setattr(self, 'cmtconfig', ami_client.ami_cmtconfig_by_image_name(self.container_name))
                         else:
                             raise Exception(
-                                'Default cmtconfig \"{0}\" is not exist in cache \"{1}\" (available: \"{2}\")'.format(
-                                    self.cmtconfig, self.cache, str(','.join(cmtconfig_list))))
+                                'cmtconfig is required for containers which are not registered in AMI')
+                else:
+                    cmtconfig_list = self._get_cmtconfig_list(self.cache)
+                    if len(cmtconfig_list) == 1:
+                        setattr(self, 'cmtconfig', cmtconfig_list[0])
+                    else:
+                        if len(cmtconfig_list) > 1:
+                            value = str(','.join(cmtconfig_list))
+                            raise Exception(
+                                'cmtconfig is not specified but more than one cmtconfig is available ({0}).'.format(
+                                    value) + ' The task is rejected')
+                        # prodsys1
+                        # ver_parts = step.step_template.swrelease.split('.')
+                        release = self.cache.split('-')[-1]
+                        ver_parts = release.split('.')
+                        ver = int(ver_parts[0]) * 1000 + int(ver_parts[1]) * 100 + int(ver_parts[2])
+                        if int(ver_parts[0]) <= 13:
+                            setattr(self, 'cmtconfig', 'i686-slc3-gcc323-opt')
+                        elif ver < 15603:
+                            setattr(self, 'cmtconfig', 'i686-slc4-gcc34-opt')
+                        elif ver < 19003:
+                            setattr(self, 'cmtconfig', 'i686-slc5-gcc43-opt')
+                        elif ver < 20100:
+                            setattr(self, 'cmtconfig', 'x86_64-slc6-gcc47-opt')
+                        else:
+                            setattr(self, 'cmtconfig', 'x86_64-slc6-gcc48-opt')
+                        if self.cmtconfig not in cmtconfig_list:
+                            if len(cmtconfig_list) > 0:
+                                setattr(self, 'cmtconfig', cmtconfig_list[0])
+                            else:
+                                raise Exception(
+                                    'Default cmtconfig \"{0}\" is not exist in cache \"{1}\" (available: \"{2}\")'.format(
+                                        self.cmtconfig, self.cache, str(','.join(cmtconfig_list))))

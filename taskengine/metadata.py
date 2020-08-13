@@ -599,3 +599,35 @@ class AMIClient(object):
                     logger.info('New tag \"{0}\" is registered'.format(tag_name))
         except Exception as ex:
             logger.exception('sync_ami_tags, exception occurred: {0}'.format(str(ex)))
+
+
+    def ami_container_exists(self, image_name):
+        query = \
+            "SELECT COUNT(*) WHERE `IMAGENAME` = '{0}'".format(image_name)
+
+        container_numbers =  list(self._post_command('SearchQuery',
+                                  catalog='Container:production',
+                                  entity='IMAGE_VIEW',
+                                  mql='{0}'.format(query))[0].values())[0]
+        return container_numbers != '0'
+
+    def ami_cmtconfig_by_image_name(self, image_name):
+        query = \
+            "SELECT * WHERE `IMAGENAME` = '{0}'".format(image_name)
+
+        container =  self._post_command('SearchQuery',
+                                  catalog='Container:production',
+                                  entity='IMAGE_VIEW',
+                                  mql='{0}'.format(query))[0]
+
+        sw_tag = container['IMAGEREPOSITORYSWTAG']
+
+        query = \
+            "SELECT * WHERE `TAGNAME` = '{0}'".format(sw_tag)
+
+        sw_tag_dict = self._post_command('SearchQuery',
+                                  catalog='Container:production',
+                                  entity='SWTAG_VIEW',
+                                  mql='{0}'.format(query))[0]
+
+        return  sw_tag_dict['IMAGEARCH'] + '-' + sw_tag_dict['IMAGEPLATFORM'] + '-' + sw_tag_dict['IMAGECOMPILER']

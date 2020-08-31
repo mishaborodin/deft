@@ -21,8 +21,11 @@ class AGISClient(object):
         url = urllib.parse.urljoin(self.base_url, 'request/swrelease/query/list/?json')
         try:
             r = requests.get(url)
-            return r.json()
-        except requests.exceptions.RequestException as ex:
+            result = r.json()
+            if (type(result) is dict) and ('error' in result):
+                raise RuntimeError(result['error'])
+            return result
+        except (requests.exceptions.RequestException,RuntimeError) as ex:
             logger.warning('_list_swreleases failed. Using failover url to list SW releases: {0}'.format(ex))
             failover_url = urllib.parse.urljoin(self.base_url, 'jsoncache/list_swreleases.json')
             r = requests.get(failover_url)

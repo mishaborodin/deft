@@ -1,3 +1,5 @@
+from django.db.models import CASCADE
+
 __author__ = 'Dmitry Golubkov'
 
 import json
@@ -488,6 +490,58 @@ class TTask(models.Model):
         db_name = 'deft_adcr'
         db_table = '"ATLAS_DEFT"."T_TASK"'
 
+class StepAction(models.Model):
+
+    STAGING_ACTION = 5
+
+    id = models.DecimalField(decimal_places=0, max_digits=12, db_column='STEP_ACTION_ID', primary_key=True)
+    request = models.ForeignKey(TRequest,  db_column='PR_ID', on_delete=CASCADE)
+    step = models.DecimalField(decimal_places=0, max_digits=12, db_column='STEP_ID')
+    action = models.DecimalField(decimal_places=0, max_digits=12, db_column='ACTION_TYPE')
+    create_time = models.DateTimeField(db_column='SUBMIT_TIME')
+    execution_time = models.DateTimeField(db_column='EXEC_TIME')
+    done_time = models.DateTimeField(db_column='DONE_TIME')
+    message = models.CharField(max_length=2000, db_column='MESSAGE')
+    attempt = models.DecimalField(decimal_places=0, max_digits=12, db_column='ATTEMPT')
+    status = models.CharField(max_length=20, db_column='STATUS', null=True)
+    config = models.CharField(max_length=2000, db_column='CONFIG')
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = prefetch_id(self._meta.db_name,'T_STEP_ACTION_SQ')
+        super(StepAction, self).save(*args, **kwargs)
+
+    def set_config(self, update_dict):
+        if not self.config:
+            self.config = ''
+            currrent_dict = {}
+        else:
+            currrent_dict = json.loads(self.config)
+        currrent_dict.update(update_dict)
+        self.config = json.dumps(currrent_dict)
+
+    def remove_config(self, key):
+        if self.config:
+            currrent_dict = json.loads(self.config)
+            if key in currrent_dict:
+                currrent_dict.pop(key)
+                self.config = json.dumps(currrent_dict)
+
+    def get_config(self, field = None):
+        return_dict = {}
+        try:
+            return_dict = json.loads(self.config)
+        except:
+            pass
+        if field:
+            return return_dict.get(field,None)
+        else:
+            return return_dict
+
+
+    class Meta:
+        db_name = 'deft_adcr'
+        db_table = '"T_STEP_ACTION"'
 
 class TTrfConfig(models.Model):
     tag = models.CharField(max_length=1, db_column='TAG', null=False)

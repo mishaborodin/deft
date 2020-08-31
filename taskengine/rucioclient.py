@@ -273,3 +273,26 @@ class RucioClient(object):
             raise Exception('{0} is not dataset'.format(dsn))
         scope, dataset = self.extract_scope(dsn)
         return [replica['rse'] for replica in self.client.list_dataset_replicas(scope, dataset)]
+
+    __tape_rse = None
+
+    def only_tape_replica(self, dsn):
+        if not self.is_dsn_dataset(dsn):
+            raise Exception('{0} is not dataset'.format(dsn))
+        full_replicas = self.full_dataset_replicas(dsn)
+        if self.__tape_rse is None:
+            self.__tape_rse = [x['rse'] for x in self.list_rses('rse_type=TAPE')]
+        if not full_replicas:
+            return False
+        for replica in full_replicas:
+            if replica not in self.__tape_rse:
+                return False
+        return True
+
+    def list_rses(self, filter=''):
+        return self.client.list_rses(filter)
+
+
+    def full_dataset_replicas(self, dsn):
+        scope, dataset = self.extract_scope(dsn)
+        return [replica['rse'] for replica in self.client.list_dataset_replicas(scope, dataset) if replica['available_length'] == replica['length']]

@@ -15,7 +15,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -1379,6 +1379,54 @@ class TaskDefinition(object):
         if not merging_tag_name:
             merging_tag_name = ProjectMode(step).merging
         return merging_tag_name
+
+
+    def  _set_pre_stage(self, step, task_proto_dict, project_mode):
+        # set staging if input os only on Tape
+        if step.request.request_type in ['REPROCESSING']:
+            primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
+            if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
+                if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
+                                                 status__in=['active', 'executing']).exists():
+                    sa = StepAction()
+                    sa.action = StepAction.STAGING_ACTION
+                    sa.status = 'done'
+                    sa.request = step.request
+                    sa.step = step.id
+                    sa.attempt = 0
+                    sa.create_time = timezone.now()
+                    sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
+                    sa.save()
+                    if project_mode.toStaging is None:
+                        task_proto_dict.update({'to_staging': True})
+
+                    if project_mode.inputPreStaging is None:
+                        task_proto_dict.update({'input_pre_staging': True})
+                    logger.info('Prestage is set for dataset {0}'.format(
+                        primary_input))
+        #Dry run
+        if step.request.request_type in ['GROUP']:
+            primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
+            if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
+                if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
+                                                 status__in=['active', 'executing']).exists():
+                    sa = StepAction()
+                    sa.action = StepAction.STAGING_ACTION
+                    sa.status = 'verify'
+                    sa.request = step.request
+                    sa.step = step.id
+                    sa.attempt = 0
+                    sa.create_time = timezone.now()
+                    sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
+                    sa.save()
+                    # if project_mode.toStaging is None:
+                    #     task_proto_dict.update({'to_staging': True})
+                    #
+                    # if project_mode.inputPreStaging is None:
+                    #     task_proto_dict.update({'input_pre_staging': True})
+                    logger.info('Prestage is set for dataset {0}'.format(
+                        primary_input))
+
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
         task_config = ProjectMode.get_task_config(step)
@@ -3519,7 +3567,11 @@ class TaskDefinition(object):
                 )
 
             self._define_merge_params(step, task_proto_dict, train_production)
-
+            try:
+                self._set_pre_stage(step, task_proto_dict, project_mode)
+            except Exception as ex:
+                logger.warning('Prestage has problem {0}'.format(
+                    str(ex)))
             task_proto = self.protocol.render_task(task_proto_dict)
 
             task_elements = list()

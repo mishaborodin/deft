@@ -1390,7 +1390,7 @@ class TaskDefinition(object):
                                                  status__in=['active', 'executing']).exists():
                     sa = StepAction()
                     sa.action = StepAction.STAGING_ACTION
-                    sa.status = 'done'
+                    sa.status = 'active'
                     sa.request = step.request
                     sa.step = step.id
                     sa.attempt = 0

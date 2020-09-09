@@ -634,7 +634,7 @@ class TaskDefinition(object):
         elif re.match('^(--)?validationFlags$', name, re.IGNORECASE):
             enclosed_value = True
         elif re.match('^(--)?athenaopts$', name, re.IGNORECASE):
-            value = value.decode('string-escape')
+            value = value.encode().decode('unicode_escape')
         elif re.match('^(--)?extraParameter$', name, re.IGNORECASE):
             enclosed_value = True
 

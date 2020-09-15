@@ -476,6 +476,7 @@ class TaskDefConstants(object, metaclass=Constants):
     DEFAULT_MEMORY_BASE = Constant(0)
     DEFAULT_SCOUT_SUCCESS_RATE = Constant(5)
     NO_ES_MIN_NUMBER_OF_EVENTS = Constant(50000)
+    DEFAULT_MAX_EVENTS_EVGEN_TASK = Constant(50000000)
 
     LEAVE_LOG_TOKEN = Constant('ddd:.*DATADISK')
     LEAVE_LOG_DESTINATION = Constant('(type=DATADISK)\\(dontkeeplog=True)')

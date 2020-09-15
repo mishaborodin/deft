@@ -88,6 +88,14 @@ class MaxJobsPerTaskLimitExceededException(Exception):
         super(MaxJobsPerTaskLimitExceededException, self).__init__(message)
 
 
+class MaxEventsPerTaskLimitExceededException(Exception):
+    def __init__(self, number_of_events):
+        message = 'The task is rejected. The limit of events per task ({0}) is exceeded. '.format(
+            TaskDefConstants.DEFAULT_MAX_EVENTS_EVGEN_TASK)  + \
+                  'Requested number of events for this task is {0}'.format(int(number_of_events))
+        super(MaxEventsPerTaskLimitExceededException, self).__init__(message)
+
+
 class TaskConfigurationException(Exception):
     def __init__(self, message):
         super(TaskConfigurationException, self).__init__(message)
@@ -1129,6 +1137,8 @@ class TaskDefinition(object):
                 and primary_input_total_files > 0:
             number_of_jobs = \
                 primary_input_total_files * int(task_config['nEventsPerInputFile']) / int(task_config['nEventsPerJob'])
+        if (prod_step.lower() == 'evgen'.lower()) and number_of_events > TaskDefConstants.DEFAULT_MAX_EVENTS_EVGEN_TASK:
+            raise MaxEventsPerTaskLimitExceededException(number_of_events)
 
         if number_of_jobs > TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK:
             raise MaxJobsPerTaskLimitExceededException(number_of_jobs)

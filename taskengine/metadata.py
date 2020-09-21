@@ -66,7 +66,7 @@ class AMIClient(object):
             logger.exception('AMI authentication error: {0}'.format(str(ex)))
             use_replica = True
         if (response is not None and response.status_code != requests.codes.ok)  or use_replica:
-            logger.warning('Access token acquisition error ({0})'.format(response.status_code))
+            logger.warning('Access token acquisition error try to reconnect')
             self._verify_server_cert = False
             current_base_url = self._default_base_url_replica
             response = requests.get('{0}token/certificate'.format(current_base_url), cert=self._cert,

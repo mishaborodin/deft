@@ -52,20 +52,19 @@ class AMIClient(object):
         except Exception as ex:
             logger.exception('AMI initialization failed: {0}'.format(str(ex)))
 
-    def _acquire_token(self):
+    def _acquire_token(self, use_replica=False):
         self._verify_server_cert = True
 
         current_base_url = self._default_base_url
         response = None
-        use_replica = False
-
-        try:
-            response = requests.get('{0}token/certificate'.format(self._default_base_url), cert=self._cert,
-                                    verify=self._verify_server_cert)
-        except ConnectionError as ex:
-            logger.exception('AMI authentication error: {0}'.format(str(ex)))
-            use_replica = True
-        if (response is not None and response.status_code != requests.codes.ok)  or use_replica:
+        if not use_replica:
+            try:
+                response = requests.get('{0}token/certificate'.format(self._default_base_url), cert=self._cert,
+                                        verify=self._verify_server_cert)
+            except ConnectionError as ex:
+                logger.exception('AMI authentication error: {0}'.format(str(ex)))
+                use_replica = True
+        if use_replica or (response is not None and response.status_code != requests.codes.ok):
             logger.warning('Access token acquisition error try to reconnect')
             self._verify_server_cert = False
             current_base_url = self._default_base_url_replica
@@ -102,11 +101,17 @@ class AMIClient(object):
             raise AMIException(errors)
 
     def _post_command(self, command, rowset_type=None, **kwargs):
-        url = self._get_url(command)
-        response = requests.post(url, headers=self._headers, data=json.dumps(kwargs), verify=self._verify_server_cert)
-        if response.status_code == 403:
+
+        response = None
+        try:
+            url = self._get_url(command)
+            response = requests.post(url, headers=self._headers, data=json.dumps(kwargs), verify=self._verify_server_cert)
+        except Exception as ex:
+                logger.exception("AMI failed: %s" % str(ex))
+        if response is None or response.status_code == 403:
             logger.warning('Access error, try to re-connect')
-            self._acquire_token()
+            self._acquire_token(response is None)
+            url = self._get_url(command)
             response = requests.post(url, headers=self._headers, data=json.dumps(kwargs), verify=self._verify_server_cert)
         if response.status_code != requests.codes.ok:
             response.raise_for_status()

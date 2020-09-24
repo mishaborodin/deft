@@ -53,7 +53,7 @@ class AMIClient(object):
             logger.exception('AMI initialization failed: {0}'.format(str(ex)))
 
     def _acquire_token(self, use_replica=False):
-        self._verify_server_cert = True
+        self._verify_server_cert = False
 
         current_base_url = self._default_base_url
         response = None

@@ -2249,10 +2249,6 @@ class TaskDefinition(object):
                     if evgen_number_jobs <= 10:
                         skip_scout_jobs = True
 
-            if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) and \
-                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile:
-                self._check_task_events_consistency(task_config)
-
             reduction_conf_base_output_types = list()
 
             if train_production:
@@ -2334,6 +2330,11 @@ class TaskDefinition(object):
                         task_config.update({'nEventsPerInputFile': number_of_events_per_input_file})
                 except Exception:
                     pass
+
+            if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) and \
+                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile:
+                self._check_task_events_consistency(task_config)
+
 
             if project_mode.primaryInputOffset is not None:
                 primary_input_offset = project_mode.primaryInputOffset

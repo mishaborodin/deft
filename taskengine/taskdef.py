@@ -138,6 +138,13 @@ class InvalidMergeException(Exception):
         super(InvalidMergeException, self).__init__(message)
 
 
+class MergeInverseException(Exception):
+    def __init__(self, neventsprtinputfile, neventsperjob):
+        message = 'The task is rejected. Merging task has lower events par job ' \
+                  'number than events per input file' \
+                  ' (nEventsPerJob = {0}, nEventsPerInputFile = {1})'.format(neventsperjob, neventsprtinputfile)
+        super(MergeInverseException, self).__init__(message)
+
 class UnmergedInputProcessedException(Exception):
     def __init__(self, task_id):
         message = 'The task is rejected. Unmerged input is already processed (task_id = {0})'.format(task_id)
@@ -1064,11 +1071,11 @@ class TaskDefinition(object):
             dsn = primary_input['dataset']
             tag_name = step.step_template.ctag
             version = self.parse_data_name(dsn)['version']
+            merge_nevents_per_job = task.get('nEventsPerJob', 0)
+            merge_nevents_per_input_file = task.get('nEventsPerInputFile', 0)
+            merge_nfiles_per_job = task.get('nFilesPerJob', 0)
+            merge_ngb_per_job = task.get('nGBPerJob', 0)
             if str(version.split('_tid')[0]).endswith(tag_name):
-                merge_nevents_per_job = task.get('nEventsPerJob', 0)
-                merge_nevents_per_input_file = task.get('nEventsPerInputFile', 0)
-                merge_nfiles_per_job = task.get('nFilesPerJob', 0)
-                merge_ngb_per_job = task.get('nGBPerJob', 0)
                 is_merge_1_to_1 = True
                 if merge_nevents_per_job > 0 and merge_nevents_per_input_file > 0:
                     if merge_nevents_per_job != merge_nevents_per_input_file:
@@ -1079,6 +1086,11 @@ class TaskDefinition(object):
                     is_merge_1_to_1 = False
                 if is_merge_1_to_1:
                     raise InvalidMergeException(dsn, tag_name)
+
+            if (merge_nevents_per_job > 0) and (merge_nevents_per_input_file > 0) and \
+                    (merge_nevents_per_job < merge_nevents_per_input_file) and \
+                    not((merge_nfiles_per_job > 1) or (merge_ngb_per_job > 0)):
+                raise MergeInverseException(merge_nevents_per_input_file, merge_nevents_per_job)
 
         lost_files_exception = None
 
@@ -4499,7 +4511,7 @@ class TaskDefinition(object):
                                     self.create_task_chain(step.id, input_dataset=input_dataset,
                                                            first_step_number_of_events=-1)
                                 except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
-                                        UnmergedInputProcessedException) as ex:
+                                        UnmergedInputProcessedException, MergeInverseException) as ex:
                                     log_msg = \
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
@@ -4539,7 +4551,7 @@ class TaskDefinition(object):
                                                                    first_step_number_of_events=-1,
                                                                    first_parent_task_id=task_id)
                                         except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
-                                                UnmergedInputProcessedException) as ex:
+                                                UnmergedInputProcessedException, MergeInverseException) as ex:
                                             log_msg = 'Request = {0}, Chain = {1} ({2}),'.format(
                                                 request.id, step.slice.slice, step.id)
                                             log_msg += ' input = {0}, exception occurred: {1}'.format(
@@ -4560,7 +4572,7 @@ class TaskDefinition(object):
                                                                primary_input_offset=step_input['offset'],
                                                                container_name=step_input['container'])
                                     except (TaskDuplicateDetected, NoMoreInputFiles, ParentTaskInvalid,
-                                            UnmergedInputProcessedException, UniformDataException) as ex:
+                                            UnmergedInputProcessedException, UniformDataException, MergeInverseException) as ex:
                                         log_msg = 'Request = {0}, Chain = {1} ({2}),'.format(
                                             request.id, step.slice.slice, step.id)
                                         log_msg += ' input = {0}, exception occurred: {1}'.format(

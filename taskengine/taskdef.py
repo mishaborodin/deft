@@ -140,8 +140,8 @@ class InvalidMergeException(Exception):
 
 class MergeInverseException(Exception):
     def __init__(self, neventsprtinputfile, neventsperjob):
-        message = 'The task is rejected. Merging task has lower events par job ' \
-                  'number than events per input file' \
+        message = 'The task is rejected. Merging tasks must have more events per job ' \
+                  ' than events per input file' \
                   ' (nEventsPerJob = {0}, nEventsPerInputFile = {1})'.format(neventsperjob, neventsprtinputfile)
         super(MergeInverseException, self).__init__(message)
 
@@ -1088,7 +1088,7 @@ class TaskDefinition(object):
                     raise InvalidMergeException(dsn, tag_name)
 
             if (merge_nevents_per_job > 0) and (merge_nevents_per_input_file > 0) and \
-                    (merge_nevents_per_job < merge_nevents_per_input_file) and \
+                    (merge_nevents_per_job <= merge_nevents_per_input_file) and \
                     not((merge_nfiles_per_job > 1) or (merge_ngb_per_job > 0)):
                 raise MergeInverseException(merge_nevents_per_input_file, merge_nevents_per_job)
 

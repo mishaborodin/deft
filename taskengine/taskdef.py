@@ -1088,7 +1088,7 @@ class TaskDefinition(object):
                     raise InvalidMergeException(dsn, tag_name)
 
             if (merge_nevents_per_job > 0) and (merge_nevents_per_input_file > 0) and \
-                    (merge_nevents_per_job <= merge_nevents_per_input_file) and \
+                    (merge_nevents_per_job < merge_nevents_per_input_file) and \
                     not((merge_nfiles_per_job > 1) or (merge_ngb_per_job > 0)):
                 raise MergeInverseException(merge_nevents_per_input_file, merge_nevents_per_job)
 

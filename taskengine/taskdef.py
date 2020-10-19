@@ -3727,8 +3727,8 @@ class TaskDefinition(object):
             for dataset in requested_datasets or []:
                 child_tasks += list(ProductionTask.objects.filter(
                     ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
-                    (Q(input_dataset=dataset) |
-                     Q(input_dataset__endswith=dataset.split(':')[-1])),
+                    (Q(step__slice__input_dataset=dataset) |
+                     Q(step__slice__input_dataset__endswith=dataset.split(':')[-1])),
                     project=step.request.project,
                     step__step_template__ctag=step.step_template.ctag))
             ps2_task_list += [x for x in child_tasks if x not in ps2_task_list]

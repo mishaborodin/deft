@@ -4,7 +4,7 @@ import os
 import re
 import math
 from deftcore.log import Logger
-from deftcore.settings import RUCIO_ACCOUNT_NAME
+from deftcore.settings import RUCIO_ACCOUNT_NAME, X509_PROXY_PATH
 from rucio.client import Client
 from rucio.common.exception import CannotAuthenticate, DataIdentifierNotFound
 from deftcore.security.voms import VOMSClient
@@ -287,7 +287,7 @@ class RucioClient(object):
         for replica in full_replicas:
             if replica not in self.__tape_rse:
                 return False
-        return True
+        return [x for x in full_replicas if x in self.__tape_rse]
 
     def list_rses(self, filter=''):
         return self.client.list_rses(filter)

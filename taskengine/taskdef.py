@@ -1434,7 +1434,7 @@ class TaskDefinition(object):
                     tape_replicas = self.rucio_client.only_tape_replica(primary_input)
                     do_staging = True
                     for replica in tape_replicas:
-                        if ('BNL' in replica) or ('RAL' in replica) or ('CERN' in replica):
+                        if ('BNL' in replica) or ('FZK' in replica) or ('RAL' in replica) or ('CERN' in replica):
                             do_staging = do_staging and True
                         else:
                             do_staging = False

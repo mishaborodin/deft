@@ -1429,36 +1429,44 @@ class TaskDefinition(object):
         if step.request.request_type in ['GROUP']:
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
-                if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
-                                                 status__in=['active', 'executing']).exists():
-                    tape_replicas = self.rucio_client.only_tape_replica(primary_input)
-                    do_staging = True
-                    for replica in tape_replicas:
-                        if ('BNL' in replica) or ('FZK' in replica) or ('RAL' in replica) or ('CERN' in replica):
-                            do_staging = do_staging and True
-                        else:
-                            do_staging = False
-
-                    sa = StepAction()
-                    sa.action = StepAction.STAGING_ACTION
-                    sa.request = step.request
-                    sa.step = step.id
-                    sa.attempt = 0
-                    sa.create_time = timezone.now()
-                    sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
-                    # Dry run
-                    if not do_staging:
-                        sa.status = 'verify'
+                tape_replicas = self.rucio_client.only_tape_replica(primary_input)
+                do_staging = True
+                for replica in tape_replicas:
+                    if ('BNL' in replica) or ('FZK' in replica) or ('RAL' in replica) or ('CERN' in replica):
+                        do_staging = do_staging and True
                     else:
-                        sa.status = 'active'
-                        if project_mode.toStaging is None:
-                            task_proto_dict.update({'to_staging': True})
-
-                        if project_mode.inputPreStaging is None:
-                            task_proto_dict.update({'input_pre_staging': True})
+                        do_staging = False
+                sa = StepAction()
+                sa.action = StepAction.STAGING_ACTION
+                sa.request = step.request
+                sa.step = step.id
+                sa.attempt = 0
+                sa.create_time = timezone.now()
+                sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
+                # Dry run
+                if not do_staging:
+                    sa.status = 'verify'
+                else:
+                    sa.status = 'active'
+                if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
+                                                 status__in=['active', 'executing', 'verify']).exists():
                     sa.save()
-                    logger.info('Prestage is set for dataset {0}'.format(
-                        primary_input))
+                else:
+                    old_step_action = StepAction.objects.get(step=int(step.id), action=StepAction.STAGING_ACTION,
+                                                             status__in=['active', 'executing', 'verify'])
+                    if old_step_action.status == 'verify' and sa.status == 'active':
+                        old_step_action.status = 'active'
+                        old_step_action.save()
+                if do_staging:
+                    if project_mode.toStaging is None:
+                        task_proto_dict.update({'to_staging': True})
+
+                    if project_mode.inputPreStaging is None:
+                        task_proto_dict.update({'input_pre_staging': True})
+                logger.info('Prestage is set for dataset {0}'.format(
+                    primary_input))
+
+
 
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
@@ -3727,8 +3735,8 @@ class TaskDefinition(object):
             for dataset in requested_datasets or []:
                 child_tasks += list(ProductionTask.objects.filter(
                     ~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']) &
-                    (Q(step__slice__input_dataset=dataset) |
-                     Q(step__slice__input_dataset__endswith=dataset.split(':')[-1])),
+                    (Q(inputdataset=dataset) |
+                     Q(inputdataset__endswith=dataset.split(':')[-1])),
                     project=step.request.project,
                     step__step_template__ctag=step.step_template.ctag))
             ps2_task_list += [x for x in child_tasks if x not in ps2_task_list]

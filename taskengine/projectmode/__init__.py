@@ -160,10 +160,17 @@ class ProjectMode(object):
                         setattr(self, 'cmtconfig', cmtconfig_list[0])
                     else:
                         if len(cmtconfig_list) > 1:
-                            value = str(','.join(cmtconfig_list))
-                            raise Exception(
-                                'cmtconfig is not specified but more than one cmtconfig is available ({0}).'.format(
-                                    value) + ' The task is rejected')
+                            cmtconfig_list.sort()
+                            if (len(cmtconfig_list) == 2 and 'AthGeneration' in self.cache) and\
+                                     (cmtconfig_list[0].split('-')[-2:] == cmtconfig_list[1].split('-')[-2:]) and \
+                                    ('centos7' in cmtconfig_list[0])  and ('slc6' in cmtconfig_list[1]):
+                                setattr(self, 'cmtconfig', cmtconfig_list[1])
+                                return
+                            else:
+                                value = str(','.join(cmtconfig_list))
+                                raise Exception(
+                                    'cmtconfig is not specified but more than one cmtconfig is available ({0}).'.format(
+                                        value) + ' The task is rejected')
                         # prodsys1
                         # ver_parts = step.step_template.swrelease.split('.')
                         release = self.cache.split('-')[-1]

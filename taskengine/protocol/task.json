@@ -103,7 +103,8 @@
   "inputPreStaging": "{{input_pre_staging}}",
   "container_name": "'{{container_name}}'",
   "outputPostProcessing": "{{output_post_processing}}",
-  "onlyTagsForFC": "{{only_tags_for_fc}}"
+  "onlyTagsForFC": "{{only_tags_for_fc}}",
+  "multiStepExec": "{{multi_step_exec}}"
 
 
 }

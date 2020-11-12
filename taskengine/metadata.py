@@ -648,3 +648,22 @@ class AMIClient(object):
                                   mql='{0}'.format(query))[0]
 
         return  sw_tag_dict['IMAGEARCH'] + '-' + sw_tag_dict['IMAGEPLATFORM'] + '-' + sw_tag_dict['IMAGECOMPILER']
+
+    def ami_sw_tag_by_cache(self, cache):
+        query = \
+            "SELECT * WHERE `SWRELEASE` = '{0}'".format(cache)
+
+        return self._post_command('SearchQuery',
+                                  catalog='Container:production',
+                                  entity='SWTAG_VIEW',
+                                  mql='{0}'.format(query))
+
+
+    def ami_image_by_sw(self, swtag):
+        query = \
+            "SELECT * WHERE `IMAGEREPOSITORYSWTAG` = '{0}'".format(swtag)
+
+        return self._post_command('SearchQuery',
+                                  catalog='Container:production',
+                                  entity='IMAGE_VIEW',
+                                  mql='{0}'.format(query))

@@ -115,6 +115,13 @@ class UnknownSiteException(Exception):
         super(UnknownSiteException, self).__init__(message)
 
 
+
+class ContainerIsNotFoundException(Exception):
+    def __init__(self, site_name):
+        message = 'The site "{0}" has no cvmfs but container is not found for this ami tag'.format(site_name)
+        super(ContainerIsNotFoundException, self).__init__(message)
+
+
 class TaskDefineOnlyException(Exception):
     def __init__(self, url):
         message = 'The task parameters are defined: {0}'.format(url)
@@ -1466,8 +1473,26 @@ class TaskDefinition(object):
                 logger.info('Prestage is set for dataset {0}'.format(
                     primary_input))
 
-
-
+    def _check_site_container(self, task_proto_dict):
+        if ('site' in task_proto_dict) and (',' not in task_proto_dict['site']) and \
+                ('BOINC' not in task_proto_dict['site']) and ('container_name' not in task_proto_dict):
+            containers = self.agis_client.list_site_sw_containers(task_proto_dict['site'])
+            if containers:
+                sw_containers = []
+                sw_tags = self.ami_client.ami_sw_tag_by_cache('_'.join([task_proto_dict['cache'],task_proto_dict['release_base']]))
+                for sw_tag in sw_tags:
+                    if sw_tag['STATE'] == 'USED':
+                        images = self.ami_client.ami_image_by_sw(sw_tag['TAGNAME'])
+                        for image in images:
+                            sw_containers.append({'name': image['IMAGENAME'],
+                                                  'cmtconfig': sw_tag['IMAGEARCH'] + '-' + sw_tag[
+                                                     'IMAGEPLATFORM'] + '-' + sw_tag['IMAGECOMPILER']})
+                for sw_container in sw_containers:
+                    if (sw_container['cmtconfig'] == task_proto_dict['architecture']) and (sw_container['name'] in containers):
+                        task_proto_dict.update(
+                            {'container_name': sw_container['name']})
+                        return
+                raise ContainerIsNotFoundException(task_proto_dict['site'])
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
         task_config = ProjectMode.get_task_config(step)
@@ -1502,7 +1527,6 @@ class TaskDefinition(object):
         trf_cache = ctag['SWReleaseCache'].split('_')[0]
         trf_release = ctag['SWReleaseCache'].split('_')[1]
         trf_params = self.ami_client.get_trf_params(trf_cache, trf_release, trf_name, force_ami=True)
-
         # proto_fix
         if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
             if '--inputHISTFile' not in trf_params:
@@ -3284,6 +3308,9 @@ class TaskDefinition(object):
             if 'outputPostProcessing' in list(task_config.keys()):
                 task_proto_dict.update({'output_post_processing': task_config['outputPostProcessing']})
 
+            if 'multiStepExec' in list(task_config.keys()):
+                task_proto_dict.update({'multi_step_exec': task_config['multiStepExec']})
+
             if 'container_name' in list(task_config.keys()):
                 task_proto_dict.update({'container_name': task_config['container_name']})
 
@@ -3607,8 +3634,9 @@ class TaskDefinition(object):
                 raise TaskConfigurationException(
                     "The task is rejected due to incompatible parameters: useRealNumEvents, 'Events per Input file'"
                 )
-
             self._define_merge_params(step, task_proto_dict, train_production)
+            self._check_site_container(task_proto_dict)
+
             try:
                 self._set_pre_stage(step, task_proto_dict, project_mode)
             except Exception as ex:

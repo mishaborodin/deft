@@ -1411,38 +1411,10 @@ class TaskDefinition(object):
 
 
     def  _set_pre_stage(self, step, task_proto_dict, project_mode):
-        # set staging if input os only on Tape
-        if step.request.request_type in ['REPROCESSING']:
+        # set staging if input is only on Tape
+        if step.request.request_type in ['REPROCESSING', 'GROUP']:
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
-                if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
-                                                 status__in=['active', 'executing']).exists():
-                    sa = StepAction()
-                    sa.action = StepAction.STAGING_ACTION
-                    sa.status = 'active'
-                    sa.request = step.request
-                    sa.step = step.id
-                    sa.attempt = 0
-                    sa.create_time = timezone.now()
-                    sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
-                    sa.save()
-                    if project_mode.toStaging is None:
-                        task_proto_dict.update({'to_staging': True})
-
-                    if project_mode.inputPreStaging is None:
-                        task_proto_dict.update({'input_pre_staging': True})
-                    logger.info('Prestage is set for dataset {0}'.format(
-                        primary_input))
-        if step.request.request_type in ['GROUP']:
-            primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
-            if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
-                tape_replicas = self.rucio_client.only_tape_replica(primary_input)
-                do_staging = True
-                for replica in tape_replicas:
-                    if ('BNL' in replica) or ('FZK' in replica) or ('RAL' in replica) or ('CERN' in replica):
-                        do_staging = do_staging and True
-                    else:
-                        do_staging = False
                 sa = StepAction()
                 sa.action = StepAction.STAGING_ACTION
                 sa.request = step.request
@@ -1450,28 +1422,24 @@ class TaskDefinition(object):
                 sa.attempt = 0
                 sa.create_time = timezone.now()
                 sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
-                # Dry run
-                if not do_staging:
-                    sa.status = 'verify'
-                else:
-                    sa.status = 'active'
+                sa.status = 'active'
                 if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
                                                  status__in=['active', 'executing', 'verify']).exists():
                     sa.save()
                 else:
                     old_step_action = StepAction.objects.get(step=int(step.id), action=StepAction.STAGING_ACTION,
                                                              status__in=['active', 'executing', 'verify'])
-                    if old_step_action.status == 'verify' and sa.status == 'active':
+                    if old_step_action.status == 'verify':
                         old_step_action.status = 'active'
                         old_step_action.save()
-                if do_staging:
-                    if project_mode.toStaging is None:
-                        task_proto_dict.update({'to_staging': True})
+                if project_mode.toStaging is None:
+                    task_proto_dict.update({'to_staging': True})
 
-                    if project_mode.inputPreStaging is None:
-                        task_proto_dict.update({'input_pre_staging': True})
+                if project_mode.inputPreStaging is None:
+                    task_proto_dict.update({'input_pre_staging': True})
                 logger.info('Prestage is set for dataset {0}'.format(
                     primary_input))
+
 
     def _check_site_container(self, task_proto_dict):
         if ('site' in task_proto_dict) and (',' not in task_proto_dict['site']) and \
@@ -1815,6 +1783,7 @@ class TaskDefinition(object):
             for key in list(trf_dict.keys()):
                 trf_params.extend(self.ami_client.get_trf_params(trf_dict[key][0], trf_dict[key][1], key,
                                                                  sub_step_list=trf_sub_steps, force_ami=force_ami))
+                #trf_params.append('--multithreaded')
 
             if not trf_params:
                 raise Exception("AMI: list of transformation parameters is empty")

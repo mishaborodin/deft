@@ -311,7 +311,10 @@ class AMIClient(object):
         ami_tag = dict()
 
         try:
-            result = self._ami_get_tag_old(tag_name)
+            if tag_name[0] in ['y']:
+                result = self._ami_get_tag_new(tag_name)
+            else:
+                result = self._ami_get_tag_old(tag_name)
             ami_tag = result[0]
         except AMIException as ex:
             if ex.has_error('Invalid amiTag found'):

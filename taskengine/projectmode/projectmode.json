@@ -458,5 +458,9 @@
   "containerName": {
     "type": "str",
     "description": ""
+  },
+  "nocvmfs": {
+    "type": "bool",
+    "description": ""
   }
 }

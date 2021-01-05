@@ -2059,8 +2059,8 @@ class TaskDefinition(object):
                             if input_name_dict['prod_step'] == 'evgen':
                                 input_types.append(input_name_dict['data_type'])
                         except Exception as ex:
-                            # if 'TXT' in input_name:
-                            #     input_types.append('TXT')
+                            if 'TXT' in input_name:
+                                input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = int(input_params.get('nEventsPerJob', 0)) or int(task_config.get('nEventsPerJob', 0))
@@ -3496,6 +3496,9 @@ class TaskDefinition(object):
 
             if project_mode.inputPreStaging is not None:
                 task_proto_dict.update({'input_pre_staging': project_mode.inputPreStaging or None})
+
+            if project_mode.nocvmfs is not None:
+                task_proto_dict.update({'multi_step_exec': {'containerOptions': {'execArgs': '--nocvmfs'}}})
 
             if project_mode.containerName is not None:
                 task_proto_dict.update({'container_name': project_mode.containerName or None})

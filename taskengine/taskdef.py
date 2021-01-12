@@ -2065,7 +2065,8 @@ class TaskDefinition(object):
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = int(input_params.get('nEventsPerJob', 0)) or int(task_config.get('nEventsPerJob', 0))
                     if min_events:
-                        project_mode.nEventsPerInputFile = min_events
+                        if not project_mode.nEventsPerInputFile:
+                            project_mode.nEventsPerInputFile = min_events
 
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
                         number_files = math.ceil(number_of_events * number_files_per_job / min_events)
@@ -2252,7 +2253,10 @@ class TaskDefinition(object):
                     if len(evgen_input_formats) == 1 and 'TXT' in evgen_input_formats:
                         if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(
                                 task_config.keys()):
-                            task_config['nEventsPerInputFile'] = int(task_config['nEventsPerJob'])
+                            if not project_mode.nEventsPerInputFile:
+                                task_config['nEventsPerInputFile'] = int(task_config['nEventsPerJob'])
+                            else:
+                                task_config['nEventsPerInputFile'] = project_mode.nEventsPerInputFile
                     if 'nEventsPerInputFile' in list(task_config.keys()) and task_config['nEventsPerInputFile'] > 0 \
                             and number_of_events > 0:
                         evgen_number_input_files_requested = \

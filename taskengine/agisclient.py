@@ -2,7 +2,7 @@ __author__ = 'Dmitry Golubkov'
 
 import requests
 import urllib.parse
-from deftcore.settings import AGIS_API_BASE_URL, X509_PROXY_PATH
+from deftcore.settings import AGIS_API_BASE_URL, X509_PROXY_PATH,  VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH
 from deftcore.log import Logger
 import json
 
@@ -10,7 +10,7 @@ logger = Logger.get()
 
 
 class AGISClient(object):
-    def __init__(self, cert=X509_PROXY_PATH):
+    def __init__(self, cert=(VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH)):
         self.base_url = AGIS_API_BASE_URL
         self.cert = cert
 

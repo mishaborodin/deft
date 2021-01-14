@@ -1865,7 +1865,10 @@ class TaskDefinition(object):
             if project_mode.fixedMaxEvents:
                 input_data_name = step.slice.input_data
                 input_data_dict = self.parse_data_name(input_data_name)
-                params = self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)
+                if self.is_new_jo_format(input_data_name):
+                    params = self._get_evgen_input_files_new(input_data_dict, energy_gev)
+                else:
+                    params = self._get_evgen_input_files(input_data_dict, energy_gev, use_evgen_otf=use_evgen_otf)
                 if 'nEventsPerJob' in params:
                     max_events_forced = params['nEventsPerJob']
                 else:

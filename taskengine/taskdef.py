@@ -2062,7 +2062,7 @@ class TaskDefinition(object):
                             if input_name_dict['prod_step'] == 'evgen':
                                 input_types.append(input_name_dict['data_type'])
                         except Exception as ex:
-                            if 'TXT' in input_name:
+                            if 'TXT' in input_name and key!='inputGenConfFile':
                                 input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:

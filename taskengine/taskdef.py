@@ -4482,20 +4482,26 @@ class TaskDefinition(object):
                                 raise Exception('AMI # input "{0}" has wrong format'.format(input_data_name))
 
                         if input_data_name and not ami_hashtag_input_list:
-                            input_data_dict = self.parse_data_name(input_data_name)
+                            try:
+                                input_data_dict = self.parse_data_name(input_data_name)
+                            except Exception as e:
+                                if step.id != step.step_parent_id:
+                                    input_data_dict = None
+                                else:
+                                    raise e
+                            if input_data_dict:
+                                force_split_evgen = ProjectMode(step).splitEvgen
 
-                            force_split_evgen = ProjectMode(step).splitEvgen
-
-                            if str(input_data_dict['number']).lower().startswith('period'.lower()) \
-                                    or input_data_dict['prod_step'].lower() == 'PhysCont'.lower():
-                                input_params = self.get_input_params(step, step, None, 0, False)
-                                if not input_params:
-                                    raise Exception("No datasets in the period container %s" % input_data_name)
-                                for key in list(input_params.keys()):
-                                    if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
-                                        phys_cont_list.extend(input_params[key])
-                            elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
-                                evgen_input_list.extend(self._get_evgen_input_list(step))
+                                if str(input_data_dict['number']).lower().startswith('period'.lower()) \
+                                        or input_data_dict['prod_step'].lower() == 'PhysCont'.lower():
+                                    input_params = self.get_input_params(step, step, None, 0, False)
+                                    if not input_params:
+                                        raise Exception("No datasets in the period container %s" % input_data_name)
+                                    for key in list(input_params.keys()):
+                                        if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
+                                            phys_cont_list.extend(input_params[key])
+                                elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
+                                    evgen_input_list.extend(self._get_evgen_input_list(step))
                         if phys_cont_list:
                             for input_dataset in phys_cont_list:
                                 try:

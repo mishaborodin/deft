@@ -1134,11 +1134,12 @@ class TaskDefinition(object):
             logger.info(log_msg)
 
         primary_input_total_files = 0
-
+        primary_input_events_from_rucio = 0
         try:
             primary_input_total_files = self.rucio_client.get_number_files(primary_input['dataset'])
+            primary_input_events_from_rucio = self.rucio_client.get_number_events(primary_input['dataset'])
         except Exception:
-            logger.info('_check_task_input, get_number_files for {0} failed (parent_task_id = {2}): {1}'.format(
+            logger.info('_check_task_input, get_number_files or get_number_events for {0} failed (parent_task_id = {2}): {1}'.format(
                 primary_input['dataset'], get_exception_string(), parent_task_id))
             task_output_name_suffix = '_tid{0}_00'.format(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % parent_task_id)
             if not str(primary_input['dataset']).endswith(task_output_name_suffix):
@@ -1152,10 +1153,16 @@ class TaskDefinition(object):
         number_of_jobs = 0
         if number_of_events > 0 and 'nEventsPerJob' in list(task_config.keys()):
             number_of_jobs = number_of_events / int(task_config['nEventsPerJob'])
-        elif 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) \
-                and primary_input_total_files > 0:
-            number_of_jobs = \
-                primary_input_total_files * int(task_config['nEventsPerInputFile']) / int(task_config['nEventsPerJob'])
+        else:
+            if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) \
+                    and primary_input_total_files > 0:
+                number_of_jobs = \
+                    math.ceil(primary_input_total_files * int(task_config['nEventsPerInputFile']) / int(task_config['nEventsPerJob']))
+            if 'nEventsPerJob' in list(task_config.keys()) and project_mode.useRealNumEvents and \
+                    primary_input_events_from_rucio>0:
+                number_of_jobs = \
+                    math.ceil(primary_input_events_from_rucio / int(task_config['nEventsPerJob']))
+
         if (prod_step.lower() == 'evgen'.lower()) and number_of_events > TaskDefConstants.DEFAULT_MAX_EVENTS_EVGEN_TASK:
             raise MaxEventsPerTaskLimitExceededException(number_of_events)
 

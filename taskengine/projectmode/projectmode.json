@@ -462,5 +462,9 @@
   "nocvmfs": {
     "type": "bool",
     "description": ""
+  },
+  "noprestage": {
+    "type": "bool",
+    "description": ""
   }
 }

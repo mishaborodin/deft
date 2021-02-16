@@ -1419,7 +1419,7 @@ class TaskDefinition(object):
 
     def  _set_pre_stage(self, step, task_proto_dict, project_mode):
         # set staging if input is only on Tape
-        if step.request.request_type in ['REPROCESSING', 'GROUP', 'MC']:
+        if not project_mode.noprestage and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC']:
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
                 sa = StepAction()
@@ -2682,6 +2682,8 @@ class TaskDefinition(object):
                     second_input_param['ratio'] = n_pileup
                     if secondary_input_offset:
                         second_input_param['offset'] = secondary_input_offset
+                    # if project_mode.count_overlay_offset:
+                    #     second_input_param['offset'] = 0
                     job_parameters.append(second_input_param)
                     is_pile_task = True
                 elif re.match(r'^.*(PtMinbias|Cavern).*File$', name, re.IGNORECASE):

@@ -2861,6 +2861,9 @@ class TaskDefinition(object):
                         param_name = self._get_input_output_param_name(output_params, 'DAOD')
                         if not param_name:
                             continue
+                    elif re.match(r'^(--)?outputHITS_RNMFile$', name, re.IGNORECASE) and 'HITS'.lower() in ','.join(
+                                [e.lower() for e in list(output_params.keys())]):
+                            continue
                     elif re.match(r'^(--)?outputHITS.*File$', name, re.IGNORECASE) and 'HITS'.lower() in ','.join(
                             [e.lower() for e in list(output_params.keys())]):
                         param_name = self._get_input_output_param_name(output_params, 'HITS')
@@ -3398,7 +3401,7 @@ class TaskDefinition(object):
                 task_proto_dict.update({'respect_split_rule': project_mode.respectSplitRule or None})
 
             if step.request.request_type.lower() == 'MC'.lower():
-                if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21:
+                if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21 and trf_name in ['Sim_tf.py']:
                     if project_mode.esConvertible is None:
                         project_mode.esConvertible = True
 

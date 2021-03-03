@@ -3401,7 +3401,8 @@ class TaskDefinition(object):
                 task_proto_dict.update({'respect_split_rule': project_mode.respectSplitRule or None})
 
             if step.request.request_type.lower() == 'MC'.lower():
-                if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21 and trf_name in ['Sim_tf.py']:
+                if prod_step.lower() == 'simul'.lower() and len(trf_release.split('.')) > 2 and \
+                        ('.'.join(trf_release.split('.')[0:3]) in ['21.0.15','21.0.31']) and trf_name in ['Sim_tf.py']:
                     if project_mode.esConvertible is None:
                         project_mode.esConvertible = True
 

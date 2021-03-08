@@ -589,7 +589,53 @@ class TaskDefinition(object):
 
         return input_params
 
-    def _construct_taskname(self, input_data_name, project, prod_step, ctag_name):
+    def _find_tag_fold(self, version_list, folding_prod_step):
+        if ProductionTask.objects.filter(ctag=version_list[-1]).exists():
+            task = ProductionTask.objects.filter(ctag=version_list[-1]).latest('id')
+            parent_dataset = task.inputdataset
+            while folding_prod_step not in parent_dataset:
+                if 'tid' in parent_dataset:
+                    task_id = self._get_parent_task_id_from_input(parent_dataset)
+                    if task_id !=0:
+                        parent_dataset =  ProductionTask.objects.get(id=task_id).inputdataset
+                    else:
+                        break
+                else:
+                    break
+            if folding_prod_step in parent_dataset:
+                if '_tid' in parent_dataset:
+                    parent_dataset = parent_dataset.split('_tid')[0]
+                tag =  parent_dataset.split('_')[-1]
+                if tag in version_list:
+                    return tag
+                else:
+                    raise Exception("Tag folding is not possible, different tag is used in the past, please create a new AMItag, old tag: {0}".format(tag))
+            else:
+                raise Exception("Something wrong with tag folding, {0} is not found in parent tasks".format(folding_prod_step))
+        else:
+            return ''
+
+    def _check_tag_folding(self, version_list, trf_name):
+        if trf_name.lower() == 'ReSim_tf.py'.lower():
+            # Fold tags for ReSim case. remove old sim and sim merge tag
+            logger.info('Try to find previous tasks for ReSim tag folding {0}'.format(str(version_list),trf_name))
+
+            simul_tag = self._find_tag_fold(version_list, 'simul')
+            if not simul_tag:
+                simul_tag = [tag for tag in version_list if not tag.startswith('e')][0]
+                logger.info('New ReSim tag folding pair {0} - {1}'.format(str(simul_tag),version_list[-1]))
+            new_version_list = []
+            for version in version_list:
+                if version != simul_tag:
+                    new_version_list.append(version)
+                else:
+                    break
+            if version_list[-1] not in new_version_list:
+                new_version_list.append(version_list[-1])
+            return new_version_list
+        return version_list
+
+    def _construct_taskname(self, input_data_name, project, prod_step, ctag_name, trf_name):
         input_data_dict = self.parse_data_name(input_data_name)
         version_list = list()
         old_version = input_data_dict['version']
@@ -599,13 +645,14 @@ class TaskDefinition(object):
                 old_version = old_version.replace(result.groupdict()['tid'], '')
             version_list.extend(old_version.split('_'))
         version_list.append(ctag_name)
+        version_list = self._check_tag_folding(version_list,trf_name)
         version = '_'.join(version_list)
         input_data_dict.update({'project': project, 'prod_step': prod_step, 'version': version})
         name_template = Template(TaskDefConstants.DEFAULT_TASK_NAME_TEMPLATE)
         return name_template.render(Context(input_data_dict, autoescape=False))
 
-    @staticmethod
-    def _construct_output(input_data_dict, project, prod_step, ctag_name, data_type, task_id):
+
+    def _construct_output(self, input_data_dict, project, prod_step, ctag_name, data_type, task_id, trf_name):
         version_list = list()
         old_version = input_data_dict['version']
         if old_version:
@@ -614,6 +661,7 @@ class TaskDefinition(object):
                 old_version = old_version.replace(result.groupdict()['tid'], '')
             version_list.extend(old_version.split('_'))
         version_list.append(ctag_name)
+        version_list = self._check_tag_folding(version_list,trf_name)
         version = '_'.join(version_list)
         input_data_dict.update({'project': project,
                                 'prod_step': prod_step,
@@ -623,7 +671,7 @@ class TaskDefinition(object):
         output_template = Template(TaskDefConstants.DEFAULT_TASK_OUTPUT_NAME_TEMPLATE)
         return output_template.render(Context(input_data_dict, autoescape=False))
 
-    def _get_output_params(self, input_data_name, output_types, project, prod_step, ctag_name, task_id):
+    def _get_output_params(self, input_data_name, output_types, project, prod_step, ctag_name, task_id, trf_name):
         # returns output_params = {'outputAODFile': [...], 'outputEVNTFile': [...], ...}
         output_params = dict()
         for output_type in output_types:
@@ -632,7 +680,7 @@ class TaskDefinition(object):
                                                          prod_step,
                                                          ctag_name,
                                                          output_type,
-                                                         task_id)
+                                                         task_id, trf_name)
             self._add_output_dataset_name(output_dataset_name, output_params)
         return output_params
 
@@ -2164,7 +2212,7 @@ class TaskDefinition(object):
             if input_data_dict['project'].lower().startswith('mc') and project.lower().startswith('data'):
                 raise Exception("The project 'data' is invalid for MC inputs")
 
-            taskname = self._construct_taskname(input_data_name, project, prod_step, ctag_name)
+            taskname = self._construct_taskname(input_data_name, project, prod_step, ctag_name, trf_name)
             task_proto_id = self.task_reg.register_task_id()
 
             if 'EVNT' in output_types and prod_step.lower() == 'evgen'.lower():
@@ -2332,7 +2380,8 @@ class TaskDefinition(object):
                                                     project,
                                                     prod_step,
                                                     ctag_name,
-                                                    task_proto_id)
+                                                    task_proto_id,
+                                                    trf_name)
 
             # proto_fix
             if trf_name.lower() == 'TrainReco_tf.py'.lower():

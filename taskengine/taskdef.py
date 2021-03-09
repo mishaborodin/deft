@@ -4487,7 +4487,7 @@ class TaskDefinition(object):
             'status', flat=True)
         for status in statuses:
             if status not in ['approved', 'comment']:
-                if status == 'waiting':
+                if status in ['waiting', 'registered']:
                     return 'working'
                 else:
                     return status

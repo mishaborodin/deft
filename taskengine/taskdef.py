@@ -3384,6 +3384,9 @@ class TaskDefinition(object):
             if project_mode.cpuTimeUnit is not None:
                 task_proto_dict.update({'cpu_time_unit': project_mode.cpuTimeUnit})
 
+            if project_mode.gshare is not None:
+                task_proto_dict.update({'global_share': project_mode.gshare})
+
             if project_mode.workDiskCount is not None:
                 task_proto_dict.update({'work_disk_count': project_mode.workDiskCount})
 
@@ -3628,7 +3631,10 @@ class TaskDefinition(object):
             if io_intensity:
                 task_proto_dict.update({'io_intensity': int(io_intensity)})
                 task_proto_dict.update({'io_intensity_unit': 'kBPerS'})
-
+            #Set GShare
+            if usergroup in ['AP_VALI','GP_VALI']:
+                if not project_mode.gshare:
+                    task_proto_dict.update({'global_share': 'Validation'})
             # test Event Service
             if project_mode.testES:
                 if project_mode.nEventsPerWorker:

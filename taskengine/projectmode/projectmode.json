@@ -466,5 +466,9 @@
   "noprestage": {
     "type": "bool",
     "description": ""
+  },
+  "gshare": {
+    "type": "str",
+    "description": ""
   }
 }

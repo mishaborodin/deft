@@ -104,7 +104,8 @@
   "container_name": "'{{container_name}}'",
   "outputPostProcessing": "{{output_post_processing}}",
   "onlyTagsForFC": "{{only_tags_for_fc}}",
-  "multiStepExec": "{{multi_step_exec}}"
+  "multiStepExec": "{{multi_step_exec}}",
+  "gshare": "'{{global_share}}'"
 
 
 }

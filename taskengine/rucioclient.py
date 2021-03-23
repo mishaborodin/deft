@@ -3,6 +3,7 @@ __author__ = 'Dmitry Golubkov'
 import os
 import re
 import math
+import random
 from deftcore.log import Logger
 from deftcore.settings import RUCIO_ACCOUNT_NAME, X509_PROXY_PATH
 from rucio.client import Client
@@ -18,6 +19,8 @@ class RucioClient(object):
             # set up Rucio environment
             os.environ['RUCIO_ACCOUNT'] = RUCIO_ACCOUNT_NAME
             os.environ['RUCIO_AUTH_TYPE'] = 'x509_proxy'
+            #os.environ['X509_USER_PROXY'] = X509_PROXY_PATH
+            #self.client = Client(ca_cert=False)
             os.environ['X509_USER_PROXY'] = self._get_proxy()
             self.client = Client()
         except CannotAuthenticate as ex:
@@ -101,6 +104,20 @@ class RucioClient(object):
             filename_list.append(file_name)
         return filename_list
 
+    def list_files_with_scope_in_dataset(self, dsn):
+        filename_list = list()
+        scope, dataset = self.extract_scope(dsn)
+        files = self.client.list_files(scope, dataset, long=False)
+        for file_name in [e['scope']+':'+e['name'] for e in files]:
+            filename_list.append(file_name)
+        return filename_list
+
+    def choose_random_files(self, list_files, files_number, random_seed=None, previously_used=None):
+        lookup_list = [x for x in list_files if x not in (previously_used or [])]
+        random.seed(random_seed)
+        return random.sample(lookup_list, files_number)
+
+
     def get_number_files(self, dsn):
         number_files = 0
         if self.is_dsn_container(dsn):
@@ -129,6 +146,10 @@ class RucioClient(object):
         if undo:
             lifetime = None
         self.client.set_metadata(scope=scope, name=name, key='lifetime', value=lifetime)
+
+    def set_dataset_metadata(self, dsn, key, value):
+        scope, name = self.extract_scope(dsn)
+        self.client.set_metadata(scope=scope, name=name, key=key, value=value)
 
     def register_dataset(self, dsn, files=None, statuses=None, meta=None, lifetime=None):
         """

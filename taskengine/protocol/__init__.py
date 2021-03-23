@@ -75,6 +75,7 @@ class TaskParamName(Enum):
     SECONDARY_INPUT_MINBIAS = auto()
     SECONDARY_INPUT_CAVERN = auto()
     SECONDARY_INPUT_ZERO_BIAS_BS = auto()
+    SECONDARY_INPUT_ZERO_BIAS_BS_RND = auto()
     LOG = auto()
     JOB_NUMBER = auto()
     FILTER_FILE = auto()
@@ -246,6 +247,16 @@ class Protocol(object):
             "offset": 0,
             "param_type": "input",
             "ratio": 0,
+            "eventRatio": {{event_ratio|default:'"None"'}},
+            "type": "template",
+            "value": "{{name}}=${IN_ZERO_BIAS_BS/L}"
+        }""",
+        TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS_RND: """{
+            "dataset": "{{dataset}}",
+            "offset": 0,
+            "param_type": "input",
+            "ratio": 0,
+            "random": "True",
             "eventRatio": {{event_ratio|default:'"None"'}},
             "type": "template",
             "value": "{{name}}=${IN_ZERO_BIAS_BS/L}"

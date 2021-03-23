@@ -914,7 +914,7 @@ class TaskDefinition(object):
 
         return self._extract_chain_input_events(parent_step)
 
-    def _check_task_number_of_jobs(self, task, nevents, step):
+    def _get_result_number_of_jobs(self, task, nevents, step):
         number_of_jobs = 0
         nevents_per_job = task.get('nEventsPerJob', 0)
         nfiles_per_job = task.get('nFilesPerJob', 0)
@@ -947,6 +947,11 @@ class TaskDefinition(object):
                 number_of_jobs = total_nevents / nevents_per_job
             else:
                 number_of_jobs = total_nevents / nfiles_per_job
+        return  number_of_jobs
+
+
+    def _check_task_number_of_jobs(self, task, nevents, step):
+        number_of_jobs = self._get_result_number_of_jobs(task, nevents, step)
 
         if number_of_jobs >= TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK / 5 or \
                 requested_nevents < TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS:
@@ -1516,6 +1521,34 @@ class TaskDefinition(object):
                             {'container_name': sw_container['name']})
                         return
                 raise ContainerIsNotFoundException(task_proto_dict['site'])
+
+    def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id):
+        used_files = set()
+        for dataset in mc_pileup_overlay['datasets']:
+            previous_task_id = self.rucio_client.get_metadata_attribute(dataset,'task_id')
+            if ProductionTask.objects.get(id=previous_task_id).status not in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
+                used_files.update(self.rucio_client.list_files_with_scope_in_dataset(dataset))
+        files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],math.ceil(number_of_jobs),random_seed=None,previously_used=list(used_files))
+        logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
+        self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_to_store,meta={'task_id':task_id})
+        pass
+
+    def _find_overlay_input_dataset(self, param_value, dsid):
+        if param_value[-1] == '/':
+            param_value = param_value[:-1]
+        files_list = self.rucio_client.list_files_with_scope_in_dataset(param_value)
+        name_base = param_value
+        if '_tid' in name_base:
+            name_base = name_base.split('_tid')[0]
+        previous_datasets = self.rucio_client.list_datasets('{base}_rnd{dsid}_*'.format(base=name_base,dsid=dsid))
+        version = 1
+        versions = []
+        for dataset in previous_datasets:
+            versions.append(int(dataset.split('_')[-1]))
+        if versions:
+            version = max(versions) + 1
+        input_dataset_name = '{base}_rnd{dsid}_{version:04d}'.format(base=name_base,dsid=dsid,version=version)
+        return {'files':files_list, 'datasets':previous_datasets,'version': version,'input_dataset_name':input_dataset_name}
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
         task_config = ProjectMode.get_task_config(step)
@@ -2441,6 +2474,8 @@ class TaskDefinition(object):
             job_parameters = list()
 
             output_trf_params = list()
+
+            mc_pileup_overlay = {'is_overlay':False,'datasets':[],'version':1,'input_dataset_name':None, 'files': []}
             for output_type in output_types:
                 if (trf_name.lower() == 'Trig_reco_tf.py'.lower() or trf_name.lower() == 'TrigMT_reco_tf.py'.lower()) \
                         and output_type == 'RAW':
@@ -2713,27 +2748,39 @@ class TaskDefinition(object):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
-                    if param_value[-1] != '/' and ('_tid' not in param_value):
-                        if self.rucio_client.is_dsn_container(param_value):
-                            param_value = '%s/' % param_value
-                    param_dict = {'name': name, 'dataset': param_value}
-                    param_dict.update(trf_options)
-                    if project_mode.eventRatio:
-                        event_ratio = project_mode.eventRatio \
-                            if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
-                        param_dict.update({'event_ratio': event_ratio})
-                    second_input_param = \
-                        self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
-                    n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
-                    if project_mode.npileup:
-                        n_pileup = project_mode.npileup \
-                            if '.' in str(project_mode.npileup) else int(project_mode.npileup)
-                    second_input_param['ratio'] = n_pileup
-                    if secondary_input_offset:
-                        second_input_param['offset'] = secondary_input_offset
-                    # if project_mode.count_overlay_offset:
-                    #     second_input_param['offset'] = 0
-                    job_parameters.append(second_input_param)
+                    if project_mode.randomMCOverlay:
+                        mc_pileup_overlay['is_overlay'] = True
+                        mc_pileup_overlay.update(self._find_overlay_input_dataset(param_value,input_data_dict['number']))
+                        param_dict = {'name': name, 'dataset': mc_pileup_overlay['input_dataset_name']}
+                        param_dict.update(trf_options)
+                        if project_mode.eventRatio:
+                            event_ratio = project_mode.eventRatio \
+                                if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
+                            param_dict.update({'event_ratio': event_ratio})
+                        second_input_param = \
+                            self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS_RND, param_dict)
+                        second_input_param['ratio'] = 1
+                        job_parameters.append(second_input_param)
+                    else:
+                        if param_value[-1] != '/' and ('_tid' not in param_value):
+                            if self.rucio_client.is_dsn_container(param_value):
+                                param_value = '%s/' % param_value
+                        param_dict = {'name': name, 'dataset': param_value}
+                        param_dict.update(trf_options)
+                        if project_mode.eventRatio:
+                            event_ratio = project_mode.eventRatio \
+                                if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
+                            param_dict.update({'event_ratio': event_ratio})
+                        second_input_param = \
+                            self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
+                        n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
+                        if project_mode.npileup:
+                            n_pileup = project_mode.npileup \
+                                if '.' in str(project_mode.npileup) else int(project_mode.npileup)
+                        second_input_param['ratio'] = n_pileup
+                        if secondary_input_offset:
+                            second_input_param['offset'] = secondary_input_offset
+                        job_parameters.append(second_input_param)
                     is_pile_task = True
                 elif re.match(r'^.*(PtMinbias|Cavern).*File$', name, re.IGNORECASE):
                     param_name = name
@@ -3757,7 +3804,8 @@ class TaskDefinition(object):
                                            input_data_name, step, primary_input_offset, prod_step,
                                            reuse_input=reuse_input, evgen_params=evgen_params,
                                            task_common_offset=task_common_offset)
-
+                if mc_pileup_overlay['is_overlay']:
+                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step), task_id)
                 if step == first_step:
                     chain_id = task_id
                     primary_input_offset = 0

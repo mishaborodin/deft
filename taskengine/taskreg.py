@@ -3,7 +3,7 @@ __author__ = 'Dmitry Golubkov'
 import json
 import re
 from django.core.exceptions import ObjectDoesNotExist
-from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution, HashTag
+from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution, HashTag, HashTagToRequest
 from taskengine.protocol import Protocol, TaskStatus, TaskDefConstants
 from django.utils import timezone
 from deftcore.settings import MONITORING_REQUEST_LINK_FORMAT
@@ -165,7 +165,12 @@ class TaskRegistration(object):
                 hashtag = HashTag(hashtag=task_common_offset_hashtag, type='UD')
                 hashtag.save()
             prod_task.set_hashtag(hashtag.hashtag)
-
+        try:
+            request_hashtags = HashTagToRequest.objects.filter(request=step.request)
+            for hashtag in request_hashtags:
+                prod_task.set_hashtag(hashtag.hashtag)
+        except Exception as e:
+            logger.warning('Problem with hashtag registration {0}'.format(str(e)))
         logger.debug('Task {0} is registered'.format(task_id))
 
     def _register_task_input(self, prod_task, events_per_file):

@@ -387,6 +387,18 @@ class HashTagToTask(models.Model):
         db_name = 'deft_adcr'
         db_table = '"ATLAS_DEFT"."T_HT_TO_TASK"'
 
+class HashTagToRequest(models.Model):
+
+    id = models.DecimalField(decimal_places=0, max_digits=12, db_column='HTTR_ID', primary_key=True)
+    request = models.ForeignKey(TRequest,  db_column='PR_ID', on_delete=CASCADE)
+    hashtag = models.ForeignKey(HashTag, db_column='HT_ID', on_delete=CASCADE)
+
+    def save(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    class Meta:
+        db_name = 'deft_adcr'
+        db_table = '"ATLAS_DEFT"."T_HT_TO_REQUEST"'
 
 class TTask(models.Model):
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='TASKID', primary_key=True)

@@ -510,6 +510,7 @@ class TaskDefConstants(object, metaclass=Constants):
     DDM_PROGRESS_EVENT_TYPE = Constant('RULE_PROGRESS')
     DATASET_DELETED_STATUS = Constant('Deleted')
     DATASET_TO_BE_DELETED_STATUS = Constant('toBeDeleted')
+    MC_DELETED_REPROCESSING_REQUEST_HASHTAG = Constant('MCDeletedReprocessing')
 
     DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT = Constant('_tco_{0}')
 

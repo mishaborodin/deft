@@ -15,7 +15,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -892,6 +892,18 @@ class TaskDefinition(object):
                     list_task_id.append(parent_id)
                     self._enum_previous_tasks(parent_id, data_type, list_task_id)
 
+    def _enum_all_previous_tasks(self, task_id, list_task_id):
+        task = TTask.objects.get(id=task_id)
+        task_params = json.loads(task.jedi_task_param)['jobParameters']
+        primary_input = self._get_primary_input(task_params)
+        if primary_input:
+            dsn = primary_input['dataset']
+            if re.match(TaskDefConstants.DEFAULT_DATA_NAME_PATTERN, dsn):
+                parent_id = self._get_parent_task_id_from_input(dsn)
+                if parent_id:
+                    list_task_id.append(parent_id)
+                    self._enum_all_previous_tasks(parent_id, list_task_id)
+
     def _enum_next_tasks(self, task_id, data_type, list_task_id):
         next_task_list = ProductionTask.objects.filter(primary_input__endswith='_tid{0}_00'.format(task_id),
                                                        output_formats__contains=data_type,
@@ -959,6 +971,54 @@ class TaskDefinition(object):
 
         if requested_nevents >= TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS:
             task['skipShortInput'] = True
+
+    def _check_task_recreated(self, task, step):
+        primary_input = self._get_primary_input(task['jobParameters'])
+        if not primary_input:
+            return False
+
+        dsn = primary_input['dataset']
+        if not dsn:
+            return False
+        task_id = self._get_parent_task_id_from_input(dsn)
+        if task_id == 0:
+            return False
+        parent_task = ProductionTask.objects.get(id=task_id)
+        hashtag = HashTag.objects.get(hashtag=TaskDefConstants.MC_DELETED_REPROCESSING_REQUEST_HASHTAG)
+        if not HashTagToRequest.objects.filter(request=step.request,hashtag=hashtag).exists() and not parent_task.hashtag_exists(TaskDefConstants.MC_DELETED_REPROCESSING_REQUEST_HASHTAG):
+            return False
+        all_previous_tasks = list()
+        self._enum_all_previous_tasks(parent_task.id,all_previous_tasks)
+        all_previous_tasks.append(parent_task.id)
+        all_previous_tasks_set = set(all_previous_tasks)
+        output_formats = set(step.step_template.output_formats.split('.'))
+        similar_tasks = ProductionTask.objects.filter(name=task['taskName'])
+        for similar_task in similar_tasks:
+            if similar_task.status in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
+                continue
+            similar_task_output_formats = set(similar_task.output_formats.split('.'))
+            if len(output_formats.intersection(similar_task_output_formats)) > 0:
+                similar_task_previous_tasks = list()
+                self._enum_all_previous_tasks(similar_task.id,similar_task_previous_tasks)
+                similar_task_previous_task_set = set(similar_task_previous_tasks)
+                if len(all_previous_tasks_set.intersection(similar_task_previous_task_set))>0:
+                    previous_output_status_dict = \
+                        self.task_reg.check_task_output(similar_task.id, output_formats)
+                    for requested_output_type in output_formats:
+                        if requested_output_type not in list(previous_output_status_dict.keys()):
+                            continue
+                        if previous_output_status_dict[requested_output_type]:
+                            logger.info('Duplication found during deep check')
+
+                            raise TaskDuplicateDetected(similar_task.id, 1,
+                                                        request=step.request.id,
+                                                        slice=step.slice.slice,
+                                                        processed_formats='.'.join(similar_task_output_formats),
+                                                        requested_formats='.'.join(output_formats),
+                                                        tag=step.step_template.ctag)
+        return True
+
+
 
     def _check_task_merged_input(self, task, step, prod_step):
         # skip EI tasks
@@ -3804,6 +3864,7 @@ class TaskDefinition(object):
                                            input_data_name, step, primary_input_offset, prod_step,
                                            reuse_input=reuse_input, evgen_params=evgen_params,
                                            task_common_offset=task_common_offset)
+                set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay']:
                     self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step)[0], task_id)
                 if step == first_step:
@@ -3826,6 +3887,12 @@ class TaskDefinition(object):
                                                    parent_task_id,
                                                    usergroup,
                                                    step.request.subcampaign)
+                if set_mc_reprocessing_hashtag:
+                    try:
+                        created_task = ProductionTask.objects.get(id=task_id)
+                        created_task.set_hashtag(TaskDefConstants.MC_DELETED_REPROCESSING_REQUEST_HASHTAG)
+                    except Exception as e:
+                        logger.warning('Problem with hashtag registration {0}'.format(str(e)))
 
                 parent_task_id = task_id
 

@@ -947,11 +947,11 @@ class TaskDefinition(object):
                 number_of_jobs = total_nevents / nevents_per_job
             else:
                 number_of_jobs = total_nevents / nfiles_per_job
-        return  number_of_jobs
+        return  number_of_jobs, requested_nevents
 
 
     def _check_task_number_of_jobs(self, task, nevents, step):
-        number_of_jobs = self._get_result_number_of_jobs(task, nevents, step)
+        number_of_jobs, requested_nevents = self._get_result_number_of_jobs(task, nevents, step)
 
         if number_of_jobs >= TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK / 5 or \
                 requested_nevents < TaskDefConstants.NO_ES_MIN_NUMBER_OF_EVENTS:
@@ -3805,7 +3805,7 @@ class TaskDefinition(object):
                                            reuse_input=reuse_input, evgen_params=evgen_params,
                                            task_common_offset=task_common_offset)
                 if mc_pileup_overlay['is_overlay']:
-                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step), task_id)
+                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step)[0], task_id)
                 if step == first_step:
                     chain_id = task_id
                     primary_input_offset = 0

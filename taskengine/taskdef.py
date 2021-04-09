@@ -980,6 +980,8 @@ class TaskDefinition(object):
         dsn = primary_input['dataset']
         if not dsn:
             return False
+        if dsn.startswith('group') or dsn.startswith('user'):
+            return False
         task_id = self._get_parent_task_id_from_input(dsn)
         if task_id == 0:
             return False

@@ -2672,6 +2672,18 @@ class TaskDefinition(object):
                     job_parameters.append(
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
+                elif re.match(r'^(--)?rivetAnas', name, re.IGNORECASE):
+                    if project_mode.rivet:
+                        param_value = project_mode.rivet
+                    else:
+                        param_value = self._get_parameter_value(name, input_params)
+                    if not param_value or str(param_value).lower() == 'none':
+                        continue
+                    param_dict = {'name': name, 'value': param_value}
+                    param_dict.update(trf_options)
+                    job_parameters.append(
+                        self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
+                    )
                 elif re.match(r'^(--)?ecmEnergy', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, input_params)
                     if not param_value:

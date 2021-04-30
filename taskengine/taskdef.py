@@ -184,6 +184,23 @@ class BlacklistedInputException(Exception):
         )
         super(BlacklistedInputException, self).__init__(message)
 
+def divisorGenerator(n):
+    large_divisors = []
+    for i in range(1, int(math.sqrt(n) + 1)):
+        if n % i == 0:
+            yield i
+            if i*i != n:
+                large_divisors.append(n // i)
+    for divisor in reversed(large_divisors):
+        yield divisor
+
+def minHigherDivisor(value, n):
+    if value >= n:
+        return n
+    for x in divisorGenerator(n):
+        if x > value:
+            return x
+    return n
 
 # noinspection PyBroadException, PyUnresolvedReferences
 class TaskDefinition(object):
@@ -2218,7 +2235,7 @@ class TaskDefinition(object):
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = int(input_params.get('nEventsPerJob', 0)) or int(task_config.get('nEventsPerJob', 0))
                     if min_events:
-                        if not project_mode.nEventsPerInputFile:
+                        if not project_mode.nEventsPerInputFile and not project_mode.optimalFirstEvent:
                             project_mode.nEventsPerInputFile = min_events
 
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
@@ -2407,7 +2424,10 @@ class TaskDefinition(object):
                         if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(
                                 task_config.keys()):
                             if not project_mode.nEventsPerInputFile:
-                                task_config['nEventsPerInputFile'] = int(task_config['nEventsPerJob'])
+                                if project_mode.optimalFirstEvent and task_config.get('nFilesPerJob') and int(task_config['nFilesPerJob'])>1:
+                                    task_config['nEventsPerInputFile'] = minHigherDivisor(int(task_config['nEventsPerJob']) // (int(task_config['nFilesPerJob'])-1) ,int(task_config['nEventsPerJob']))
+                                else:
+                                    task_config['nEventsPerInputFile'] = int(task_config['nEventsPerJob'])
                             else:
                                 task_config['nEventsPerInputFile'] = project_mode.nEventsPerInputFile
                     if 'nEventsPerInputFile' in list(task_config.keys()) and task_config['nEventsPerInputFile'] > 0 \
@@ -2514,7 +2534,7 @@ class TaskDefinition(object):
                     pass
 
             if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) and \
-                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile:
+                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile and not project_mode.optimalFirstEvent:
                 self._check_task_events_consistency(task_config)
 
 
@@ -3449,11 +3469,10 @@ class TaskDefinition(object):
                 number_of_events_per_range = int(task_config['nEventsPerRange'])
                 task_proto_dict.update({'number_of_events_per_range': number_of_events_per_range})
 
-            if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()):
-                number_of_max_files_per_job = \
-                    int(task_config['nEventsPerJob']) / int(task_config['nEventsPerInputFile'])
+            if ('nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys())) and not('nFilesPerJob' in list(task_config.keys())):
+                number_of_max_files_per_job = int(task_config['nEventsPerJob']) / int(task_config['nEventsPerInputFile'])
                 if number_of_max_files_per_job > TaskDefConstants.DEFAULT_MAX_FILES_PER_JOB:
-                    task_proto_dict.update({'number_of_max_files_per_job': int(number_of_max_files_per_job)})
+                    task_proto_dict.update({'number_of_max_files_per_job': ceil(number_of_max_files_per_job)})
 
             if 'nGBPerJob' in list(task_config.keys()):
                 number_of_gb_per_job = int(task_config['nGBPerJob'])

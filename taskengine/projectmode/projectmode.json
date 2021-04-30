@@ -478,6 +478,10 @@
   "rivet": {
     "type": "str",
     "description": ""
+  },
+  "optimalFirstEvent": {
+    "type": "bool",
+    "description": ""
   }
 
 }

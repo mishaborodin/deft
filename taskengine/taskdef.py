@@ -3472,7 +3472,7 @@ class TaskDefinition(object):
             if ('nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys())) and not('nFilesPerJob' in list(task_config.keys())):
                 number_of_max_files_per_job = int(task_config['nEventsPerJob']) / int(task_config['nEventsPerInputFile'])
                 if number_of_max_files_per_job > TaskDefConstants.DEFAULT_MAX_FILES_PER_JOB:
-                    task_proto_dict.update({'number_of_max_files_per_job': ceil(number_of_max_files_per_job)})
+                    task_proto_dict.update({'number_of_max_files_per_job': math.ceil(number_of_max_files_per_job)})
 
             if 'nGBPerJob' in list(task_config.keys()):
                 number_of_gb_per_job = int(task_config['nGBPerJob'])

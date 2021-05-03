@@ -823,6 +823,17 @@ class JEDIDatasetContent(models.Model):
         db_name = 'panda_adcr'
         db_table = '"ATLAS_PANDA"."JEDI_DATASET_CONTENTS"'
 
+class GlobalShare(models.Model):
+    name = models.CharField(max_length=32, db_column='NAME', primary_key=True)
+    value = models.DecimalField(decimal_places=0, max_digits=3, db_column='VALUE')
+    parent = models.CharField (max_length=32, db_column='PARENT')
+
+    def save(self, *args, **kwargs):
+        raise NotImplementedError('Only manual creation')
+
+    class Meta:
+        db_name = 'panda_adcr'
+        db_table = '"ATLAS_PANDA"."GLOBAL_SHARES"'
 
 class InstalledSW(models.Model):
     site_id = models.CharField(max_length=60, db_column='SITEID', primary_key=True)

@@ -15,7 +15,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, GlobalShare
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -3525,7 +3525,11 @@ class TaskDefinition(object):
                 task_proto_dict.update({'cpu_time_unit': project_mode.cpuTimeUnit})
 
             if project_mode.gshare is not None:
-                task_proto_dict.update({'global_share': project_mode.gshare})
+                all_gshares = GlobalShare.objects.all().values_list('name',flat=True)
+                for gshare in all_gshares:
+                    if gshare.replace(" ","") == project_mode.gshare:
+                        task_proto_dict.update({'global_share': gshare})
+                        break
 
             if project_mode.workDiskCount is not None:
                 task_proto_dict.update({'work_disk_count': project_mode.workDiskCount})

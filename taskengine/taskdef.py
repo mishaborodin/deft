@@ -2210,9 +2210,15 @@ class TaskDefinition(object):
                     max_events_forced = input_params['nEventsPerJob']
                     use_evnt_filter = True
                     task_config['nFiles'] = int(number_of_events * input_params['nFilesPerJob'] / max_events_forced)
-                    project_mode.nEventsPerInputFile = max_events_forced
-                    input_params['nEventsPerInputFile'] = max_events_forced
-                    task_config['nEventsPerInputFile'] = max_events_forced
+                    if project_mode.optimalFirstEvent:
+                       nEventsOptimal = minHigherDivisor(int(max_events_forced) // (int(input_params['nFilesPerJob'])-1) ,int(max_events_forced))
+                       project_mode.nEventsPerInputFile = nEventsOptimal
+                       input_params['nEventsPerInputFile'] = nEventsOptimal
+                       task_config['nEventsPerInputFile'] = nEventsOptimal
+                    else:
+                        project_mode.nEventsPerInputFile = max_events_forced
+                        input_params['nEventsPerInputFile'] = max_events_forced
+                        task_config['nEventsPerInputFile'] = max_events_forced
 
             use_lhe_filter = None
             is_evnt = False
@@ -2288,6 +2294,8 @@ class TaskDefinition(object):
                     if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                         input_params['inputBSCONFIGFile'] = input_params[key]
                         del input_params[key]
+            elif trf_name.lower() == 'ReSim_tf.py'.lower():
+                trf_options.update({'separator': ' '})
 
             input_data_name = None
             skip_check_input = False

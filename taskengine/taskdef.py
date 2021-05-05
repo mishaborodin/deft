@@ -1522,10 +1522,13 @@ class TaskDefinition(object):
             if random_seed_param:
                 random_seed_param['offset'] = number_of_input_files_used
             if prod_step.lower() == 'evgen'.lower():
-                events_per_file = int(task_config['nEventsPerInputFile'])
-                first_event_param = self._get_job_parameter('firstEvent', task['jobParameters'])
-                if first_event_param:
-                    first_event_param['offset'] = number_of_input_files_used * events_per_file
+                if project_mode.optimalFirstEvent:
+                    random_seed_param['offset'] = math.ceil(number_of_input_files_used / task_config['nFilesPerJob'])
+                else:
+                    events_per_file = int(task_config['nEventsPerInputFile'])
+                    first_event_param = self._get_job_parameter('firstEvent', task['jobParameters'])
+                    if first_event_param:
+                        first_event_param['offset'] = number_of_input_files_used * events_per_file
 
         if evgen_params and prod_step.lower() == 'evgen'.lower():
             random_seed_param = self._get_job_parameter('randomSeed', task['jobParameters'])
@@ -2798,7 +2801,13 @@ class TaskDefinition(object):
                 elif re.match('^(--)?firstEvent$', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        if ('nEventsPerJob' in list(task_config.keys()) or 'nEventsPerRange' in list(
+                        if project_mode.optimalFirstEvent:
+                            param_dict = {'name': name, 'nEventsPerJob': int(task_config['nEventsPerJob']) }
+                            param_dict.update(trf_options)
+                            job_parameters.append(
+                                self.protocol.render_param(TaskParamName.SPECIAL_FIRST_EVENT, param_dict)
+                            )
+                        elif ('nEventsPerJob' in list(task_config.keys()) or 'nEventsPerRange' in list(
                                 task_config.keys()) or
                             project_mode.tgtNumEventsPerJob) and \
                                 ('nEventsPerInputFile' in list(task_config.keys()) or use_real_nevents):

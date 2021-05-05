@@ -67,6 +67,7 @@ class TaskParamName(Enum):
     RANDOM_SEED = auto()
     RANDOM_SEED_MC = auto()
     FIRST_EVENT = auto()
+    SPECIAL_FIRST_EVENT = auto()
     DB_RELEASE = auto()
     INPUT = auto()
     INPUT_DIRECT_IO = auto()
@@ -153,6 +154,11 @@ class Protocol(object):
             "param_type": "number",
             "type": "template",
             "value": "{{name}}{{separator}}${FIRSTEVENT}"
+        }""",
+        TaskParamName.SPECIAL_FIRST_EVENT: """{
+            "param_type": "number",
+            "type": "template",
+            "value": "{{name}}{{separator}}${SEQNUMBER/M[({{nEventsPerJob}}*(#-1))+1]}"
         }""",
         TaskParamName.DB_RELEASE: """{
             "dataset": "{{dataset}}",

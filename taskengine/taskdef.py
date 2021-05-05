@@ -3378,6 +3378,9 @@ class TaskDefinition(object):
                     task_proto_dict.update({'use_exhausted': True})
                 if project.lower().startswith('mc'):
                     task_proto_dict.update({'cpu_time': 200})
+                if core_count > 1:
+                    memory = 1750
+                    base_memory = 2000
 
             if trf_name in ['AODMerge_tf.py', 'DAODMerge_tf.py', 'Archive_tf.py', 'ESDMerge_tf.py']:
                 task_proto_dict.update({'out_disk_count': 1000})

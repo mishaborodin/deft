@@ -4745,6 +4745,8 @@ class TaskDefinition(object):
                                         if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                                             phys_cont_list.extend(input_params[key])
                                 elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
+                                    if ProjectMode(step).optimalFirstEvent:
+                                        raise Exception("optimalFirstEvent can't be used yet with splitEvgen")
                                     evgen_input_list.extend(self._get_evgen_input_list(step))
                         if phys_cont_list:
                             for input_dataset in phys_cont_list:

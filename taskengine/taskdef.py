@@ -1622,14 +1622,14 @@ class TaskDefinition(object):
         name_base = param_value
         if '_tid' in name_base:
             name_base = name_base.split('_tid')[0]
-        previous_datasets = self.rucio_client.list_datasets('{base}_rnd{dsid}_*'.format(base=name_base,dsid=dsid))
+        previous_datasets = self.rucio_client.list_datasets('{base}_sub*_rnd{dsid}'.format(base=name_base,dsid=dsid))
         version = 1
         versions = []
         for dataset in previous_datasets:
-            versions.append(int(dataset.split('_')[-1]))
+            versions.append(int(dataset[dataset.find('_sub')+len('_sub'):dataset.find('_rnd')]))
         if versions:
             version = max(versions) + 1
-        input_dataset_name = '{base}_rnd{dsid}_{version:04d}'.format(base=name_base,dsid=dsid,version=version)
+        input_dataset_name = '{base}_sub{version:04d}_rnd{dsid}'.format(base=name_base,dsid=dsid,version=version)
         return {'files':files_list, 'datasets':previous_datasets,'version': version,'input_dataset_name':input_dataset_name}
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):

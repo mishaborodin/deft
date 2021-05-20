@@ -3727,6 +3727,9 @@ class TaskDefinition(object):
             if project_mode.useZipToPin is not None:
                 task_proto_dict.update({'use_zip_to_pin': project_mode.useZipToPin or None})
 
+            if project_mode.noLoopingCheck is not None:
+                task_proto_dict.update({'no_looping_check': project_mode.noLoopingCheck or None})
+
             if project_mode.toStaging is not None:
                 task_proto_dict.update({'to_staging': project_mode.toStaging or None})
 

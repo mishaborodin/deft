@@ -482,6 +482,10 @@
   "optimalFirstEvent": {
     "type": "bool",
     "description": ""
+  },
+  "noLoopingCheck": {
+    "type": "bool",
+    "description": ""
   }
 
 }

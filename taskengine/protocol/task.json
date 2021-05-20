@@ -105,7 +105,6 @@
   "outputPostProcessing": "{{output_post_processing}}",
   "onlyTagsForFC": "{{only_tags_for_fc}}",
   "multiStepExec": "{{multi_step_exec}}",
-  "gshare": "'{{global_share}}'"
-
-
+  "gshare": "'{{global_share}}'",
+  "noLoopingCheck": "{{no_looping_check}}"
 }

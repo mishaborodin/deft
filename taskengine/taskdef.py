@@ -15,7 +15,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, GlobalShare
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, GlobalShare, SliceError
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -346,6 +346,21 @@ class TaskDefinition(object):
     @staticmethod
     def _read_events_per_job_from_jo(jo):
         return TaskDefinition._read_param_from_jo(jo, ['evgenConfig.minevents', 'evgenConfig.nEventsPerJob'])
+
+
+    @staticmethod
+    def set_slice_error(request, slice, exception_type, message):
+        try:
+            slice_error = SliceError(request=TRequest.objects.get(id=request), slice=InputRequestList.objects.get(id=slice))
+            if SliceError.objects.filter(request=request, slice=slice).exists():
+                slice_error = SliceError.objects.filter(request=request, slice=slice)[0]
+            slice_error.exception_type = exception_type
+            slice_error.message = message
+            slice_error.exception_time = timezone.now()
+            slice_error.is_active = True
+            slice_error.save()
+        except Exception as ex:
+            logger.warning('Slice error saving failed: {0}'.format(ex))
 
     @staticmethod
     def _read_files_per_job_from_jo(jo):
@@ -4762,6 +4777,7 @@ class TaskDefinition(object):
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
                                     jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
                                     continue
                                 except Exception as ex:
@@ -4779,6 +4795,7 @@ class TaskDefinition(object):
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
                                     jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
                                     continue
                                 except Exception as ex:
@@ -4798,6 +4815,7 @@ class TaskDefinition(object):
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
                                     jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
                                     continue
                                 except Exception as ex:
@@ -4838,6 +4856,7 @@ class TaskDefinition(object):
                                             log_msg += ' input = {0}, exception occurred: {1}'.format(
                                                 self.get_step_input_data_name(step), get_exception_string())
                                             jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                            self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                             exception = True
                                             continue
                                         except Exception as ex:
@@ -4859,6 +4878,7 @@ class TaskDefinition(object):
                                         log_msg += ' input = {0}, exception occurred: {1}'.format(
                                             self.get_step_input_data_name(step), get_exception_string())
                                         jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                        self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                         exception = True
                                         continue
                                     except Exception as ex:
@@ -4869,6 +4889,7 @@ class TaskDefinition(object):
                         log_msg = 'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                             get_exception_string())
+                        self.set_slice_error(request.id,step.slice.id,'default',get_exception_string())
                         logger.exception(log_msg)
                         if request.reference:
                             try:

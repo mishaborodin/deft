@@ -15,6 +15,9 @@ class DefaultRouter(object):
             return 'default'
 
     def allow_relation(self, obj1, obj2, **hints):
+        if (((obj1._meta.db_name == 'deft_intr') and (obj2._meta.db_name == 'deft_adcr')) or
+            ((obj1._meta.db_name == 'deft_adcr') and (obj2._meta.db_name == 'deft_intr'))):
+            return True
         return None
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):

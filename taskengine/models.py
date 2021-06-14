@@ -985,5 +985,5 @@ class SliceError(models.Model):
 
 
     class Meta:
-        db_name = 'deft_intr'
+        db_name = 'deft_adcr'
         db_table = '"ATLAS_DEFT"."T_SLICE_ERROR"'

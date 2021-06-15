@@ -486,6 +486,10 @@
   "noLoopingCheck": {
     "type": "bool",
     "description": ""
+  },
+  "useDestForLogs": {
+    "type": "bool",
+    "description": ""
   }
 
 }

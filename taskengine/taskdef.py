@@ -3265,9 +3265,8 @@ class TaskDefinition(object):
             if leave_log:
                 self.protocol.set_leave_log_param(log_param)
             if 'token' in list(task_config.keys()):
-                if step.request.request_type.lower() in ['GROUP'.lower()]:
+                if (step.request.request_type.lower() in ['GROUP'.lower()]) or project_mode.useDestForLogs:
                     log_param['token'] = task_config['token']
-
             if 'Data' in input_types_defined:
                 for job_param in job_parameters:
                     if re.match(r'^(--)?inputDataFile', job_param['value'], re.IGNORECASE):

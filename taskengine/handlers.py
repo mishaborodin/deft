@@ -88,8 +88,8 @@ class TaskActionHandler(object):
         result = jedi_client.changeTaskAttribute(task_id, attr_name, attr_value)
         return self.parse_jedi_result(result)
 
-    def retry_task(self, task_id, discard_events):
-        result = jedi_client.retryTask(task_id, verbose=False, discardEvents=discard_events)
+    def retry_task(self, task_id, discard_events, disable_staging_mode):
+        result = jedi_client.retryTask(task_id, verbose=False, discardEvents=discard_events, disable_staging_mode=disable_staging_mode)
         return self.parse_jedi_result(result)
 
     def reload_input(self, task_id):

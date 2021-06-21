@@ -143,7 +143,8 @@ class ApiServer(object, metaclass=Singleton):
                 body = json.loads(request.body)
                 task_id = int(body['task_id'])
                 discard_events = bool(body.get('discard_events', False))
-                handler_status = handler.retry_task(task_id, discard_events)
+                disable_staging_mode = bool(body.get('disable_staging_mode', False))
+                handler_status = handler.retry_task(task_id, discard_events, disable_staging_mode)
                 try:
                     jedi_info = handler_status['jedi_info']
                     if jedi_info['status_code'] == 0 and jedi_info['return_code'] == 0:

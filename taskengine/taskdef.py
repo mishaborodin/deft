@@ -2283,9 +2283,10 @@ class TaskDefinition(object):
                                 input_params['inputBS_RDOFile'] = input_params[input_param_name]
                                 trf_params.remove('--inputBSFile')
                             else:
-                                input_params['inputBSFile'] = input_params[input_param_name]
-                                if '--inputBS_RDOFile' in trf_params:
-                                    trf_params.remove('--inputBS_RDOFile')
+                                if 'TRIGCOST' not in input_param_name:
+                                    input_params['inputBSFile'] = input_params[input_param_name]
+                                    if '--inputBS_RDOFile' in trf_params:
+                                        trf_params.remove('--inputBS_RDOFile')
                         break
                 if 'athenaopts' in list(ctag.keys()) and ctag_name == 'r6395':
                     ctag['athenaopts'] = \
@@ -2618,7 +2619,7 @@ class TaskDefinition(object):
             name = self._get_input_output_param_name(input_params, 'RAW')
             if not name:
                 name = self._get_input_output_param_name(input_params, 'DRAW')
-            if name:
+            if name and 'TRIGCOST' not in name:
                 input_bs_type = 'inputBSFile'
                 if input_bs_type not in list(input_params.keys()):
                     input_params[input_bs_type] = list()
@@ -2969,11 +2970,14 @@ class TaskDefinition(object):
                     # BS (byte stream) - for all *RAW* (DRAW, RAW, DRAW_ZEE, etc.) [2]
                     if re.match(r'^(--)?inputBSFile$', name, re.IGNORECASE) and 'RAW'.lower() in ','.join(
                             [e.lower() for e in list(input_params.keys())]):
-                        param_name = self._get_input_output_param_name(input_params, 'RAW')
-                        if not param_name:
-                            param_name = self._get_input_output_param_name(input_params, 'DRAW')
+                        if 'TRIGCOST'.lower() not in ','.join([e.lower() for e in list(input_params.keys())]):
+                            param_name = self._get_input_output_param_name(input_params, 'RAW')
                             if not param_name:
-                                continue
+                                param_name = self._get_input_output_param_name(input_params, 'DRAW')
+                                if not param_name:
+                                    continue
+                        else:
+                            continue
                     if re.match(r'^(--)?inputESDFile$', name, re.IGNORECASE) and 'ESD'.lower() in ','.join(
                             [e.lower() for e in list(input_params.keys())]):
                         param_name = self._get_input_output_param_name(input_params, 'ESD')
@@ -3635,6 +3639,9 @@ class TaskDefinition(object):
                         ('.'.join(trf_release.split('.')[0:3]) in ['21.0.15','21.0.31']) and trf_name in ['Sim_tf.py']:
                     if project_mode.esConvertible is None:
                         project_mode.esConvertible = True
+
+            # if not project_mode.ipConnectivity and int(trf_release.split('.')[0])<=20:
+            #     task_proto_dict.update({'ip_connectivity': "''" })
 
             if project_mode.esFraction is not None:
                 if project_mode.esFraction > 0:

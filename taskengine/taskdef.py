@@ -621,6 +621,28 @@ class TaskDefinition(object):
 
         return input_params
 
+
+    def _find_optimal_evnt_offset(self, task_name):
+        previous_task_list = ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']),
+                                                  name=task_name)
+        max_previous_offset = 0
+        for task in previous_task_list:
+            jedi_task = TTask.objects.get(id=task.id)
+            task_params = json.loads(jedi_task.jedi_task_param)
+            old_offset = 0
+            old_offset_is_not_found = True
+            for param in task_params['jobParameters']:
+                if 'dataset' in list(param.keys()) and param['dataset'] == 'seq_number':
+                    old_offset = param['offset']
+                    old_offset_is_not_found = False
+                    break
+            if ('nFiles' not in task_params) or ('nFilesPerJob' not in task_params) or old_offset_is_not_found:
+                raise Exception("Something wrong with optimal first event settings")
+            max_previous_offset = max(max_previous_offset,old_offset + math.ceil(int(task_params['nFiles'])/int(task_params['nFilesPerJob'])))
+        return max_previous_offset
+
+
+
     def _find_tag_fold(self, version_list, folding_prod_step):
         if ProductionTask.objects.filter(ctag=version_list[-1]).exists():
             task = ProductionTask.objects.filter(ctag=version_list[-1]).latest('id')
@@ -1538,7 +1560,8 @@ class TaskDefinition(object):
                 random_seed_param['offset'] = number_of_input_files_used
             if prod_step.lower() == 'evgen'.lower():
                 if project_mode.optimalFirstEvent:
-                    random_seed_param['offset'] = math.ceil(number_of_input_files_used / task_config['nFilesPerJob'])
+                    max_offset = self._find_optimal_evnt_offset(task['taskName'])
+                    random_seed_param['offset'] = max(max_offset,math.ceil(number_of_input_files_used / task_config['nFilesPerJob']))
                 else:
                     events_per_file = int(task_config['nEventsPerInputFile'])
                     first_event_param = self._get_job_parameter('firstEvent', task['jobParameters'])

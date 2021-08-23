@@ -1643,6 +1643,10 @@ class TaskDefinition(object):
                 raise ContainerIsNotFoundException(task_proto_dict['site'])
 
     def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id):
+        def split_list(input_list, n):
+            k, m = divmod(len(input_list), n)
+            return (input_list[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
+
         used_files = set()
         for dataset in mc_pileup_overlay['datasets']:
             previous_task_id = self.rucio_client.get_metadata_attribute(dataset,'task_id')
@@ -1650,8 +1654,10 @@ class TaskDefinition(object):
                 used_files.update(self.rucio_client.list_files_with_scope_in_dataset(dataset))
         files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],math.ceil(number_of_jobs),random_seed=None,previously_used=list(used_files))
         logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
-        self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_to_store,meta={'task_id':task_id})
-        pass
+        files_list = list(split_list(files_to_store,100))
+        self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_list[0],meta={'task_id':task_id})
+        for files in files_list[1:]:
+            self.rucio_client.register_files_in_dataset(mc_pileup_overlay['input_dataset_name'],files)
 
     def _find_overlay_input_dataset(self, param_value, dsid):
         if param_value[-1] == '/':
@@ -4358,7 +4364,8 @@ class TaskDefinition(object):
                         raise NoRequestedCampaignInput()
                 else:
                     requested_campaign = str(step.request.subcampaign)
-                    if requested_campaign.lower().startswith('MC16'.lower()) and \
+                    requested_campaign = requested_campaign.replace('MC20','MC16')
+                    if (requested_campaign.lower().startswith('MC16'.lower()) ) and \
                             step.request.request_type.lower() == 'MC'.lower():
                         requested_datasets = list()
                         if requested_campaign in list(campaigns.keys()):
@@ -4369,7 +4376,6 @@ class TaskDefinition(object):
                             raise NoRequestedCampaignInput()
 
             force_merge_container = project_mode.mergeCont
-
             use_default_splitting_rule = True
             if project_mode.forceSplitInput:
                 use_default_splitting_rule = False

@@ -2456,9 +2456,8 @@ class TaskDefinition(object):
                                 if input_name_dict['prod_step'] == 'evgen':
                                     evgen_input_formats.append(input_name_dict['data_type'])
                             except Exception:
-                                pass
-                                # if 'TXT' in input_name:
-                                #     evgen_input_formats.append('TXT')
+                                if 'TXT' in input_name and key!='inputGenConfFile':
+                                    evgen_input_formats.append('TXT')
                 if number_of_events > 0 and task_config.get('nEventsPerJob', None) and not evgen_params:
                     events_per_job = int(task_config['nEventsPerJob'])
                     if not (number_of_events % events_per_job == 0):

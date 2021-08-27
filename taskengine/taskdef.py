@@ -1559,9 +1559,9 @@ class TaskDefinition(object):
             if random_seed_param:
                 random_seed_param['offset'] = number_of_input_files_used
             if prod_step.lower() == 'evgen'.lower():
-                if project_mode.optimalFirstEvent:
+                if project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent'):
                     max_offset = self._find_optimal_evnt_offset(task['taskName'])
-                    random_seed_param['offset'] = max(max_offset,math.ceil(number_of_input_files_used / task_config['nFilesPerJob']))
+                    random_seed_param['offset'] = max(max_offset,math.ceil(number_of_input_files_used / task['nFilesPerJob']))
                 else:
                     events_per_file = int(task_config['nEventsPerInputFile'])
                     first_event_param = self._get_job_parameter('firstEvent', task['jobParameters'])
@@ -2256,8 +2256,11 @@ class TaskDefinition(object):
                     ignore_trf_params.append('skipEvents')
                     max_events_forced = input_params['nEventsPerJob']
                     use_evnt_filter = True
+                    if project_mode.optimalFirstEvent is None:
+                        task_config['optimalFirstEvent'] = True
+
                     task_config['nFiles'] = int(number_of_events * input_params['nFilesPerJob'] / max_events_forced)
-                    if project_mode.optimalFirstEvent:
+                    if project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent'):
                        nEventsOptimal = minHigherDivisor(int(max_events_forced) // (int(input_params['nFilesPerJob'])-1) ,int(max_events_forced))
                        project_mode.nEventsPerInputFile = nEventsOptimal
                        input_params['nEventsPerInputFile'] = nEventsOptimal
@@ -2288,7 +2291,7 @@ class TaskDefinition(object):
                 if len(input_types) == 1 and 'TXT' in input_types:
                     min_events = int(input_params.get('nEventsPerJob', 0)) or int(task_config.get('nEventsPerJob', 0))
                     if min_events:
-                        if not project_mode.nEventsPerInputFile and not project_mode.optimalFirstEvent:
+                        if not project_mode.nEventsPerInputFile and not (project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent')):
                             project_mode.nEventsPerInputFile = min_events
 
                         number_files_per_job = int(task_config.get('nFilesPerJob', 1))
@@ -2479,7 +2482,7 @@ class TaskDefinition(object):
                         if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(
                                 task_config.keys()):
                             if not project_mode.nEventsPerInputFile:
-                                if project_mode.optimalFirstEvent and task_config.get('nFilesPerJob') and int(task_config['nFilesPerJob'])>1:
+                                if (project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent')) and task_config.get('nFilesPerJob') and int(task_config['nFilesPerJob'])>1:
                                     task_config['nEventsPerInputFile'] = minHigherDivisor(int(task_config['nEventsPerJob']) // (int(task_config['nFilesPerJob'])-1) ,int(task_config['nEventsPerJob']))
                                 else:
                                     task_config['nEventsPerInputFile'] = int(task_config['nEventsPerJob'])
@@ -2589,7 +2592,7 @@ class TaskDefinition(object):
                     pass
 
             if 'nEventsPerInputFile' in list(task_config.keys()) and 'nEventsPerJob' in list(task_config.keys()) and \
-                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile and not project_mode.optimalFirstEvent:
+                    (not skip_check_input_ne) and not project_mode.nEventsPerInputFile and not (project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent')):
                 self._check_task_events_consistency(task_config)
 
 
@@ -2845,7 +2848,7 @@ class TaskDefinition(object):
                 elif re.match('^(--)?firstEvent$', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        if project_mode.optimalFirstEvent:
+                        if project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent'):
                             param_dict = {'name': name, 'nEventsPerJob': int(task_config['nEventsPerJob']) }
                             param_dict.update(trf_options)
                             job_parameters.append(

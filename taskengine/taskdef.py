@@ -4638,7 +4638,7 @@ class TaskDefinition(object):
         if 'nFilesPerJob' in list(task_config.keys()):
             nfiles_per_job = int(task_config['nFilesPerJob'])
 
-        nfiles_requested = int(step.input_events) * nfiles_per_job / nevents_per_job
+        nfiles_requested = math.ceil(int(step.input_events) * nfiles_per_job // nevents_per_job)
         nfiles = 0
         files_used_count = nfiles_used
         files_requested_count = nfiles_requested
@@ -4656,22 +4656,22 @@ class TaskDefinition(object):
             input_params_split = copy.deepcopy(input_params)
             files_requested_count -= nfiles_in_ds
             if files_requested_count > 0:
-                input_params_split['nevents'] = int(nfiles_in_ds * nevents_per_job / nfiles_per_job)
+                input_params_split['nevents'] = math.ceil(nfiles_in_ds * nevents_per_job // nfiles_per_job)
                 input_params_split['nfiles'] = nfiles_in_ds
                 input_params_split['offset'] = nfiles_used + nfiles
                 nfiles += nfiles_in_ds
                 input_params_split['event_offset'] = \
-                    int(input_params_split['offset'] * nevents_per_job / nfiles_per_job)
+                    math.ceil(input_params_split['offset'] * nevents_per_job )
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
             else:
                 input_params_split['nevents'] = \
-                    int((nfiles_requested - nfiles) * nevents_per_job / nfiles_per_job)
+                    math.ceil((nfiles_requested - nfiles) * nevents_per_job // nfiles_per_job)
                 input_params_split['nfiles'] = (nfiles_requested - nfiles)
                 input_params_split['offset'] = nfiles_used + nfiles
                 nfiles += (nfiles_requested - nfiles)
                 input_params_split['event_offset'] = \
-                    int(input_params_split['offset'] * nevents_per_job / nfiles_per_job)
+                    math.ceil(input_params_split['offset'] * nevents_per_job )
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
                 break

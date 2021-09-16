@@ -3581,6 +3581,9 @@ class TaskDefinition(object):
             if step.request.request_type.lower() == 'EVENTINDEX'.lower():
                 task_proto_dict.update(({'ip_connectivity': "'full'"}))
 
+            if mc_pileup_overlay['is_overlay']:
+                task_proto_dict.update({'task_broker_on_master': True})
+
             if project_mode.ipConnectivity is not None:
                 task_proto_dict.update({'ip_connectivity': "'%s'" % project_mode.ipConnectivity})
 
@@ -3781,6 +3784,10 @@ class TaskDefinition(object):
 
             if project_mode.noLoopingCheck is not None:
                 task_proto_dict.update({'no_looping_check': project_mode.noLoopingCheck or None})
+
+            if project_mode.taskBrokerOnMaster is not None:
+                task_proto_dict.update({'task_broker_on_master': project_mode.taskBrokerOnMaster or None})
+
 
             if project_mode.toStaging is not None:
                 task_proto_dict.update({'to_staging': project_mode.toStaging or None})

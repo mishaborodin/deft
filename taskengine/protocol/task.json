@@ -106,5 +106,6 @@
   "onlyTagsForFC": "{{only_tags_for_fc}}",
   "multiStepExec": "{{multi_step_exec}}",
   "gshare": "'{{global_share}}'",
-  "noLoopingCheck": "{{no_looping_check}}"
+  "noLoopingCheck": "{{no_looping_check}}",
+  "taskBrokerOnMaster": "{{task_broker_on_master}}"
 }

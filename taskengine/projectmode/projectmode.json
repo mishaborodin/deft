@@ -490,6 +490,10 @@
   "useDestForLogs": {
     "type": "bool",
     "description": ""
+  },
+  "taskBrokerOnMaster": {
+    "type": "bool",
+    "description": ""
   }
 
 }

@@ -2011,8 +2011,11 @@ class TaskDefinition(object):
                     use_containers = True
                 if prod_step.lower() == 'simul'.lower() and not skip_evgen_check:
                     if step.step_parent_id != step.id:
+
                         try:
                             evgen_step = StepExecution.objects.get(id=step.step_parent_id)
+                            if evgen_step.step_template.step.lower() != 'Evgen'.lower():
+                                raise Exception('The parent is not EVNT. The checking is skipped')
                             if evgen_step.step_template.step.lower() == 'Evgen Merge'.lower():
                                 raise Exception('The parent is EVNT merging. The checking is skipped')
                             if evgen_step.status != self.protocol.STEP_STATUS[StepStatus.APPROVED]:

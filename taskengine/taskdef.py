@@ -1573,7 +1573,7 @@ class TaskDefinition(object):
             if random_seed_param:
                 random_seed_param['offset'] = evgen_params['offset']
             first_event_param = self._get_job_parameter('firstEvent', task['jobParameters'])
-            if first_event_param:
+            if first_event_param and not (project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent')):
                 first_event_param['offset'] = evgen_params['event_offset']
 
         if primary_input_offset:
@@ -4536,7 +4536,7 @@ class TaskDefinition(object):
                                                         'container': input_data_name})
         return splitting_dict
 
-    def _get_evgen_input_list(self, step):
+    def _get_evgen_input_list(self, step, optimalFirstEvent = False):
         evgen_input_list = list()
         input_data_name = self.get_step_input_data_name(step)
         task_config = ProjectMode.get_task_config(step)
@@ -4622,6 +4622,8 @@ class TaskDefinition(object):
             if task_random_seed:
                 offset = int(task_random_seed['offset'])
             nfiles_used = offset
+            if optimalFirstEvent:
+                nfiles_used = offset * task_config.get('nFilesPerJob', 1)
             if 'nFiles' in task_params:
                 nfiles_in_tid_ds = 0
                 if 'tid' in task_dsn_no_scope:
@@ -4644,11 +4646,9 @@ class TaskDefinition(object):
                 'JO file {0} does not contain nEventsPerJob definition. '.format(
                     input_data_name) +
                 'The task is rejected')
-        nfiles_per_job = 1
-        if 'nFilesPerJob' in list(task_config.keys()):
-            nfiles_per_job = int(task_config['nFilesPerJob'])
+        nfiles_per_job = task_config.get('nFilesPerJob', 1)
 
-        nfiles_requested = math.ceil(int(step.input_events) * nfiles_per_job // nevents_per_job)
+        nfiles_requested = math.ceil(int(step.input_events) * nfiles_per_job / nevents_per_job)
         nfiles = 0
         files_used_count = nfiles_used
         files_requested_count = nfiles_requested
@@ -4669,21 +4669,29 @@ class TaskDefinition(object):
                 input_params_split['nevents'] = math.ceil(nfiles_in_ds * nevents_per_job // nfiles_per_job)
                 input_params_split['nfiles'] = nfiles_in_ds
                 input_params_split['offset'] = nfiles_used + nfiles
-                nfiles += nfiles_in_ds
                 input_params_split['event_offset'] = \
                     math.ceil(input_params_split['offset'] * nevents_per_job )
+                if optimalFirstEvent:
+                    input_params_split.pop('event_offset')
+                    input_params_split['offset'] = math.ceil((nfiles_used + nfiles)/nfiles_per_job)
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
+                nfiles += nfiles_in_ds
+
             else:
                 input_params_split['nevents'] = \
                     math.ceil((nfiles_requested - nfiles) * nevents_per_job // nfiles_per_job)
                 input_params_split['nfiles'] = (nfiles_requested - nfiles)
                 input_params_split['offset'] = nfiles_used + nfiles
-                nfiles += (nfiles_requested - nfiles)
                 input_params_split['event_offset'] = \
                     math.ceil(input_params_split['offset'] * nevents_per_job )
+                if optimalFirstEvent:
+                    input_params_split.pop('event_offset')
+                    input_params_split['offset'] = math.ceil((nfiles_used + nfiles)/nfiles_per_job)
                 input_params_split[container_name_key] = list([dsn])
                 evgen_input_list.append(input_params_split)
+                nfiles += (nfiles_requested - nfiles)
+
                 break
         if nfiles < nfiles_requested:
             raise Exception(
@@ -4810,9 +4818,7 @@ class TaskDefinition(object):
                                         if re.match(r'^(--)?input.*File$', key, re.IGNORECASE):
                                             phys_cont_list.extend(input_params[key])
                                 elif input_data_dict['prod_step'].lower() == 'py'.lower() and force_split_evgen:
-                                    if ProjectMode(step).optimalFirstEvent:
-                                        raise Exception("optimalFirstEvent can't be used yet with splitEvgen")
-                                    evgen_input_list.extend(self._get_evgen_input_list(step))
+                                    evgen_input_list.extend(self._get_evgen_input_list(step, ProjectMode(step).optimalFirstEvent))
                         if phys_cont_list:
                             for input_dataset in phys_cont_list:
                                 try:

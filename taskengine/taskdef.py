@@ -3791,6 +3791,8 @@ class TaskDefinition(object):
             if project_mode.taskBrokerOnMaster is not None:
                 task_proto_dict.update({'task_broker_on_master': project_mode.taskBrokerOnMaster or None})
 
+            if project_mode.releasePerLB is not None:
+                task_proto_dict.update({'release_per_LB': project_mode.releasePerLB or None})
 
             if project_mode.toStaging is not None:
                 task_proto_dict.update({'to_staging': project_mode.toStaging or None})

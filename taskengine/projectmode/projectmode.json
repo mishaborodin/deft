@@ -494,6 +494,9 @@
   "taskBrokerOnMaster": {
     "type": "bool",
     "description": ""
+  },
+  "releasePerLB": {
+    "type": "bool",
+    "description": ""
   }
-
 }

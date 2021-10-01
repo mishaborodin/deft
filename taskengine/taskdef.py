@@ -644,8 +644,8 @@ class TaskDefinition(object):
 
 
     def _find_tag_fold(self, version_list, folding_prod_step):
-        if ProductionTask.objects.filter(ctag=version_list[-1]).exists():
-            task = ProductionTask.objects.filter(ctag=version_list[-1]).latest('id')
+        if ProductionTask.objects.filter(ctag=version_list[-1], status__in=['done','finished']).exists():
+            task = ProductionTask.objects.filter(ctag=version_list[-1], status__in=['done','finished']).latest('id')
             parent_dataset = task.inputdataset
             while folding_prod_step not in parent_dataset:
                 if 'tid' in parent_dataset:
@@ -1940,10 +1940,19 @@ class TaskDefinition(object):
             if 'T' in trf_release:
                 # release contains timestamp - nightly
                 # 21.1.2-21.0-2017-04-03T2135
-                version_base = trf_release[:trf_release.index('-')]
-                release_part = trf_release[trf_release.index('-') + 1:]
-                version_major = release_part[:release_part.index('-')]
-                version_timestamp = release_part[release_part.index('-') + 1:]
+                if '--' not in trf_release:
+                    version_base = trf_release[:trf_release.index('-')]
+
+                    release_part = trf_release[trf_release.index('-') + 1:]
+                    version_major = release_part[:release_part.index('-')]
+                    version_timestamp = release_part[release_part.index('-') + 1:]
+                else:
+                    trf_release = trf_release.replace('--','$$')
+                    release_part = trf_release[trf_release.index('-') + 1:]
+                    version_major = release_part[:release_part.index('-')].replace('$$','--')
+                    version_timestamp = release_part[release_part.index('-') + 1:].replace('$$','--')
+                    release_part = release_part.replace('--','$$')
+                    trf_release = trf_release.replace('$$','--')
                 use_nightly_release = True
 
             project_mode = ProjectMode(step, '{0}-{1}'.format(trf_cache, trf_release),

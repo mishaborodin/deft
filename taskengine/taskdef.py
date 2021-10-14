@@ -2383,7 +2383,7 @@ class TaskDefinition(object):
                     )
                 input_data_name = datasets[0]
 
-            if use_container_name and container_name:
+            if use_container_name and container_name and (step == first_step):
                 input_data_name = container_name
 
             input_data_dict = self.parse_data_name(input_data_name)

@@ -1942,10 +1942,8 @@ class TaskDefinition(object):
                 # 21.1.2-21.0-2017-04-03T2135
                 if '--' not in trf_release:
                     version_base = trf_release[:trf_release.index('-')]
-
-                    release_part = trf_release[trf_release.index('-') + 1:]
-                    version_major = release_part[:release_part.index('-')]
-                    version_timestamp = release_part[release_part.index('-') + 1:]
+                    version_timestamp = '-'.join(trf_release.split('-')[-3:])
+                    version_major = trf_release[trf_release.index('-') + 1:].replace(version_timestamp,'')[:-1]
                 else:
                     trf_release = trf_release.replace('--','$$')
                     release_part = trf_release[trf_release.index('-') + 1:]

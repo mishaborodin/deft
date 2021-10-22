@@ -1650,14 +1650,16 @@ class TaskDefinition(object):
         used_files = set()
         for dataset in mc_pileup_overlay['datasets']:
             previous_task_id = self.rucio_client.get_metadata_attribute(dataset,'task_id')
-            if ProductionTask.objects.get(id=previous_task_id).status not in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
+            if ProductionTask.objects.filter(id=previous_task_id).exists() and \
+                    ProductionTask.objects.get(id=previous_task_id).status not in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
                 used_files.update(self.rucio_client.list_files_with_scope_in_dataset(dataset))
         files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],math.ceil(number_of_jobs),random_seed=None,previously_used=list(used_files))
         logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
-        files_list = list(split_list(files_to_store,100))
+        files_list = list(split_list(files_to_store,len(files_to_store)//100+1))
         self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_list[0],meta={'task_id':task_id})
         for files in files_list[1:]:
-            self.rucio_client.register_files_in_dataset(mc_pileup_overlay['input_dataset_name'],files)
+            if files:
+                self.rucio_client.register_files_in_dataset(mc_pileup_overlay['input_dataset_name'],files)
 
     def _find_overlay_input_dataset(self, param_value, dsid):
         if param_value[-1] == '/':

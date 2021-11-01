@@ -1642,18 +1642,21 @@ class TaskDefinition(object):
                         return
                 raise ContainerIsNotFoundException(task_proto_dict['site'])
 
-    def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id):
+    def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id, task):
         def split_list(input_list, n):
             k, m = divmod(len(input_list), n)
             return (input_list[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
 
         used_files = set()
+        nevents_per_job = task.get('nEventsPerJob')
         for dataset in mc_pileup_overlay['datasets']:
             previous_task_id = self.rucio_client.get_metadata_attribute(dataset,'task_id')
             if ProductionTask.objects.filter(id=previous_task_id).exists() and \
                     ProductionTask.objects.get(id=previous_task_id).status not in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
                 used_files.update(self.rucio_client.list_files_with_scope_in_dataset(dataset))
-        files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],math.ceil(number_of_jobs),random_seed=None,previously_used=list(used_files))
+        events_per_pileup_file = self.rucio_client.get_number_events(mc_pileup_overlay['files'][0])
+        pileup_files_per_job = nevents_per_job // events_per_pileup_file
+        files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],math.ceil(number_of_jobs) * pileup_files_per_job,random_seed=None,previously_used=list(used_files))
         logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
         files_list = list(split_list(files_to_store,len(files_to_store)//100+1))
         self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_list[0],meta={'task_id':task_id})
@@ -4003,7 +4006,7 @@ class TaskDefinition(object):
                                            task_common_offset=task_common_offset)
                 set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay']:
-                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step)[0], task_id)
+                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step)[0], task_id, task)
                 if step == first_step:
                     chain_id = task_id
                     primary_input_offset = 0

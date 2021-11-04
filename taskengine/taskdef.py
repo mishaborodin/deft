@@ -2940,17 +2940,23 @@ class TaskDefinition(object):
                                 param_value = '%s/' % param_value
                         param_dict = {'name': name, 'dataset': param_value}
                         param_dict.update(trf_options)
+                        eventRatio = None
                         if project_mode.eventRatio:
                             event_ratio = project_mode.eventRatio \
                                 if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
                             param_dict.update({'event_ratio': event_ratio})
+
+                        n_pileup = None
                         second_input_param = \
                             self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
-                        n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
                         if project_mode.npileup:
                             n_pileup = project_mode.npileup \
                                 if '.' in str(project_mode.npileup) else int(project_mode.npileup)
-                        second_input_param['ratio'] = n_pileup
+                            second_input_param['ratio']= n_pileup
+                        if not n_pileup and not eventRatio:
+                            second_input_param['eventRatio'] = 1
+                            second_input_param['ratio'] = 1
+
                         if secondary_input_offset:
                             second_input_param['offset'] = secondary_input_offset
                         job_parameters.append(second_input_param)

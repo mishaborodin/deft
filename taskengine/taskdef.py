@@ -1656,7 +1656,11 @@ class TaskDefinition(object):
                 used_files.update(self.rucio_client.list_files_with_scope_in_dataset(dataset))
         events_per_pileup_file = self.rucio_client.get_number_events(mc_pileup_overlay['files'][0])
         pileup_files_per_job = nevents_per_job // events_per_pileup_file
-        files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],math.ceil(number_of_jobs) * pileup_files_per_job,random_seed=None,previously_used=list(used_files))
+        files_required = math.ceil(number_of_jobs) * pileup_files_per_job
+        if (len(used_files) + files_required) > len(mc_pileup_overlay['files']):
+            files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=[])
+        else:
+            files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=list(used_files))
         logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
         files_list = list(split_list(files_to_store,len(files_to_store)//100+1))
         self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_list[0],meta={'task_id':task_id})

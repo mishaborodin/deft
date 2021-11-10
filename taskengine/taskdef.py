@@ -966,6 +966,43 @@ class TaskDefinition(object):
             list_task_id.append(int(next_task.id))
             self._enum_next_tasks(int(next_task.id), data_type, list_task_id)
 
+    def _extract_chain_input_from_datasets(self, dataset_name):
+        result = re.match(r'^.+_tid(?P<tid>\d+)_00$', dataset_name)
+        if result:
+            parent_task = ProductionTask.objects.get(id=int(result.groupdict()['tid']))
+            if parent_task.number_of_files and parent_task.events_per_job:
+                return parent_task.number_of_files * parent_task.events_per_file
+            if '_tid' in parent_task.primary_input:
+                return  self._extract_chain_input_from_datasets(parent_task.primary_input)
+        return -1
+
+
+    def _get_total_number_of_jobs(self, task, nevents):
+        nevents_per_job = task.get('nEventsPerJob', 0)
+
+        primary_input = self._get_primary_input(task['jobParameters'])
+        if not primary_input:
+            return
+
+        dsn = primary_input['dataset']
+        if not dsn:
+            return
+        if nevents > 0:
+            number_of_jobs = nevents / nevents_per_job
+        else:
+            total_nevents = 0
+            try:
+                total_nevents = self.rucio_client.get_number_events(dsn)
+                if not total_nevents:
+                    raise EmptyDataset()
+            except:
+                chain_input_events = self._extract_chain_input_from_datasets(dsn)
+                if chain_input_events > 0:
+                    total_nevents = chain_input_events
+            number_of_jobs = total_nevents / nevents_per_job
+        return  number_of_jobs
+
+
     def _extract_chain_input_events(self, step):
         if step.step_parent_id == step.id:
             return step.input_events
@@ -4016,7 +4053,7 @@ class TaskDefinition(object):
                                            task_common_offset=task_common_offset)
                 set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay']:
-                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_result_number_of_jobs(task, number_of_events, step)[0], task_id, task)
+                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task)
                 if step == first_step:
                     chain_id = task_id
                     primary_input_offset = 0

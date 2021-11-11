@@ -974,6 +974,8 @@ class TaskDefinition(object):
                 return parent_task.number_of_files * parent_task.events_per_file
             if '_tid' in parent_task.primary_input:
                 return  self._extract_chain_input_from_datasets(parent_task.primary_input)
+            if parent_task.status in ['done', 'finished']:
+                return parent_task.total_events
         return -1
 
 

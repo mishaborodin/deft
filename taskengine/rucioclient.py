@@ -19,9 +19,8 @@ class RucioClient(object):
             # set up Rucio environment
             os.environ['RUCIO_ACCOUNT'] = RUCIO_ACCOUNT_NAME
             os.environ['RUCIO_AUTH_TYPE'] = 'x509_proxy'
-            #os.environ['X509_USER_PROXY'] = X509_PROXY_PATH
-            #self.client = Client(ca_cert=False)
             os.environ['X509_USER_PROXY'] = self._get_proxy()
+            #self.client = Client(ca_cert=False)
             self.client = Client()
         except CannotAuthenticate as ex:
             logger.critical('RucioClient: authentication failed: {0}'.format(str(ex)))
@@ -232,6 +231,17 @@ class RucioClient(object):
             return bool(self.client.get_metadata(scope=scope, name=dataset))
         except DataIdentifierNotFound:
             return False
+
+    def is_dsn_exists_with_rule_or_replica(self, dsn):
+        scope, dataset = self.extract_scope(dsn)
+        dataset_exists = self.is_dsn_exist(dsn)
+        if not dataset_exists:
+            return False
+        if not list(self.client.list_dataset_replicas(scope, dataset)) and not(list(self.client.list_did_rules(scope, dataset))):
+            return False
+        return True
+
+
 
     def get_campaign(self, dsn):
         scope, dataset = self.extract_scope(dsn)

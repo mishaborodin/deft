@@ -269,7 +269,7 @@ class TaskRegistration(object):
             if output_type not in types:
                 continue
             if output_type:
-                output_dataset_exists = rucio_client.is_dsn_exist(output_dataset)
+                output_dataset_exists = rucio_client.is_dsn_exists_with_rule_or_replica(output_dataset)
                 output_type_status_dict.update({output_type: output_dataset_exists})
 
         return output_type_status_dict

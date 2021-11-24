@@ -140,6 +140,18 @@ class ProjectMode(object):
                     raise Exception(
                         'cmtconfig \"{0}\" specified by user is not exist in cache \"{1}\" (available: \"{2}\")'.format(
                             self.cmtconfig, self.cache, str(', '.join(available_cmtconfig_list))))
+        if self.container_name and self.cache:
+            cache_exists = False
+            ami_client = AMIClient()
+            sw_tags_per_cache = ami_client.ami_sw_tag_by_cache(self.cache.replace('-','_'))
+            for sw_tag in sw_tags_per_cache:
+                if sw_tag['TAGNAME'] in self.container_name:
+                    cache_exists = True
+                    break
+            if not cache_exists:
+                raise Exception(
+                    'Cache \"{0}\" is not found in the container \"{1}\" '.format(
+                        self.cache, self.container_name))
 
         if not self.cmtconfig and self.use_nightly_release:
             raise Exception('cmtconfig parameter must be specified in project_mode when nightly release is used')

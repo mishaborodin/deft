@@ -30,7 +30,10 @@ logger = Logger.get()
 
 
 class NotEnoughEvents(Exception):
-    pass
+    def __init__(self, previous_tasks):
+        message = 'Not enough events, previous tasks: {0} '.format(str(previous_tasks))
+        super(NotEnoughEvents, self).__init__(message)
+
 
 
 class TaskDuplicateDetected(Exception):
@@ -2529,7 +2532,7 @@ class TaskDefinition(object):
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('split_slice',))
-                    random_seed_offset = int(self._get_number_events_processed(step) / events_per_job)
+                    random_seed_offset = int(self._get_number_events_processed(step)[0] / events_per_job)
                     first_event_offset = random_seed_offset * events_per_job
                     skip_check_input = True
                     if number_of_events > 0:
@@ -2558,7 +2561,7 @@ class TaskDefinition(object):
                     events_per_job = int(task_config['nEventsPerJob'])
                     task_config.update({'split_slice': True})
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('split_slice',))
-                    random_seed_offset = int(self._get_number_events_processed(step) / events_per_job)
+                    random_seed_offset = int(self._get_number_events_processed(step)[0] / events_per_job)
                     first_event_offset = random_seed_offset * events_per_job
 
                 if 'nEventsPerJob' in list(task_config.keys()) and number_of_events > 0:
@@ -2603,7 +2606,8 @@ class TaskDefinition(object):
             if 'D2AOD' in reduction_conf_base_output_types:
                 trf_params.remove('--inputAODFile')
                 trf_params.remove('--preExec')
-
+            if project_mode.rivet and 'YODA' not in output_types:
+                output_types.append('YODA')
             if 'log' not in output_types:
                 output_types.append('log')
             output_params = self._get_output_params(input_data_name,
@@ -2820,6 +2824,7 @@ class TaskDefinition(object):
                     job_parameters.append(
                         self.protocol.render_param(TaskParamName.CONSTANT, param_dict)
                     )
+
                 elif re.match(r'^(--)?ecmEnergy', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, input_params)
                     if not param_value:
@@ -3220,6 +3225,8 @@ class TaskDefinition(object):
                         arch_proto_key = TaskParamName.ZIP_MAP
                         arch_param = self.protocol.render_param(arch_proto_key, arch_param_dict)
                         job_parameters.append(arch_param)
+                    elif re.match(r'^(--)?outputYODAFile$', name, re.IGNORECASE):
+                        proto_key = TaskParamName.YODA_OUTPUT
                     output_param = self.protocol.render_param(proto_key, param_dict)
                     if project_mode.spacetoken is not None:
                         output_param['token'] = project_mode.spacetoken
@@ -4087,6 +4094,7 @@ class TaskDefinition(object):
 
     def _get_number_events_processed(self, step, requested_datasets=None):
         number_events_processed = 0
+        tasks = []
         input_data_name = self.get_step_input_data_name(step)
         project_mode = ProjectMode(step)
 
@@ -4180,7 +4188,7 @@ class TaskDefinition(object):
                         logger.info('Output {0} of task {1} is deleted'.format(requested_output_type, ps2_task.id))
                 if not previous_output_exists:
                     continue
-
+            tasks.append(ps2_task.id)
             number_events = int(ps2_task.total_req_events or 0)
             if not number_events:
                 if ps2_task.parent_id != ps2_task.id and previous_dsn:
@@ -4191,7 +4199,7 @@ class TaskDefinition(object):
             if offset and offset > 0:
                 max_by_offset = max(max_by_offset, number_events + offset)
 
-        return max(number_events_processed, max_by_offset)
+        return max(number_events_processed, max_by_offset), tasks
 
     def _get_processed_datasets(self, step, requested_datasets=None):
         processed_datasets = []
@@ -4523,7 +4531,7 @@ class TaskDefinition(object):
                             (step.id, input_data_name))
                 return splitting_dict
 
-            number_events_processed = self._get_number_events_processed(step, result['datasets'])
+            number_events_processed, previous_existed_tasks = self._get_number_events_processed(step, result['datasets'])
             logger.info("Step = %d, number_events_processed = %d" % (step.id, number_events_processed))
 
             if step.input_events > 0:
@@ -4532,7 +4540,7 @@ class TaskDefinition(object):
                 number_events_requested = number_events_in_container - number_events_processed
 
             if number_events_requested <= 0:
-                raise NotEnoughEvents()
+                raise NotEnoughEvents(previous_existed_tasks)
 
             if (number_events_requested + number_events_processed) > number_events_in_container:
                 number_events_available = number_events_in_container - number_events_processed
@@ -4541,7 +4549,7 @@ class TaskDefinition(object):
                 if events_remains <= 10:
                     number_events_requested = number_events_available
                 else:
-                    raise NotEnoughEvents()
+                    raise NotEnoughEvents(previous_existed_tasks)
             if (step.input_events <= 0) and (step.request.request_type.lower() in ['GROUP'.lower()]):
                 processed_datasets = self._get_processed_datasets(step, result['datasets'])
                 for dataset_name in result['datasets']:
@@ -4950,7 +4958,7 @@ class TaskDefinition(object):
                                 if not use_parent_output:
                                     splitting_dict = self._get_splitting_dict(step)
                             except NotEnoughEvents:
-                                raise Exception('Not enough events')
+                                raise Exception(get_exception_string())
                             except UniformDataException as ex:
                                 raise ex
                             except NoRequestedCampaignInput:

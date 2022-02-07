@@ -86,6 +86,7 @@ class TaskParamName(Enum):
     TXT_EVENTID_OUTPUT = auto()
     TAR_CONFIG_OUTPUT = auto()
     ZIP_OUTPUT = auto()
+    YODA_OUTPUT = auto()
     ZIP_MAP = auto()
     OVERLAY_FILTER_FILE = auto()
     HITAR_FILE = auto()
@@ -220,6 +221,14 @@ class Protocol(object):
             "token": "ATLASDATADISK",
             "type": "template",
             "value": "{{name}}={{data_type}}.{{task_id|stringformat:\".08d\"}}._${SN}.zip"
+        }""",
+        TaskParamName.YODA_OUTPUT: """{
+            "dataset": "{{dataset}}",
+            "offset": 0,
+            "param_type": "output",
+            "token": "ATLASDATADISK",
+            "type": "template",
+            "value": "{{name}}={{data_type}}.{{task_id|stringformat:\".08d\"}}._${SN}.yoda.gz"
         }""",
         TaskParamName.ZIP_MAP: """{
             "type": "constant",

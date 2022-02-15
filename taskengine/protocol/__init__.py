@@ -538,3 +538,8 @@ class TaskDefConstants(object, metaclass=Constants):
     }
 
     DEFAULT_KILL_JOB_CODE = Constant(9)
+
+    ERRORS_TO_REPEAT = ['http status code: 503',
+                        'Connection broken: IncompleteRead']
+    TRANSIENT_ERROR_ATTEMPTS = 1
+    REPEAT_ATTEMPT_MESSAGE = 'Repeated because of a transient error'

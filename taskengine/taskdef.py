@@ -352,6 +352,16 @@ class TaskDefinition(object):
 
 
     @staticmethod
+    def unset_slice_error(request, slice):
+        try:
+            if SliceError.objects.filter(request=request, slice=slice, is_active=True).exists():
+                slice_error = SliceError.objects.filter(request=request, slice=slice)[0]
+                slice_error.is_active = False
+                slice_error.save()
+        except Exception as ex:
+            logger.warning('Slice error saving failed: {0}'.format(ex))
+
+    @staticmethod
     def set_slice_error(request, slice, exception_type, message):
         try:
             slice_error = SliceError(request=TRequest.objects.get(id=request), slice=InputRequestList.objects.get(id=slice))
@@ -4808,15 +4818,33 @@ class TaskDefinition(object):
         return result_list, another_chain_step
 
     @staticmethod
-    def _get_request_status(request):
-        statuses = TRequestStatus.objects.filter(request=request).order_by('-timestamp').values_list(
-            'status', flat=True)
+    def _get_request_status(request, summary_log):
+
+        statuses = TRequestStatus.objects.filter(request=request).order_by('-timestamp')
+        number_of_repeated_attempts = 0
         for status in statuses:
-            if status not in ['approved', 'comment']:
-                if status in ['waiting', 'registered']:
+            if status.owner == 'deft' and status.comment == TaskDefConstants.REPEAT_ATTEMPT_MESSAGE:
+                number_of_repeated_attempts += 1
+            else:
+                break
+
+        if number_of_repeated_attempts < TaskDefConstants.TRANSIENT_ERROR_ATTEMPTS:
+            for error in TaskDefConstants.ERRORS_TO_REPEAT:
+                if error in summary_log:
+                    new_status = TRequestStatus()
+                    new_status.request = request
+                    new_status.status = 'approved'
+                    new_status.comment = TaskDefConstants.REPEAT_ATTEMPT_MESSAGE
+                    new_status.owner = 'deft'
+                    new_status.timestamp = timezone.now()
+                    new_status.save()
+                    return 'approved'
+        for status in statuses:
+            if status.status not in ['approved', 'comment']:
+                if status.status in ['waiting', 'registered']:
                     return 'working'
                 else:
-                    return status
+                    return status.status
 
     def _define_tasks_for_requests(self, requests, jira_client, restart=False):
         for request in requests:
@@ -4830,6 +4858,8 @@ class TaskDefinition(object):
             try:
                 logger.info("Processing request %d" % request.id)
                 exception = False
+                summary_log = ''
+                processed_slices = []
                 first_steps = list()
                 for input_slice in InputRequestList.objects.filter(request=request).order_by('slice'):
                     steps_in_slice = StepExecution.objects.filter(request=request,
@@ -4856,7 +4886,8 @@ class TaskDefinition(object):
                         evgen_input_list = list()
                         ami_hashtag_input_list = list()
                         input_data_name = self.get_step_input_data_name(step)
-
+                        processed_slices.append(step.slice_id)
+                        self.unset_slice_error(step.request, step.slice)
                         if input_data_name.startswith('ami#'):
                             ami_hashtag_input = input_data_name.split('ami#')[-1]
                             if ami_hashtag_input:
@@ -4903,6 +4934,7 @@ class TaskDefinition(object):
                                     jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
+                                    summary_log += log_msg
                                     continue
                                 except Exception as ex:
                                     raise ex
@@ -4921,6 +4953,7 @@ class TaskDefinition(object):
                                     jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
+                                    summary_log += log_msg
                                     continue
                                 except Exception as ex:
                                     raise ex
@@ -4941,6 +4974,7 @@ class TaskDefinition(object):
                                     jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
+                                    summary_log += log_msg
                                     continue
                                 except Exception as ex:
                                     raise ex
@@ -4982,6 +5016,7 @@ class TaskDefinition(object):
                                             jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                             self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                             exception = True
+                                            summary_log += log_msg
                                             continue
                                         except Exception as ex:
                                             raise ex
@@ -5004,6 +5039,7 @@ class TaskDefinition(object):
                                         jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                         self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                         exception = True
+                                        summary_log += log_msg
                                         continue
                                     except Exception as ex:
                                         raise ex
@@ -5019,10 +5055,18 @@ class TaskDefinition(object):
                             try:
                                 jira_client.add_issue_comment(request.reference, log_msg)
                                 exception = True
+                                summary_log += log_msg
                             except Exception:
                                 pass
                         continue
-                request.status = self._get_request_status(request)
+
+                request.status = self._get_request_status(request, summary_log)
+                if not exception:
+                    slices_with_error = list(SliceError.objects.filter(request=request, is_active=True))
+                    for slice_error in slices_with_error:
+                        if not slice_error.slice.hided and slice_error.slice_id not in processed_slices:
+                            exception = True
+                            break
                 request.exception = exception
                 request.save()
                 logger.info("Request = %d, status = %s" % (request.id, request.status))

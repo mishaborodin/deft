@@ -1770,7 +1770,7 @@ class TaskDefinition(object):
         trf_name = ctag['transformation']
         trf_cache = ctag['SWReleaseCache'].split('_')[0]
         trf_release = ctag['SWReleaseCache'].split('_')[1]
-        trf_params = self._get_ami_transform_param_cached(trf_cache, trf_release, trf_name, force_ami=True)
+        trf_params = self.ami_client.get_trf_params(trf_cache, trf_release, trf_name, force_ami=True)
         # proto_fix
         if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
             if '--inputHISTFile' not in trf_params:
@@ -2078,9 +2078,8 @@ class TaskDefinition(object):
             trf_params = list()
             trf_sub_steps = list()
             for key in list(trf_dict.keys()):
-                trf_from_cache = self._get_ami_transform_param_cached(trf_dict[key][0], trf_dict[key][1], key,
-                                                                sub_step_list=trf_sub_steps, force_ami=force_ami)
-                trf_params.extend(trf_from_cache)
+                trf_params.extend(self.ami_client.get_trf_params(trf_dict[key][0], trf_dict[key][1], key,
+                                                                 sub_step_list=trf_sub_steps, force_ami=force_ami))
                 #trf_params.append('--multithreaded')
 
             if not trf_params:

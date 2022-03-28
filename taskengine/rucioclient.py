@@ -68,7 +68,7 @@ class RucioClient(object):
                 collection = 'container'
             filters = {'name': dataset}
             # FIXME: use type='collection'
-            for name in self.client.list_dids(scope, filters, type=collection):
+            for name in self.client.list_dids(scope, filters, did_type=collection):
                 result.append('{0}:{1}'.format(scope, name))
         return result
 

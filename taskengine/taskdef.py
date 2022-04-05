@@ -380,7 +380,10 @@ class TaskDefinition(object):
         return TaskDefinition._read_param_from_jo(jo, ['evgenConfig.inputFilesPerJob'])
 
     def _get_evgen_input_files_new(self, input_data_dict, energy, evgen_input_container=None):
-        path_template = Template("/{{number|slice:\"0:3\"}}xxx/{{number}}/{{file_name}}")
+        if len(str(input_data_dict['number'])) <= 6:
+            path_template = Template("/{{number|slice:\"0:3\"}}xxx/{{number}}/{{file_name}}")
+        else:
+            path_template = Template("{{number|slice:\"0:1\"}}/{{number|slice:\"0:4\"}}xxx/{{number}}/{{file_name}}")
         job_options_file_path = path_template.render(
             Context({'number': str(input_data_dict['number']), 'file_name': input_data_dict['file_name']},
                     autoescape=False))

@@ -3530,11 +3530,10 @@ class TaskDefinition(object):
                 task_proto_dict.update({'cpu_time': 0})
                 task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
                 task_proto_dict.update({'base_wall_time': 60})
+                task_proto_dict.update({'cpu_time': 200})
                 if project.lower().startswith('data'):
                     task_proto_dict.update({'goal': str(100.0)})
                     task_proto_dict.update({'use_exhausted': True})
-                if project.lower().startswith('mc'):
-                    task_proto_dict.update({'cpu_time': 200})
                 if core_count > 1:
                     memory = 1750
                     base_memory = 2000

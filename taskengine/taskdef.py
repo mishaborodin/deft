@@ -3047,51 +3047,77 @@ class TaskDefinition(object):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
-                    if param_value[-1] != '/' and ('_tid' not in param_value):
-                        param_value = '%s/' % param_value
-                    postfix = ''
-                    if 'Low'.lower() in name.lower():
-                        postfix = '_LOW'
-                    elif 'High'.lower() in name.lower():
-                        postfix = '_HIGH'
-                    param_dict = {'name': param_name, 'dataset': param_value, 'postfix': postfix}
-                    param_dict.update(trf_options)
-                    if project_mode.eventRatio:
-                        event_ratio = project_mode.eventRatio \
-                            if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
-                        param_dict.update({'event_ratio': event_ratio})
-                    if postfix == '_LOW':
-                        if project_mode.eventRatioLow:
-                            event_ratio = project_mode.eventRatioLow \
-                                if '.' in str(project_mode.eventRatioLow) else int(project_mode.eventRatioLow)
-                            param_dict.update({'event_ratio': event_ratio})
-                    elif postfix == '_HIGH':
-                        if project_mode.eventRatioHigh:
-                            event_ratio = project_mode.eventRatioHigh \
-                                if '.' in str(project_mode.eventRatioHigh) else int(project_mode.eventRatioHigh)
-                            param_dict.update({'event_ratio': event_ratio})
-                    if 'Cavern'.lower() in name.lower():
-                        second_input_param = self.protocol.render_param(TaskParamName.SECONDARY_INPUT_CAVERN,
-                                                                        param_dict)
+                    if ',' not in param_value:
+                        param_input_list = [param_value]
                     else:
-                        second_input_param = self.protocol.render_param(TaskParamName.SECONDARY_INPUT_MINBIAS,
-                                                                        param_dict)
-                    n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
-                    if project_mode.npileup:
-                        n_pileup = project_mode.npileup \
-                            if '.' in str(project_mode.npileup) else int(project_mode.npileup)
-                    if postfix == '_LOW':
-                        if project_mode.npileuplow:
-                            n_pileup = project_mode.npileuplow \
-                                if '.' in str(project_mode.npileuplow) else int(project_mode.npileuplow)
-                    elif postfix == '_HIGH':
-                        if project_mode.npileuphigh:
-                            n_pileup = project_mode.npileuphigh \
-                                if '.' in str(project_mode.npileuphigh) else int(project_mode.npileuphigh)
-                    second_input_param['ratio'] = n_pileup
-                    if secondary_input_offset:
-                        second_input_param['offset'] = secondary_input_offset
-                    job_parameters.append(second_input_param)
+                        param_input_list = param_value.split(',')
+                    for param_index, param_value in enumerate(param_input_list):
+                        if param_value[-1] != '/' and ('_tid' not in param_value):
+                            param_value = '%s/' % param_value
+                        postfix = ''
+                        if param_index == 0:
+                            postfix_index = ''
+                        else:
+                            postfix_index = f'_{param_index}'
+                        if 'Low'.lower() in name.lower():
+                            postfix = f'_LOW{postfix_index}'
+                        elif 'High'.lower() in name.lower():
+                            postfix = f'_HIGH{postfix_index}'
+
+                        param_dict = {'name': param_name, 'dataset': param_value, 'postfix': postfix}
+                        param_dict.update(trf_options)
+                        if project_mode.eventRatio:
+                            current_event_ratio = project_mode.eventRatio
+                            if ',' in project_mode.eventRatio:
+                                current_event_ratio = project_mode.eventRatio.split(',')[param_index]
+                            if '.' in current_event_ratio:
+                                event_ratio = str(current_event_ratio)
+                            else:
+                                event_ratio = int(current_event_ratio)
+                            param_dict.update({'event_ratio': event_ratio})
+                        if postfix.startswith('_LOW'):
+                            if project_mode.eventRatioLow:
+                                current_event_ratio = project_mode.eventRatioLow
+                                if ',' in project_mode.eventRatioLow:
+                                    current_event_ratio = project_mode.eventRatioLow.split(',')[param_index]
+                                if '.' in current_event_ratio:
+                                    event_ratio = str(current_event_ratio)
+                                else:
+                                    event_ratio = int(current_event_ratio)
+                                param_dict.update({'event_ratio': event_ratio})
+                        elif postfix.startswith('_HIGH'):
+                            if project_mode.eventRatioHigh:
+                                current_event_ratio = project_mode.eventRatioHigh
+                                if ',' in project_mode.eventRatioLow:
+                                    current_event_ratio = project_mode.eventRatioHigh.split(',')[param_index]
+                                if '.' in current_event_ratio:
+                                    event_ratio = str(current_event_ratio)
+                                else:
+                                    event_ratio = int(current_event_ratio)
+                                param_dict.update({'event_ratio': event_ratio})
+                        if 'Cavern'.lower() in name.lower():
+                            second_input_param = self.protocol.render_param(TaskParamName.SECONDARY_INPUT_CAVERN,
+                                                                            param_dict)
+                        else:
+                            second_input_param = self.protocol.render_param(TaskParamName.SECONDARY_INPUT_MINBIAS,
+                                                                            param_dict)
+                        n_pileup = TaskDefConstants.DEFAULT_MINIBIAS_NPILEUP
+                        if project_mode.npileup:
+                            n_pileup = project_mode.npileup \
+                                if '.' in str(project_mode.npileup) else int(project_mode.npileup)
+                        if postfix == '_LOW':
+                            if project_mode.npileuplow:
+                                n_pileup = project_mode.npileuplow \
+                                    if '.' in str(project_mode.npileuplow) else int(project_mode.npileuplow)
+                        elif postfix == '_HIGH':
+                            if project_mode.npileuphigh:
+                                n_pileup = project_mode.npileuphigh \
+                                    if '.' in str(project_mode.npileuphigh) else int(project_mode.npileuphigh)
+                        second_input_param['ratio'] = n_pileup
+                        if secondary_input_offset:
+                            second_input_param['offset'] = secondary_input_offset
+                        job_parameters.append(second_input_param)
+
                     is_pile_task = True
                 elif re.match(r'^(--)?input.*File$', name, re.IGNORECASE):
                     param_name = re.sub("(?<=input)evgen(?=file)", "EVNT".lower(), name.lower())

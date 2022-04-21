@@ -104,15 +104,15 @@
     "description": ""
   },
   "eventRatio": {
-    "type": "float",
+    "type": "str",
     "description": ""
   },
   "eventRatioHigh": {
-    "type": "float",
+    "type": "str",
     "description": ""
   },
   "eventRatioLow": {
-    "type": "float",
+    "type": "str",
     "description": ""
   },
   "failWhenGoalUnreached": {
@@ -496,6 +496,10 @@
     "description": ""
   },
   "releasePerLB": {
+    "type": "bool",
+    "description": ""
+  },
+  "splitPileupInput": {
     "type": "bool",
     "description": ""
   }

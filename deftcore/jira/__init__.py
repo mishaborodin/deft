@@ -4,7 +4,7 @@ import requests
 import json
 import copy
 from deftcore.security.sso import SSOCookies
-from deftcore.settings import JIRA_CONFIG, VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH
+from deftcore.settings import JIRA_CONFIG, VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH, JIRA_KEY
 from deftcore.log import Logger
 
 logger = Logger.get()
@@ -16,12 +16,13 @@ class JIRAClient(object):
 
     def authorize(self):
         try:
-            self.sso_cookies = SSOCookies(
-                JIRA_CONFIG['auth_url'],
-                krb=False,
-                pem_cert_file_path=VOMS_CERT_FILE_PATH,
-                pem_cert_key_path=VOMS_KEY_FILE_PATH
-            ).get()
+            # self.sso_cookies = SSOCookies(
+            #     JIRA_CONFIG['auth_url'],
+            #     krb=False,
+            #     pem_cert_file_path=VOMS_CERT_FILE_PATH,
+            #     pem_cert_key_path=VOMS_KEY_FILE_PATH
+            # ).get()
+            self.sso_cookies = {'fake':'fake'}
             return self.sso_cookies
         except Exception as ex:
             raise Exception('JIRAClient: SSO authentication error: {0}'.format(str(ex)))
@@ -34,12 +35,11 @@ class JIRAClient(object):
         issue['fields']['summary'] = issue['fields']['summary'] % summary
         issue['fields']['description'] = issue['fields']['description'] % description
 
-        headers = {'Content-type': 'application/json'}
+        headers = {'Content-type': 'application/json', 'Authorization': 'Basic %s'%JIRA_KEY}
 
         response = requests.post(JIRA_CONFIG['issue_url'],
                                  data=json.dumps(issue),
                                  headers=headers,
-                                 cookies=self.sso_cookies,
                                  verify=JIRA_CONFIG['verify_ssl_certificates'])
 
         if response.status_code != requests.codes.created:
@@ -58,9 +58,9 @@ class JIRAClient(object):
             issue_key,
             str(delete_sub_issues).lower()
         )
-
+        headers = {'Content-type': 'application/json', 'Authorization': 'Basic %s'%JIRA_KEY}
         response = requests.delete(issue_url,
-                                   cookies=self.sso_cookies,
+                                   headers=headers,
                                    verify=JIRA_CONFIG['verify_ssl_certificates'])
 
         if response.status_code != requests.codes.no_content:
@@ -77,13 +77,12 @@ class JIRAClient(object):
         issue['fields']['description'] = issue['fields']['description'] % description
         issue['fields']['parent']['key'] = issue['fields']['parent']['key'] % parent_issue_key
 
-        headers = {'Content-type': 'application/json'}
+        headers = {'Content-type': 'application/json', 'Authorization': 'Basic %s'%JIRA_KEY}
 
         response = requests.post(JIRA_CONFIG['issue_url'],
                                  data=json.dumps(issue),
                                  headers=headers,
-                                 cookies=self.sso_cookies,
-                                 verify=JIRA_CONFIG['verify_ssl_certificates'])
+                                    verify=JIRA_CONFIG['verify_ssl_certificates'])
 
         if response.status_code != requests.codes.created:
             response.raise_for_status()
@@ -109,14 +108,13 @@ class JIRAClient(object):
         comment = JIRA_CONFIG['issue_comment_template'].copy()
         comment['body'] = comment['body'] % comment_body
 
-        headers = {'Content-type': 'application/json'}
+        headers = {'Content-type': 'application/json', 'Authorization': 'Basic %s'%JIRA_KEY}
         comment_url = '{0}{1}/comment'.format(JIRA_CONFIG['issue_url'], issue_key)
 
         response = requests.post(comment_url,
                                  data=json.dumps(comment),
                                  headers=headers,
-                                 cookies=self.sso_cookies,
-                                 verify=JIRA_CONFIG['verify_ssl_certificates'])
+                                   verify=JIRA_CONFIG['verify_ssl_certificates'])
 
         if response.status_code != requests.codes.created:
             response.raise_for_status()
@@ -131,14 +129,13 @@ class JIRAClient(object):
         issue_close_request['update']['comment'][0]['add']['body'] = \
             issue_close_request['update']['comment'][0]['add']['body'] % comment
 
-        headers = {'Content-type': 'application/json'}
+        headers = {'Content-type': 'application/json', 'Authorization': 'Basic %s'%JIRA_KEY}
         transitions_url = '{0}{1}/transitions'.format(JIRA_CONFIG['issue_url'], issue_key)
 
         response = requests.post(transitions_url,
                                  data=json.dumps(issue_close_request),
                                  headers=headers,
-                                 cookies=self.sso_cookies,
-                                 verify=JIRA_CONFIG['verify_ssl_certificates'])
+                                   verify=JIRA_CONFIG['verify_ssl_certificates'])
 
         if response.status_code != requests.codes.no_content:
             response.raise_for_status()

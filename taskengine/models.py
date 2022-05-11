@@ -760,6 +760,31 @@ def t_request_proxy_post_init(sender, **kwargs):
         logger.exception('Exception occurred: {0}'.format(get_exception_string()))
         self.evgen_steps = None
 
+class TaskTemplate(models.Model):
+
+    class TEMPLATE_TYPE():
+        SAMPLE = 'SAMPLE'
+        TEST = 'TEST'
+        USER = 'USER'
+
+    id = models.DecimalField(decimal_places=0, max_digits=12, db_column='TASK_TEMPLATE_ID', primary_key=True)
+    step = models.ForeignKey(StepExecution, db_column='STEP_ID', on_delete=CASCADE)
+    request = models.ForeignKey(TRequest, db_column='PR_ID', on_delete=CASCADE)
+    parent_id = models.DecimalField(decimal_places=0, max_digits=12, db_column='PARENT_TID')
+    name = models.CharField(max_length=130, db_column='TASK_NAME')
+    timestamp = models.DateTimeField(db_column='TIMESTAMP')
+    template_type = models.CharField(max_length=128, db_column='TEMPLATE_TYPE', null=True)
+    task_template = models.JSONField(db_column='TEMPLATE')
+    task_error = models.CharField(max_length=4000, db_column='TASK_ERROR', null=True)
+    build = models.CharField(max_length=200, db_column='TAG', null=True)
+
+    def save(self, *args, **kwargs):
+        self.timestamp = timezone.now()
+        super(TaskTemplate, self).save(*args, **kwargs)
+
+    class Meta:
+        db_name = 'deft_intr'
+        db_table =  "T_TASK_TEMPLATE"
 
 class TProject(models.Model):
     project = models.CharField(max_length=30, db_column='PROJECT', primary_key=True)

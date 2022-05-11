@@ -544,3 +544,5 @@ class TaskDefConstants(object, metaclass=Constants):
                         '[Errno 111] Connection refused']
     TRANSIENT_ERROR_ATTEMPTS = 1
     REPEAT_ATTEMPT_MESSAGE = 'Repeated because of a transient error'
+    TEMPLATE_TASK_ID = 28948171
+    WORKFLOW_VALIDATION_REQUESTS = [43321, 43400]

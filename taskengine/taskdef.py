@@ -15,7 +15,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, GlobalShare, SliceError
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, GlobalShare, SliceError, TaskTemplate
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -214,6 +214,8 @@ class TaskDefinition(object):
         self.ami_client = AMIClient()
         self.rucio_client = RucioClient()
         self.agis_client = AGISClient()
+        self.template_type = None
+        self.template_build = None
 
     @staticmethod
     def _get_usergroup(step):
@@ -2473,7 +2475,10 @@ class TaskDefinition(object):
                 raise Exception("The project 'data' is invalid for MC inputs")
 
             taskname = self._construct_taskname(input_data_name, project, prod_step, ctag_name, trf_name)
-            task_proto_id = self.task_reg.register_task_id()
+            if not self.template_type:
+                task_proto_id = self.task_reg.register_task_id()
+            else:
+                task_proto_id = TaskDefConstants.TEMPLATE_TASK_ID # replace
 
             if 'EVNT' in output_types and prod_step.lower() == 'evgen'.lower():
                 use_evnt_txt = False
@@ -3767,10 +3772,11 @@ class TaskDefinition(object):
             ttcr_timestamp = None
 
             try:
-                ttcr = TConfig.get_ttcr(project, prod_step, usergroup)
-                if ttcr > 0:
-                    ttcr_timestamp = timezone.now() + datetime.timedelta(seconds=ttcr)
-                    task_proto_dict.update({'ttcr_timestamp': str(ttcr_timestamp)})
+                if not self.template_type:
+                    ttcr = TConfig.get_ttcr(project, prod_step, usergroup)
+                    if ttcr > 0:
+                        ttcr_timestamp = timezone.now() + datetime.timedelta(seconds=ttcr)
+                        task_proto_dict.update({'ttcr_timestamp': str(ttcr_timestamp)})
             except Exception as ex:
                 logger.exception('Getting TTC failed: {0}'.format(str(ex)))
 
@@ -4041,7 +4047,8 @@ class TaskDefinition(object):
             self._check_site_container(task_proto_dict)
 
             try:
-                self._set_pre_stage(step, task_proto_dict, project_mode)
+                if not self.template_type:
+                    self._set_pre_stage(step, task_proto_dict, project_mode)
             except Exception as ex:
                 logger.warning('Prestage has problem {0}'.format(
                     str(ex)))
@@ -4070,7 +4077,10 @@ class TaskDefinition(object):
                     template_string = self.protocol.serialize_task(task_proto)
                     task_template = Template(template_string)
                     task_string = task_template.render(Context(context_dict))
-                    task_id = self.task_reg.register_task_id()
+                    if not self.template_type:
+                        task_id = self.task_reg.register_task_id()
+                    else:
+                        task_id = task_proto_id
                     task_string = task_string.replace(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_proto_id,
                                                       TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_id)
 
@@ -4078,7 +4088,10 @@ class TaskDefinition(object):
                     task_elements.append({task_id: task})
             else:
                 task_string = self.protocol.serialize_task(task_proto)
-                task_id = self.task_reg.register_task_id()
+                if not self.template_type:
+                    task_id = self.task_reg.register_task_id()
+                else:
+                    task_id = task_proto_id
                 task_string = task_string.replace(TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_proto_id,
                                                   TaskDefConstants.DEFAULT_TASK_ID_FORMAT % task_id)
                 task = self.protocol.deserialize_task(task_string)
@@ -4114,7 +4127,7 @@ class TaskDefinition(object):
                                            reuse_input=reuse_input, evgen_params=evgen_params,
                                            task_common_offset=task_common_offset)
                 set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
-                if mc_pileup_overlay['is_overlay']:
+                if mc_pileup_overlay['is_overlay'] and not self.template_type:
                     self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task)
                 if step == first_step:
                     chain_id = task_id
@@ -4123,19 +4136,23 @@ class TaskDefinition(object):
                         parent_task_id = first_parent_task_id
                     else:
                         parent_task_id = self.task_reg.get_parent_task_id(step, task_id)
+                if not self.template_type:
+                    self.task_reg.register_task(task, step, task_id, parent_task_id, chain_id, project, input_data_name,
+                                                number_of_events, step.request.campaign, step.request.subcampaign,
+                                                bunchspacing, ttcr_timestamp,
+                                                truncate_output_formats=truncate_output_formats,
+                                                task_common_offset=task_common_offset)
 
-                self.task_reg.register_task(task, step, task_id, parent_task_id, chain_id, project, input_data_name,
-                                            number_of_events, step.request.campaign, step.request.subcampaign,
-                                            bunchspacing, ttcr_timestamp,
-                                            truncate_output_formats=truncate_output_formats,
-                                            task_common_offset=task_common_offset)
-
-                self.task_reg.register_task_output(output_params,
-                                                   task_proto_id,
-                                                   task_id,
-                                                   parent_task_id,
-                                                   usergroup,
-                                                   step.request.subcampaign)
+                    self.task_reg.register_task_output(output_params,
+                                                       task_proto_id,
+                                                       task_id,
+                                                       parent_task_id,
+                                                       usergroup,
+                                                       step.request.subcampaign)
+                else:
+                    task_template = self.task_reg.register_task_template(task, step, parent_task_id,
+                                                                         template_type=self.template_type, template_build=self.template_build)
+                    self.template_results[step.id] = task_template
                 if set_mc_reprocessing_hashtag:
                     try:
                         created_task = ProductionTask.objects.get(id=task_id)
@@ -4889,14 +4906,43 @@ class TaskDefinition(object):
                 else:
                     return status.status
 
-    def _define_tasks_for_requests(self, requests, jira_client, restart=False):
+    def set_error(self, log_msg, request, step, exception_name, exception_type, exception_string ):
+        self.set_slice_error(request.id, step.slice.id, exception_type, exception_string)
+        if not self.template_type:
+            jira_client.log_exception(request.reference, exception_name, log_msg=log_msg)
+        else:
+            if step.id in self.template_results:
+                task_template = self.template_results[step.id]
+            else:
+                if TaskTemplate.objects.filter(step=step, request=step.request, template_type=self.template_type,
+                                               build=self.template_build).exists():
+                    task_template = TaskTemplate.objects.get(step=step, request=step.request,
+                                                             template_type=self.template_type, build=self.template_build)
+                    task_template.name = 'NotDefined'
+                    task_template.task_error = None
+                    task_template.task_template = '{}'
+                else:
+                    task_template = TaskTemplate(step=step,
+                                                 request=step.request,
+                                                 parent_id=0,
+                                                 name='NotDefined',
+                                                 template_type=self.template_type,
+                                                 task_template='{}',
+                                                 build=self.template_build)
+            task_template.task_error = log_msg
+            task_template.save()
+            self.template_results[step.id] = task_template
+
+    def _define_tasks_for_requests(self, requests, jira_client, restart=False, template_type=None):
         for request in requests:
             request.locked = True
             request.save()
             logger.info("Request %d is locked" % request.id)
         logger.info("Processing production requests")
         logger.info("Requests to process: %s" % str([int(req.id) for req in requests]))
-
+        self.template_type = template_type
+        if self.template_type:
+            self.template_results = {}
         for request in requests:
             try:
                 logger.info("Processing request %d" % request.id)
@@ -4930,7 +4976,8 @@ class TaskDefinition(object):
                         ami_hashtag_input_list = list()
                         input_data_name = self.get_step_input_data_name(step)
                         processed_slices.append(step.slice_id)
-                        self.unset_slice_error(step.request, step.slice)
+                        if (self.template_type):
+                            self.unset_slice_error(step.request, step.slice)
                         if input_data_name.startswith('ami#'):
                             ami_hashtag_input = input_data_name.split('ami#')[-1]
                             if ami_hashtag_input:
@@ -4974,8 +5021,9 @@ class TaskDefinition(object):
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
-                                    jira_client.log_exception(request.reference, ex, log_msg=log_msg)
-                                    self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
+                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string() )
+                                    # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
                                     summary_log += log_msg
                                     continue
@@ -4993,8 +5041,9 @@ class TaskDefinition(object):
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
-                                    jira_client.log_exception(request.reference, ex, log_msg=log_msg)
-                                    self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
+                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string() )
+                                    # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
                                     summary_log += log_msg
                                     continue
@@ -5014,8 +5063,10 @@ class TaskDefinition(object):
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
-                                    jira_client.log_exception(request.reference, ex, log_msg=log_msg)
-                                    self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
+                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string() )
+
+                                    # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                    # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
                                     summary_log += log_msg
                                     continue
@@ -5056,8 +5107,11 @@ class TaskDefinition(object):
                                                 request.id, step.slice.slice, step.id)
                                             log_msg += ' input = {0}, exception occurred: {1}'.format(
                                                 self.get_step_input_data_name(step), get_exception_string())
-                                            jira_client.log_exception(request.reference, ex, log_msg=log_msg)
-                                            self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
+                                            self.set_error(log_msg, request, step, ex, type(ex).__name__,
+                                                           get_exception_string())
+
+                                            # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                            # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                             exception = True
                                             summary_log += log_msg
                                             continue
@@ -5079,8 +5133,11 @@ class TaskDefinition(object):
                                             request.id, step.slice.slice, step.id)
                                         log_msg += ' input = {0}, exception occurred: {1}'.format(
                                             self.get_step_input_data_name(step), get_exception_string())
-                                        jira_client.log_exception(request.reference, ex, log_msg=log_msg)
-                                        self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
+                                        self.set_error(log_msg, request, step, ex, type(ex).__name__,
+                                                       get_exception_string())
+
+                                        # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
+                                        # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                         exception = True
                                         summary_log += log_msg
                                         continue
@@ -5088,20 +5145,23 @@ class TaskDefinition(object):
                                         raise ex
                     except KeyboardInterrupt:
                         pass
-                    except Exception:
+                    except Exception as ex:
                         log_msg = 'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                             get_exception_string())
-                        self.set_slice_error(request.id,step.slice.id,'default',get_exception_string())
-                        logger.exception(log_msg)
-                        if request.reference:
-                            try:
-                                jira_client.add_issue_comment(request.reference, log_msg)
-                                exception = True
-                                summary_log += log_msg
-                            except Exception:
-                                pass
-                        continue
+                        if self.template_type:
+                            self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string())
+                        else:
+                            self.set_slice_error(request.id,step.slice.id,'default',get_exception_string())
+                            logger.exception(log_msg)
+                            if request.reference:
+                                try:
+                                    jira_client.add_issue_comment(request.reference, log_msg)
+                                    exception = True
+                                    summary_log += log_msg
+                                except Exception:
+                                    pass
+                            continue
 
                 request.status = self._get_request_status(request, summary_log)
                 if not exception:
@@ -5127,6 +5187,15 @@ class TaskDefinition(object):
             logger.exception('JIRAClient::authorize failed: {0}'.format(str(ex)))
         requests = TRequest.objects.filter(id__in=requests_ids)
         self._define_tasks_for_requests(requests, jira_client, restart)
+
+    def test_process_requests(self, request_id, template_type=None):
+        jira_client = JIRAClient()
+        try:
+            jira_client.authorize()
+        except Exception as ex:
+            logger.exception('JIRAClient::authorize failed: {0}'.format(str(ex)))
+        requests = [TRequest.objects.get(id=request_id)]
+        self._define_tasks_for_requests(requests, jira_client, False, template_type)
 
     def process_requests(self, restart=False, no_wait=False, debug_only=False, request_types=None):
         jira_client = JIRAClient()

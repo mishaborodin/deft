@@ -3,7 +3,7 @@ __author__ = 'Dmitry Golubkov'
 import json
 import re
 from django.core.exceptions import ObjectDoesNotExist
-from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution, HashTag, HashTagToRequest
+from taskengine.models import ProductionDataset, ProductionTask, TTask, StepExecution, HashTag, HashTagToRequest, TaskTemplate
 from taskengine.protocol import Protocol, TaskStatus, TaskDefConstants
 from django.utils import timezone
 from deftcore.settings import MONITORING_REQUEST_LINK_FORMAT
@@ -68,6 +68,29 @@ class TaskRegistration(object):
         except Exception as ex:
             logger.exception('register_request_reference, exception occurred: {0}'.format(str(ex)))
             return None
+
+    def register_task_template(self, task, step, parent_task_id, template_type=None, template_build=None):
+        protocol = Protocol()
+        if TaskTemplate.objects.filter(step=step,request=step.request, template_type=template_type,build=template_build).exists():
+            task_template = TaskTemplate.objects.get(step=step,request=step.request, template_type=template_type,build=template_build)
+            task_template.name = task['taskName']
+            task_template.task_error = None
+            task_template.task_template = protocol.serialize_task(task)
+        else:
+            task_template = TaskTemplate(step=step,
+                                         request=step.request,
+                                         parent_id=parent_task_id,
+                                         name=task['taskName'],
+                                         template_type=template_type,
+                                         task_template=protocol.serialize_task(task),
+                                         build=template_build)
+        task_template.save()
+        return   task_template
+
+
+
+
+
 
     def register_task(self, task, step, task_id, parent_task_id, chain_id, project, input_data_name, number_of_events,
                       campaign, subcampaign, bunchspacing, ttcr_timestamp, truncate_output_formats=None,

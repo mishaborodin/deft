@@ -422,7 +422,7 @@ class AMIClient(object):
         del sys.modules[os.path.splitext(trf_transform)[0]]
         return executor_list
 
-    def get_trf_params(self, trf_cache, trf_release, trf_transform, sub_step_list=None, force_dump_args=False,
+    def get_trf_params(self, trf_cache, trf_release, trf_transform, sub_step_list=False, force_dump_args=False,
                        force_ami=False):
         root = '/afs/cern.ch/atlas/software/releases'
         trf_path_t = Template("$root/$base_rel/$cache/$rel/InstallArea/share/bin/$trf")
@@ -495,8 +495,8 @@ class AMIClient(object):
                 trf_params = self.ami_get_params(trf_cache, trf_release, trf_transform)
             except Exception as ex:
                 logger.exception("ami_get_params failed: %s" % str(ex))
-
-        if sub_step_list is not None:
+        sub_steps = None
+        if sub_step_list:
             # old way from PS1
             if trf_transform.lower() in [e.lower() for e in ['AtlasG4_tf.py', 'Sim_tf.py', 'StoppedParticleG4_tf.py',
                                                              'TrigFTKMergeReco_tf.py', 'Reco_tf.py',
@@ -509,9 +509,9 @@ class AMIClient(object):
                                      'sim', 'a2r', 'ESDtoDPD', 'r2e', 'a2d', 'HITtoRDO', 'RAWtoESD', 'default',
                                      'EVNTtoHITS', 'h2r', 'SPGenerator', 'first', 'BSRDOtoRAW', 'b2r', 'OverlayBS',
                                      'RDOFTKCreator', 'AODFTKCreator']
-                sub_step_list.extend(default_sub_steps)
+                sub_steps = default_sub_steps
 
-        return trf_params
+        return trf_params, sub_steps
 
     def sync_ami_projects(self):
         try:

@@ -9,6 +9,8 @@ import ast
 import datetime
 import copy
 import math
+from copy import deepcopy
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.template import Context, Template
@@ -1775,7 +1777,8 @@ class TaskDefinition(object):
         trf_name = ctag['transformation']
         trf_cache = ctag['SWReleaseCache'].split('_')[0]
         trf_release = ctag['SWReleaseCache'].split('_')[1]
-        trf_params = self.ami_client.get_trf_params(trf_cache, trf_release, trf_name, force_ami=True)
+        #trf_params = self.ami_client.get_trf_params(trf_cache, trf_release, trf_name, force_ami=True)
+        trf_params, _ = self._get_ami_transform_param_cached(trf_cache, trf_release, trf_name, force_ami=True)
         # proto_fix
         if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
             if '--inputHISTFile' not in trf_params:
@@ -1911,19 +1914,20 @@ class TaskDefinition(object):
             self._tag_cache.update({tag_name: ctag})
         return ctag
 
-    def _get_ami_transform_param_cached(self, trf_cache, trf_release, trf_transform, sub_step_list=None, force_dump_args=False,
+    def _get_ami_transform_param_cached(self, trf_cache, trf_release, trf_transform, sub_step_list=False, force_dump_args=False,
                                         force_ami=False):
         sw_name = trf_cache + trf_release + trf_transform + str(sub_step_list) + str(force_dump_args) + str(force_ami)
         try:
-            sw_transform = self._sw_cache.get(sw_name, None)
+            sw_transform, new_sub_step_list = deepcopy(self._sw_cache.get(sw_name, (None, None)))
         except AttributeError:
             self._sw_cache = dict()
             sw_transform = None
+            new_sub_step_list = None
         if sw_transform is None:
-            sw_transform = self.ami_client.get_trf_params(trf_cache, trf_release, trf_transform, sub_step_list, force_dump_args,
+            sw_transform, new_sub_step_list = self.ami_client.get_trf_params(trf_cache, trf_release, trf_transform, sub_step_list, force_dump_args,
                                                           force_ami)
-            self._sw_cache.update({sw_name: sw_transform})
-        return sw_transform
+            self._sw_cache.update({sw_name: (deepcopy(sw_transform), deepcopy(new_sub_step_list))})
+        return sw_transform, new_sub_step_list
 
     @staticmethod
     def _check_task_events_consistency(task_config):
@@ -2083,8 +2087,13 @@ class TaskDefinition(object):
             trf_params = list()
             trf_sub_steps = list()
             for key in list(trf_dict.keys()):
-                trf_params.extend(self.ami_client.get_trf_params(trf_dict[key][0], trf_dict[key][1], key,
-                                                                 sub_step_list=trf_sub_steps, force_ami=force_ami))
+                # trf_params.extend(self.ami_client.get_trf_params(trf_dict[key][0], trf_dict[key][1], key,
+                #                                                  sub_step_list=trf_sub_steps, force_ami=force_ami))
+                trf_from_cache, sub_steps_from_cache = self._get_ami_transform_param_cached(trf_dict[key][0], trf_dict[key][1], key,
+                                                                sub_step_list=True, force_ami=force_ami)
+                trf_params.extend(trf_from_cache)
+                if sub_steps_from_cache is not None:
+                    trf_sub_steps.extend(sub_steps_from_cache)
                 #trf_params.append('--multithreaded')
 
             if not trf_params:
@@ -4906,11 +4915,12 @@ class TaskDefinition(object):
                 else:
                     return status.status
 
-    def set_error(self, log_msg, request, step, exception_name, exception_type, exception_string ):
+    def set_error(self, log_msg, request, step, exception_name, exception_type, exception_string, jira_client ):
         self.set_slice_error(request.id, step.slice.id, exception_type, exception_string)
         if not self.template_type:
             jira_client.log_exception(request.reference, exception_name, log_msg=log_msg)
         else:
+            logger.exception(log_msg)
             if step.id in self.template_results:
                 task_template = self.template_results[step.id]
             else:
@@ -5021,7 +5031,7 @@ class TaskDefinition(object):
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
-                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string() )
+                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string(),jira_client )
                                     # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
@@ -5041,7 +5051,7 @@ class TaskDefinition(object):
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
-                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string() )
+                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string(), jira_client )
                                     # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
                                     exception = True
@@ -5063,7 +5073,7 @@ class TaskDefinition(object):
                                         'Request = {0}, Chain = {1} ({2}), input = {3}, exception occurred: {4}'.format(
                                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                                             get_exception_string())
-                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string() )
+                                    self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string(), jira_client )
 
                                     # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                     # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
@@ -5108,7 +5118,7 @@ class TaskDefinition(object):
                                             log_msg += ' input = {0}, exception occurred: {1}'.format(
                                                 self.get_step_input_data_name(step), get_exception_string())
                                             self.set_error(log_msg, request, step, ex, type(ex).__name__,
-                                                           get_exception_string())
+                                                           get_exception_string(), jira_client)
 
                                             # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                             # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
@@ -5134,7 +5144,7 @@ class TaskDefinition(object):
                                         log_msg += ' input = {0}, exception occurred: {1}'.format(
                                             self.get_step_input_data_name(step), get_exception_string())
                                         self.set_error(log_msg, request, step, ex, type(ex).__name__,
-                                                       get_exception_string())
+                                                       get_exception_string(), jira_client)
 
                                         # jira_client.log_exception(request.reference, ex, log_msg=log_msg)
                                         # self.set_slice_error(request.id,step.slice.id,type(ex).__name__,get_exception_string())
@@ -5150,7 +5160,7 @@ class TaskDefinition(object):
                             request.id, step.slice.slice, step.id, self.get_step_input_data_name(step),
                             get_exception_string())
                         if self.template_type:
-                            self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string())
+                            self.set_error(log_msg, request, step, ex, type(ex).__name__, get_exception_string(), jira_client)
                         else:
                             self.set_slice_error(request.id,step.slice.id,'default',get_exception_string())
                             logger.exception(log_msg)

@@ -9,11 +9,11 @@ from deftcore.log import Logger
 
 logger = Logger.get()
 
-def make_sample_for_slice(request_id, slice_number, submit=False):
-    slice = InputRequestList.objects.get(request=request_id, slice=slice_number)
+def make_sample_for_slice(request_id, slice_numbers, submit=False):
+    slices = InputRequestList.objects.filter(request=request_id, slice__in=slice_numbers)
     approved_steps = []
     for step in StepExecution.objects.filter(request=request_id, status='Approved'):
-        if step.slice != slice and (not ProductionTask.objects.filter(step=step).exists()):
+        if step.slice not in slices and (not ProductionTask.objects.filter(step=step).exists()):
             approved_steps.append(step.id)
             step.status = 'NotChecked'
             step.save()

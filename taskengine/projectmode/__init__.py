@@ -148,7 +148,7 @@ class ProjectMode(object):
                 if sw_tag['TAGNAME'] in self.container_name:
                     cache_exists = True
                     break
-            if not cache_exists:
+            if not cache_exists and not self.skipCMTConfigCheck:
                 raise Exception(
                     'Cache \"{0}\" is not found in the container \"{1}\" '.format(
                         self.cache, self.container_name))

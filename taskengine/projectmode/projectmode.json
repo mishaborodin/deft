@@ -502,5 +502,13 @@
   "splitPileupInput": {
     "type": "bool",
     "description": ""
+  },
+  "ignoreBlacklist": {
+    "type": "bool",
+    "description": ""
+  },
+  "ignoreTestLHE": {
+    "type": "bool",
+    "description": ""
   }
 }

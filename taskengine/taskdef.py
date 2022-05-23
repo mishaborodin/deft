@@ -996,6 +996,8 @@ class TaskDefinition(object):
                 return  self._extract_chain_input_from_datasets(parent_task.primary_input)
             if parent_task.status in ['done', 'finished']:
                 return parent_task.total_events
+            if ('evgen' in parent_task.name) and (parent_task.step.input_events > 0):
+                return parent_task.step.input_events
         return -1
 
 

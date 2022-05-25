@@ -502,7 +502,8 @@ class AMIClient(object):
                                                              'TrigFTKMergeReco_tf.py', 'Reco_tf.py',
                                                              'FullChain_tf.py', 'Trig_reco_tf.py', 'TrigMT_reco_tf.py',
                                                              'OverlayChain_tf.py', 'TrigFTKTM64SM1Un_tf.py',
-                                                             'TrigFTKSMUn_Tower22_tf.py', 'Digi_tf.py']]:
+                                                             'TrigFTKSMUn_Tower22_tf.py', 'Digi_tf.py','HITSMerge_tf.py',
+                                                             'AODMerge_tf.py','EVNTMerge_tf.py']]:
                 default_sub_steps = ['AODtoRED', 'FTKRecoRDOtoESD', 'all', 'n2n', 'AODtoHIST', 'DQHistogramMerge',
                                      'NTUPtoRED', 'SPSim', 'AODtoTAG', 'AtlasG4Tf', 'ESDtoAOD', 'e2d', 'e2a',
                                      'AODtoDPD',

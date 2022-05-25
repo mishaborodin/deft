@@ -3349,7 +3349,7 @@ class TaskDefinition(object):
                 elif re.match('^(--)?jobNumber$', name, re.IGNORECASE):
                     if trf_name.lower() == 'AtlasG4_tf.py'.lower():
                         continue
-                    elif trf_name.lower() == 'Sim_tf.py'.lower():
+                    elif (trf_name.lower() == 'Sim_tf.py'.lower()) and (not project_mode.enableJobNumber):
                         continue
                     param_dict = {'name': name, 'offset': random_seed_offset}
                     param_dict.update(trf_options)

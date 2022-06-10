@@ -4078,7 +4078,8 @@ class TaskDefinition(object):
                     "The task is rejected - pile tasks required  Events per Input file or useRealNumEvents to be set"
                 )
             self._define_merge_params(step, task_proto_dict, train_production)
-            self._check_site_container(task_proto_dict)
+            if not project_mode.skipCMTConfigCheck:
+                self._check_site_container(task_proto_dict)
 
             try:
                 if not self.template_type:

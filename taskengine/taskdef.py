@@ -1226,7 +1226,7 @@ class TaskDefinition(object):
 
                 requested_output_types = step.step_template.output_formats.split('.')
                 previous_output_types = prod_task.output_formats
-                processed_output_types = [e for e in requested_output_types if e in previous_output_types]
+                processed_output_types = [e for e in requested_output_types if e in previous_output_types.split('.')]
                 if not processed_output_types:
                     continue
 

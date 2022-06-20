@@ -1490,7 +1490,17 @@ class TaskDefinition(object):
 
             if current_dsn_no_scope != previous_dsn_no_scope:
                 continue
-
+            if project_mode.checkOutputDeleted:
+                previous_output_status_dict = \
+                    self.task_reg.check_task_output(task_id, requested_output_types)
+                dataset_still_exists = False
+                for requested_output_type in requested_output_types:
+                    if previous_output_status_dict[requested_output_type]:
+                        dataset_still_exists = True
+                if not dataset_still_exists:
+                    logger.info('Output {0} of task {1} is deleted'.format(
+                        str(requested_output_types), task_id))
+                    continue
             if prod_task_existing.status == 'done':
                 if 'nFiles' in task_existing:
                     number_of_input_files_used += int(task_existing['nFiles'])
@@ -1511,29 +1521,12 @@ class TaskDefinition(object):
                                 raise Exception('Task duplication candidate is found: task_id={0}. '.format(task_id) +
                                                 '(The part of) input was already processed')
                     else:
-                        if project_mode.checkOutputDeleted:
-                            previous_output_status_dict = \
-                                self.task_reg.check_task_output(task_id, requested_output_types)
-                            for requested_output_type in requested_output_types:
-                                if requested_output_type not in list(previous_output_status_dict.keys()):
-                                    continue
-                                if previous_output_status_dict[requested_output_type]:
-                                    raise TaskDuplicateDetected(task_id, 1,
-                                                                request=step.request.id,
-                                                                slice=step.slice.slice,
-                                                                processed_formats='.'.join(processed_output_types),
-                                                                requested_formats='.'.join(requested_output_types),
-                                                                tag=step.step_template.ctag)
-                                else:
-                                    logger.info('Output {0} of task {1} is deleted'.format(
-                                        requested_output_type, task_id))
-                        else:
-                            raise TaskDuplicateDetected(task_id, 1,
-                                                        request=step.request.id,
-                                                        slice=step.slice.slice,
-                                                        processed_formats='.'.join(processed_output_types),
-                                                        requested_formats='.'.join(requested_output_types),
-                                                        tag=step.step_template.ctag)
+                        raise TaskDuplicateDetected(task_id, 1,
+                                                    request=step.request.id,
+                                                    slice=step.slice.slice,
+                                                    processed_formats='.'.join(processed_output_types),
+                                                    requested_formats='.'.join(requested_output_types),
+                                                    tag=step.step_template.ctag)
             elif prod_task_existing.status == 'finished':
                 if 'nFiles' in task_existing:
                     number_of_input_files_used += int(task_existing['nFiles'])
@@ -1554,29 +1547,12 @@ class TaskDefinition(object):
                                 raise Exception('Task duplication candidate is found: task_id={0}. '.format(task_id) +
                                                 '(The part of) input was already processed')
                     else:
-                        if project_mode.checkOutputDeleted:
-                            previous_output_status_dict = \
-                                self.task_reg.check_task_output(task_id, requested_output_types)
-                            for requested_output_type in requested_output_types:
-                                if requested_output_type not in list(previous_output_status_dict.keys()):
-                                    continue
-                                if previous_output_status_dict[requested_output_type]:
-                                    raise TaskDuplicateDetected(task_id, 3,
-                                                                request=step.request.id,
-                                                                slice=step.slice.slice,
-                                                                processed_formats='.'.join(processed_output_types),
-                                                                requested_formats='.'.join(requested_output_types),
-                                                                tag=step.step_template.ctag)
-                                else:
-                                    logger.info('Output {0} of task {1} is deleted'.format(
-                                        requested_output_type, task_id))
-                        else:
-                            raise TaskDuplicateDetected(task_id, 3,
-                                                        request=step.request.id,
-                                                        slice=step.slice.slice,
-                                                        processed_formats='.'.join(processed_output_types),
-                                                        requested_formats='.'.join(requested_output_types),
-                                                        tag=step.step_template.ctag)
+                        raise TaskDuplicateDetected(task_id, 3,
+                                                    request=step.request.id,
+                                                    slice=step.slice.slice,
+                                                    processed_formats='.'.join(processed_output_types),
+                                                    requested_formats='.'.join(requested_output_types),
+                                                    tag=step.step_template.ctag)
             else:
                 if 'nFiles' in task_existing:
                     number_of_input_files_used += int(task_existing['nFiles'])

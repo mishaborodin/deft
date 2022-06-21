@@ -775,6 +775,8 @@ class TaskDefinition(object):
 
         if re.match('^(--)?reductionConf$', name, re.IGNORECASE):
             enclosed_value = True
+        elif re.match('^(--)?formats', name, re.IGNORECASE):
+            enclosed_value = True
         elif re.match('^(--)?validationFlags$', name, re.IGNORECASE):
             enclosed_value = True
         elif re.match('^(--)?athenaopts$', name, re.IGNORECASE):
@@ -2137,6 +2139,10 @@ class TaskDefinition(object):
                     if str(ctag[key]).lower() != 'none':
                         train_production = True
                         break
+                if re.match('^(--)?formats', key, re.IGNORECASE):
+                    if str(ctag[key]).lower() != 'none':
+                        train_production = True
+                        break
 
             use_evgen_otf = project_mode.isOTF or False
             use_no_output = project_mode.noOutput or False
@@ -2603,6 +2609,9 @@ class TaskDefinition(object):
                             trf_params.append(output_param_name)
                 for key in list(ctag.keys()):
                     if re.match('^(--)?reductionConf', key, re.IGNORECASE):
+                        ctag[key] = ' '.join(reduction_conf)
+                        break
+                    if re.match('^(--)?formats', key, re.IGNORECASE):
                         ctag[key] = ' '.join(reduction_conf)
                         break
 

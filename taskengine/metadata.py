@@ -498,12 +498,13 @@ class AMIClient(object):
         sub_steps = None
         if sub_step_list:
             # old way from PS1
-            if trf_transform.lower() in [e.lower() for e in ['AtlasG4_tf.py', 'Sim_tf.py', 'StoppedParticleG4_tf.py',
+            if ((trf_transform.lower() in [e.lower() for e in ['AtlasG4_tf.py', 'Sim_tf.py', 'StoppedParticleG4_tf.py',
                                                              'TrigFTKMergeReco_tf.py', 'Reco_tf.py',
                                                              'FullChain_tf.py', 'Trig_reco_tf.py', 'TrigMT_reco_tf.py',
                                                              'OverlayChain_tf.py', 'TrigFTKTM64SM1Un_tf.py',
                                                              'TrigFTKSMUn_Tower22_tf.py', 'Digi_tf.py','HITSMerge_tf.py',
-                                                             'AODMerge_tf.py','EVNTMerge_tf.py']]:
+                                                             'AODMerge_tf.py','EVNTMerge_tf.py']]) or
+                    trf_transform.lower().endswith('Merge_tf.py'.lower())):
                 default_sub_steps = ['AODtoRED', 'FTKRecoRDOtoESD', 'all', 'n2n', 'AODtoHIST', 'DQHistogramMerge',
                                      'NTUPtoRED', 'SPSim', 'AODtoTAG', 'AtlasG4Tf', 'ESDtoAOD', 'e2d', 'e2a',
                                      'AODtoDPD',

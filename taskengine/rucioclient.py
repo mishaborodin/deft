@@ -103,12 +103,19 @@ class RucioClient(object):
             filename_list.append(file_name)
         return filename_list
 
-    def list_files_with_scope_in_dataset(self, dsn):
+    def list_files_with_scope_in_dataset(self, dsn, skip_short=False):
         filename_list = list()
         scope, dataset = self.extract_scope(dsn)
-        files = self.client.list_files(scope, dataset, long=False)
-        for file_name in [e['scope']+':'+e['name'] for e in files]:
-            filename_list.append(file_name)
+        files = list(self.client.list_files(scope, dataset, long=False))
+        if skip_short:
+            sizes = [x['events'] for x in  files]
+            sizes.sort()
+            filter_size = sizes[-1]
+            for file_name in [e['scope']+':'+e['name'] for e in files if e['events'] == filter_size]:
+                filename_list.append(file_name)
+        else:
+            for file_name in [e['scope']+':'+e['name'] for e in files]:
+                filename_list.append(file_name)
         return filename_list
 
     def choose_random_files(self, list_files, files_number, random_seed=None, previously_used=None):

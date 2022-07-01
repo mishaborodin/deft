@@ -1711,7 +1711,7 @@ class TaskDefinition(object):
     def _find_overlay_input_dataset(self, param_value, dsid):
         if param_value[-1] == '/':
             param_value = param_value[:-1]
-        files_list = self.rucio_client.list_files_with_scope_in_dataset(param_value)
+        files_list = self.rucio_client.list_files_with_scope_in_dataset(param_value, True)
         name_base = param_value
         if '_tid' in name_base:
             name_base = name_base.split('_tid')[0]

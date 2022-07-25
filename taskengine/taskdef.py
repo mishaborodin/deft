@@ -4898,9 +4898,12 @@ class TaskDefinition(object):
         return result_list, another_chain_step
 
     @staticmethod
-    def _get_request_status(request, summary_log):
-
+    def _get_request_status(request, summary_log, locked_time, current_status):
+        if current_status in ['test']:
+            return 'test'
         statuses = TRequestStatus.objects.filter(request=request).order_by('-timestamp')
+        if statuses[0].timestamp > locked_time and statuses[0].status == 'approved' and current_status == 'approved':
+            return 'approved'
         number_of_repeated_attempts = 0
         for status in statuses:
             if status.owner == 'deft' and status.comment == TaskDefConstants.REPEAT_ATTEMPT_MESSAGE:
@@ -4959,6 +4962,7 @@ class TaskDefinition(object):
             request.locked = True
             request.save()
             logger.info("Request %d is locked" % request.id)
+        self.lock_request_time = timezone.now()
         logger.info("Processing production requests")
         logger.info("Requests to process: %s" % str([int(req.id) for req in requests]))
         self.template_type = template_type
@@ -5184,7 +5188,7 @@ class TaskDefinition(object):
                                     pass
                             continue
 
-                request.status = self._get_request_status(request, summary_log)
+                request.status = self._get_request_status(request, summary_log, self.lock_request_time, request.status)
                 if not exception:
                     slices_with_error = list(SliceError.objects.filter(request=request, is_active=True))
                     for slice_error in slices_with_error:

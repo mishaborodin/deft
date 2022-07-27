@@ -169,6 +169,12 @@ class MergedInputProcessedException(Exception):
         super(MergedInputProcessedException, self).__init__(message)
 
 
+class InputEventsForChildStepException(Exception):
+    def __init__(self):
+        message = "To avoid possible events duplication child step can't have total events set. Please use all events or" \
+                  " change input for the slice (Split->Split by events)"
+        super(InputEventsForChildStepException, self).__init__(message)
+
 class WrongCacheVersionUsedException(Exception):
     def __init__(self, version, data_version):
         message = 'The task is rejected. The major part of the current cache version ({0}) for derivation '. \
@@ -5110,9 +5116,14 @@ class TaskDefinition(object):
                             try:
                                 if not use_parent_output:
                                     splitting_dict = self._get_splitting_dict(step)
+                                elif type(step.input_events) is int and step.input_events > -1:
+                                    raise InputEventsForChildStepException()
+
                             except NotEnoughEvents:
                                 raise Exception(get_exception_string())
                             except UniformDataException as ex:
+                                raise ex
+                            except InputEventsForChildStepException as ex:
                                 raise ex
                             except NoRequestedCampaignInput:
                                 raise Exception('No input for specified campaign')

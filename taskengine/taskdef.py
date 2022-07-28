@@ -5117,7 +5117,9 @@ class TaskDefinition(object):
                                 if not use_parent_output:
                                     splitting_dict = self._get_splitting_dict(step)
                                 elif type(step.input_events) is int and step.input_events > -1:
-                                    raise InputEventsForChildStepException()
+                                    parent_step = StepExecution.objects.get(id=step.step_parent_id)
+                                    if step.input_events < parent_step.slice.input_events:
+                                        raise InputEventsForChildStepException()
 
                             except NotEnoughEvents:
                                 raise Exception(get_exception_string())

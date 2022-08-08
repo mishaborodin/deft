@@ -1,5 +1,6 @@
 __author__ = 'Dmitry Golubkov'
 
+import glob
 import re
 import json
 import subprocess
@@ -27,6 +28,7 @@ from deftcore.settings import REQUEST_GRACE_PERIOD
 from deftcore.log import Logger, get_exception_string
 from deftcore.jira import JIRAClient
 from taskengine.projectmode import ProjectMode
+import  xml.etree.ElementTree as ET
 
 logger = Logger.get()
 
@@ -104,6 +106,11 @@ class MaxEventsPerTaskLimitExceededException(Exception):
 class TaskConfigurationException(Exception):
     def __init__(self, message):
         super(TaskConfigurationException, self).__init__(message)
+
+
+class GRLInputException(Exception):
+    def __init__(self, message):
+        super(GRLInputException, self).__init__(message)
 
 
 class TaskSmallEventsException(Exception):
@@ -648,6 +655,71 @@ class TaskDefinition(object):
         return input_params
 
 
+    def _find_grl_xml_file(self, project, file_name):
+        if not file_name.endswith('.xml'):
+            file_name = file_name + '.xml'
+        grl_file = glob.glob(TaskDefConstants.DEFAULT_GRL_XML_PATH.format(project=project) + '*/' +  file_name)
+        if not grl_file:
+            raise GRLInputException(f'GRL {file_name} file is not found')
+        return grl_file[-1]
+
+
+    def _get_GRL_from_xml(self, file_path):
+        grl_xml_root = ET.parse(file_path).getroot()
+        grl_range = {}
+        for run in grl_xml_root.findall('NamedLumiRange/LumiBlockCollection'):
+            run_number = int(run.find('Run').text)
+            grl_range[run_number] = []
+            for lumiblock_range in run.findall('LBRange'):
+                start = int(lumiblock_range.get('Start'))
+                end = int(lumiblock_range.get('End'))
+                grl_range[run_number].append((start, end))
+        logger.info("GRL finds for the file %s " % file_path)
+        return grl_range
+
+    def _filter_input_dataset_by_GRL(self, dataset, grl_range):
+        run_number =  int(dataset.split('.')[1])
+        if run_number not in grl_range:
+            raise GRLInputException(f'{run_number} is not found in the Good Run List')
+        current_run_ranges = grl_range[run_number]
+        files_in_dataset = self.rucio_client.list_file_long(dataset)
+        filtered_files = []
+        for input_file in files_in_dataset:
+            if 'lumiblocknr' not in input_file:
+                raise GRLInputException('lumiblocknr is not found in the input dataset')
+            for lumiblock_range in current_run_ranges:
+                if (input_file['lumiblocknr'] >= lumiblock_range[0]) and (input_file['lumiblocknr'] <= lumiblock_range[1]):
+                    filtered_files.append(input_file)
+                    break
+        logger.info("GRL files filtered for dataset %s with %d files from %d" % (dataset,  len(filtered_files), len(files_in_dataset)))
+        return filtered_files, len(filtered_files) == len(files_in_dataset)
+
+    def _register_input_GRL_dataset(self, grl_dataset_name, filtered_files, task_id):
+        logger.info("GRL input dataset %s with %d files is registered for a task %d" % (
+        grl_dataset_name, len(filtered_files), task_id))
+        files_to_store = [f"{x['scope']}:{x['name']}" for x in filtered_files]
+        files_list = list(self.split_list(files_to_store, len(files_to_store) // 100 + 1))
+        try:
+            self.rucio_client.register_dataset(grl_dataset_name, files_list[0])
+            for files in files_list[1:]:
+                if files:
+                    self.rucio_client.register_files_in_dataset(grl_dataset_name, files)
+        except Exception as ex:
+            raise GRLInputException(str(ex))
+
+
+    def _find_grl_dataset_input_name(self, input_dataset_name, filtered_files):
+        previous_datasets = self.rucio_client.list_datasets('{base}_sub*_grl'.format(base=input_dataset_name))
+        versions = [0]
+        for dataset in previous_datasets:
+            versions.append(int(dataset[dataset.find('_sub') + len('_sub'):dataset.find('_grl')]))
+            if len(filtered_files) == self.rucio_client.get_number_files(dataset):
+                file_to_check = self.rucio_client.list_files_in_dataset(dataset)
+                if not [x for x in filtered_files if x['name'] not in file_to_check]:
+                    return dataset, False
+        version = max(versions) + 1
+        return '{base}_sub{version:04d}_grl'.format(base=input_dataset_name,version=version), True
+
     def _find_optimal_evnt_offset(self, task_name):
         previous_task_list = ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']),
                                                   name=task_name)
@@ -929,6 +1001,9 @@ class TaskDefinition(object):
                     continue
                 return job_param
         return None
+
+
+
 
     @staticmethod
     def _get_job_parameter(name, job_parameters):
@@ -1303,6 +1378,13 @@ class TaskDefinition(object):
 
         raise BlacklistedInputException(dataset_rses)
 
+
+    @staticmethod
+    def translate_sub_dataset(dataset):
+        if '_grl' in dataset:
+            return dataset.split('_sub')[0]
+        return dataset
+
     def _check_task_input(self, task, task_id, number_of_events, task_config, parent_task_id, input_data_name, step,
                           primary_input_offset=0, prod_step=None, reuse_input=None, evgen_params=None,
                           task_common_offset=None):
@@ -1483,6 +1565,8 @@ class TaskDefinition(object):
 
             previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
             previous_dsn_no_scope = previous_dsn.split(':')[-1]
+            if '_sub' in previous_dsn_no_scope:
+                previous_dsn_no_scope = self.translate_sub_dataset(previous_dsn_no_scope)
             current_dsn = primary_input['dataset']
             current_dsn_no_scope = current_dsn.split(':')[-1]
 
@@ -1667,6 +1751,8 @@ class TaskDefinition(object):
                     primary_input))
 
 
+
+
     def _check_site_container(self, task_proto_dict):
         if ('site' in task_proto_dict) and (',' not in task_proto_dict['site']) and \
                 ('BOINC' not in task_proto_dict['site']) and ('container_name' not in task_proto_dict):
@@ -1688,10 +1774,12 @@ class TaskDefinition(object):
                         return
                 raise ContainerIsNotFoundException(task_proto_dict['site'])
 
+    @staticmethod
+    def split_list(input_list, n):
+        k, m = divmod(len(input_list), n)
+        return (input_list[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
+
     def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id, task):
-        def split_list(input_list, n):
-            k, m = divmod(len(input_list), n)
-            return (input_list[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
 
         used_files = set()
         nevents_per_job = task.get('nEventsPerJob')
@@ -1708,7 +1796,7 @@ class TaskDefinition(object):
         else:
             files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=list(used_files))
         logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
-        files_list = list(split_list(files_to_store,len(files_to_store)//100+1))
+        files_list = list(self.split_list(files_to_store,len(files_to_store)//100+1))
         self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_list[0],meta={'task_id':task_id})
         for files in files_list[1:]:
             if files:
@@ -4155,6 +4243,20 @@ class TaskDefinition(object):
                 set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay'] and not self.template_type:
                     self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task)
+                if project_mode.GRL:
+                    grl_file = self._find_grl_xml_file(input_data_name.split(':')[0].split('.')[0], project_mode.GRL)
+                    grl_range = self._get_GRL_from_xml(grl_file)
+                    primary_input = self._get_primary_input(task['jobParameters'])
+                    primary_input_dataset = primary_input['dataset']
+                    filtered_files, whole_dataset = self._filter_input_dataset_by_GRL(primary_input_dataset, grl_range)
+                    if not whole_dataset:
+                        new_input_name, new_dataset = self._find_grl_dataset_input_name(primary_input_dataset, filtered_files)
+                        if new_dataset:
+                            self._register_input_GRL_dataset(new_input_name, filtered_files, task_id)
+                        for entity in task['jobParameters']:
+                            if  entity['dataset'] == primary_input_dataset:
+                                entity['dataset'] = new_input_name
+                                break
                 if step == first_step:
                     chain_id = task_id
                     primary_input_offset = 0

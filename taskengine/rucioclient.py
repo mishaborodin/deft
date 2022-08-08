@@ -118,6 +118,11 @@ class RucioClient(object):
                 filename_list.append(file_name)
         return filename_list
 
+    def list_file_long(self, dsn):
+        scope, dataset = self.extract_scope(dsn)
+        files = list(self.client.list_files(scope, dataset, long=True))
+        return files
+
     def choose_random_files(self, list_files, files_number, random_seed=None, previously_used=None):
         lookup_list = [x for x in list_files if x not in (previously_used or [])]
         random.seed(random_seed)

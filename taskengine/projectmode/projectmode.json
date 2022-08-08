@@ -514,5 +514,13 @@
   "enableJobNumber": {
     "type": "bool",
     "description": ""
+  },
+  "keepUnmerged": {
+    "type": "str",
+    "description": ""
+  },
+  "GRL": {
+    "type": "str",
+    "description": ""
   }
 }

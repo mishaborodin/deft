@@ -202,6 +202,9 @@ class ProjectMode(object):
                             if len(cmtconfig_list) > 0:
                                 setattr(self, 'cmtconfig', cmtconfig_list[0])
                             else:
-                                raise Exception(
-                                    'Default cmtconfig \"{0}\" is not exist in cache \"{1}\" (available: \"{2}\")'.format(
-                                        self.cmtconfig, self.cache, str(','.join(cmtconfig_list))))
+                                if cmtconfig_list:
+                                    raise Exception(
+                                        'Default cmtconfig \"{0}\" is not exist in cache \"{1}\" (available: \"{2}\")'.format(
+                                            self.cmtconfig, self.cache, str(','.join(cmtconfig_list))))
+                                else:
+                                    raise Exception(f'{self.cache} is not registered in CRIC')

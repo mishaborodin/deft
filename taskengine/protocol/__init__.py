@@ -543,7 +543,8 @@ class TaskDefConstants(object, metaclass=Constants):
 
     ERRORS_TO_REPEAT = ['http status code: 503',
                         'Connection broken: IncompleteRead',
-                        '[Errno 111] Connection refused']
+                        '[Errno 111] Connection refused',
+                        'QueuePool limit of size 5']
     TRANSIENT_ERROR_ATTEMPTS = 1
     REPEAT_ATTEMPT_MESSAGE = 'Repeated because of a transient error'
     TEMPLATE_TASK_ID = 28948171

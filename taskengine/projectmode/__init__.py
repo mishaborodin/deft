@@ -8,8 +8,9 @@ from pydoc import locate
 from taskengine.models import InstalledSW
 from taskengine.agisclient import AGISClient
 from taskengine.protocol import TaskDefConstants
+from deftcore.log import Logger
 
-
+logger = Logger.get()
 class UnknownProjectModeOption(Exception):
     def __init__(self, option_key):
         super(UnknownProjectModeOption, self).__init__('Invalid project_mode option: {0}'.format(option_key))
@@ -122,6 +123,13 @@ class ProjectMode(object):
         cmtconfig_list = set(list(installed_cmtconfig_list) + agis_cmtconfig_list)
         return list(cmtconfig_list)
 
+    def _get_cmtconfig_from_cvmfs(self, cache):
+        release = cache.split('-')[-1]
+        project = cache.split('-')[0]
+        path = TaskDefConstants.DEAFULT_SW_RELEASE_PATH.format(release=release,project=project,release_base=".".join(release.split(".")[:2]))
+        cmt_config_from_cvmfs = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+        return cmt_config_from_cvmfs
+
     def set_cmtconfig(self):
         if not self.container_name and 'container_name' in self.task_config:
             self.container_name = self.task_config['container_name']
@@ -202,9 +210,9 @@ class ProjectMode(object):
                             if len(cmtconfig_list) > 0:
                                 setattr(self, 'cmtconfig', cmtconfig_list[0])
                             else:
-                                if cmtconfig_list:
-                                    raise Exception(
-                                        'Default cmtconfig \"{0}\" is not exist in cache \"{1}\" (available: \"{2}\")'.format(
-                                            self.cmtconfig, self.cache, str(','.join(cmtconfig_list))))
-                                else:
+                                logger.error(f'{self.cache} is not registered in CRIC')
+                                cmtconfig_list = self._get_cmtconfig_from_cvmfs(self.cache)
+                                if len(cmtconfig_list) != 1 :
                                     raise Exception(f'{self.cache} is not registered in CRIC')
+                                else:
+                                    setattr(self, 'cmtconfig', cmtconfig_list[0])

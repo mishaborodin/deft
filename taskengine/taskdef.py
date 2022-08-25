@@ -709,6 +709,8 @@ class TaskDefinition(object):
 
 
     def _find_grl_dataset_input_name(self, input_dataset_name, filtered_files):
+        if input_dataset_name.endswith('RAW'):
+            input_dataset_name = input_dataset_name + '.'
         previous_datasets = self.rucio_client.list_datasets('{base}_sub*_grl'.format(base=input_dataset_name))
         versions = [0]
         for dataset in previous_datasets:
@@ -1382,7 +1384,10 @@ class TaskDefinition(object):
     @staticmethod
     def translate_sub_dataset(dataset):
         if '_grl' in dataset:
-            return dataset.split('_sub')[0]
+            base_dataset =  dataset.split('_sub')[0]
+            if base_dataset.endswith('.'):
+                return base_dataset[:-1]
+            return base_dataset
         return dataset
 
     def _check_task_input(self, task, task_id, number_of_events, task_config, parent_task_id, input_data_name, step,

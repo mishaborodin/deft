@@ -4161,6 +4161,11 @@ class TaskDefinition(object):
                 raise TaskConfigurationException(
                     "The task is rejected - pile tasks required  Events per Input file or useRealNumEvents to be set"
                 )
+
+            if prod_step.lower() == 'simul'.lower()and (not use_real_nevents) and (not ('number_of_events_per_input_file' in list(task_proto_dict.keys()))):
+                raise TaskConfigurationException(
+                    "The task is rejected - simul tasks required  Events per Input file or useRealNumEvents to be set"
+                )
             self._define_merge_params(step, task_proto_dict, train_production)
             if not project_mode.skipCMTConfigCheck:
                 self._check_site_container(task_proto_dict)

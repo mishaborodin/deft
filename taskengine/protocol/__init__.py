@@ -549,3 +549,12 @@ class TaskDefConstants(object, metaclass=Constants):
     REPEAT_ATTEMPT_MESSAGE = 'Repeated because of a transient error'
     TEMPLATE_TASK_ID = 28948171
     WORKFLOW_VALIDATION_REQUESTS = [43321, 43400]
+
+    FULL_CHAIN = {'GOOGLE': {
+        'project_mode': 'GoogleFullChain',
+        'hashtag': 'GoogleFullChainTask',
+        'request_hashtag_base': 'GoogleFullChainRequest',
+        'site': 'GOOGLE_EUW1',
+        'nucleus': 'GOOGLE',
+        'token': 'dst:GOOGLE_EU'
+    }}

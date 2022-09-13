@@ -108,5 +108,6 @@
   "gshare": "'{{global_share}}'",
   "noLoopingCheck": "{{no_looping_check}}",
   "taskBrokerOnMaster": "{{task_broker_on_master}}",
-  "releasePerLB": "{{release_per_LB}}"
+  "releasePerLB": "{{release_per_LB}}",
+  "onSiteMerging": "{{on_site_merging}}"
 }

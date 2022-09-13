@@ -1270,6 +1270,31 @@ class TaskDefinition(object):
 
                 raise MergedInputProcessedException(prod_task.id)
 
+    def _task_full_chain(self, step, parent_task_id, project_mode):
+        for cloud, cloud_dict in TaskDefConstants.FULL_CHAIN.items():
+            if cloud_dict['project_mode'] in project_mode.project_mode_dict:
+                return cloud
+        if parent_task_id:
+            task = ProductionTask.objects.get(id=parent_task_id)
+            for cloud, cloud_dict in TaskDefConstants.FULL_CHAIN.items():
+                if cloud_dict['hashtag'] in  [x.hashtag for x in task.hashtags]:
+                    return cloud
+        return None
+
+
+    def _set_task_full_chain(self, task_config, project_mode, task_full_chain):
+        cloud_dict = TaskDefConstants.FULL_CHAIN[task_full_chain]
+        if 'site' in cloud_dict:
+            project_mode.site = cloud_dict['site']
+        if 'nucleus' in cloud_dict:
+            project_mode.nucleus = cloud_dict['nucleus']
+        if 'token' in cloud_dict:
+            task_config['token'] = cloud_dict['token']
+        project_mode.useDestForLogs = True
+        project_mode.disableReassign = True
+        return cloud_dict['hashtag']
+
+
     def _check_task_unmerged_input(self, task, step, prod_step):
         # skip EI tasks
         if step.request.request_type.lower() == 'EVENTINDEX'.lower():
@@ -2871,7 +2896,11 @@ class TaskDefinition(object):
                                     'TRF parameter {0} is removed from the list. It is ignored'.format(trf_param)
                                 )
                                 trf_params.remove(trf_param)
-
+            full_chain_hashtag = None
+            # if project_mode.site is None:
+            #     task_full_chain = self._task_full_chain(step, parent_task_id, project_mode)
+            #     if task_full_chain:
+            #         full_chain_hashtag = self._set_task_full_chain(task_config, project_mode, task_full_chain)
             for name in trf_params:
                 if re.match(r'^(--)?runNumber$', name, re.IGNORECASE):
                     run_number = input_data_dict['number']
@@ -3704,7 +3733,6 @@ class TaskDefinition(object):
                 task_proto_dict.update({'base_ram_count': project_mode.baseRamCount})
             if project_mode.baseWalltime is not None:
                 task_proto_dict.update({'base_wall_time': project_mode.baseWalltime})
-
             if project_mode.site is not None:
                 site_value = project_mode.site
                 specified_sites = list()
@@ -4036,6 +4064,9 @@ class TaskDefinition(object):
             if project_mode.taskBrokerOnMaster is not None:
                 task_proto_dict.update({'task_broker_on_master': project_mode.taskBrokerOnMaster or None})
 
+            if project_mode.onSiteMerging is not None:
+                task_proto_dict.update({'on_site_merging': project_mode.onSiteMerging or None})
+
             if project_mode.releasePerLB is not None:
                 task_proto_dict.update({'release_per_LB': project_mode.releasePerLB or None})
 
@@ -4167,6 +4198,8 @@ class TaskDefinition(object):
                     "The task is rejected - simul tasks required  Events per Input file or useRealNumEvents to be set"
                 )
             self._define_merge_params(step, task_proto_dict, train_production)
+
+
             if not project_mode.skipCMTConfigCheck:
                 self._check_site_container(task_proto_dict)
 
@@ -4244,7 +4277,6 @@ class TaskDefinition(object):
                 self._check_task_merged_input(task, step, prod_step)
                 # self._check_task_cache_version_consistency(task, step, trf_release)
                 self._check_task_blacklisted_input(task, project_mode)
-
                 if not skip_check_input:
                     self._check_task_input(task, task_id, number_of_events, task_config, parent_task_id,
                                            input_data_name, step, primary_input_offset, prod_step,
@@ -4297,7 +4329,12 @@ class TaskDefinition(object):
                         created_task.set_hashtag(TaskDefConstants.MC_DELETED_REPROCESSING_REQUEST_HASHTAG)
                     except Exception as e:
                         logger.warning('Problem with hashtag registration {0}'.format(str(e)))
-
+                if full_chain_hashtag:
+                    try:
+                        created_task = ProductionTask.objects.get(id=task_id)
+                        created_task.set_hashtag(full_chain_hashtag)
+                    except Exception as e:
+                        logger.error('Problem with hashtag registration {0}'.format(str(e)))
                 parent_task_id = task_id
 
     def _get_number_events_processed(self, step, requested_datasets=None):

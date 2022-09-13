@@ -522,5 +522,13 @@
   "GRL": {
     "type": "str",
     "description": ""
+  },
+  "GoogleFullChain": {
+    "type": "bool",
+    "description": ""
+  },
+  "onSiteMerging": {
+    "type": "bool",
+    "description": ""
   }
 }

@@ -6,6 +6,8 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+
+from celerybackend.celery import app
 from deftcore.log import Logger
 from api import ApiServer
 
@@ -119,6 +121,10 @@ class Request(models.Model):
     def get_status(self):
         return json.loads(self.status)
 
+    @staticmethod
+    def send_es_comment(action, owner, body, status):
+        app.send_task('atlas.prodtask.tasks.log_external_task_action', [action, owner, body, status])
+
     def create_default_task_comment(self, body):
         params = ', '.join('{0} = \"{1}\"'.format(key, value) for key, value in list(body.items()))
         status = self.get_status()
@@ -141,7 +147,13 @@ class Request(models.Model):
             jedi_info = status['jedi_info']
             task_comment += ' (JEDI: status_code = {0}, return_code = {1}, return_info = \"{2}\")'.format(
                 jedi_info['status_code'], jedi_info['return_code'], jedi_info['return_info'])
+            try:
+                self.send_es_comment(self.action, self.owner, body, status)
+            except:
+                pass
         return task_comment
+
+
 
     def __unicode__(self):
         return str(self.id)

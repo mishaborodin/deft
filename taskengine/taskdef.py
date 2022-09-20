@@ -2897,10 +2897,10 @@ class TaskDefinition(object):
                                 )
                                 trf_params.remove(trf_param)
             full_chain_hashtag = None
-            # if project_mode.site is None:
-            #     task_full_chain = self._task_full_chain(step, parent_task_id, project_mode)
-            #     if task_full_chain:
-            #         full_chain_hashtag = self._set_task_full_chain(task_config, project_mode, task_full_chain)
+            if project_mode.site is None:
+                task_full_chain = self._task_full_chain(step, parent_task_id, project_mode)
+                if task_full_chain:
+                    full_chain_hashtag = self._set_task_full_chain(task_config, project_mode, task_full_chain)
             for name in trf_params:
                 if re.match(r'^(--)?runNumber$', name, re.IGNORECASE):
                     run_number = input_data_dict['number']

@@ -5,7 +5,6 @@ __author__ = 'Dmitry Golubkov'
 import os
 import json
 from pydoc import locate
-from taskengine.models import InstalledSW
 from taskengine.agisclient import AGISClient
 from taskengine.protocol import TaskDefConstants
 from deftcore.log import Logger
@@ -108,20 +107,12 @@ class ProjectMode(object):
         return project_mode_dict
 
     def _is_cmtconfig_exist(self, cache, cmtconfig):
-        installed_cmtconfig_list = \
-            InstalledSW.objects.filter(cache=cache, cmtconfig=cmtconfig).values_list('cmtconfig', flat=True).distinct()
-        if bool(installed_cmtconfig_list):
-            return True
-        else:
-            agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
-            return cmtconfig in agis_cmtconfig_list
+        agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
+        return cmtconfig in agis_cmtconfig_list
 
     def _get_cmtconfig_list(self, cache):
-        installed_cmtconfig_list = \
-            InstalledSW.objects.filter(cache=cache).values_list('cmtconfig', flat=True).distinct()
         agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
-        cmtconfig_list = set(list(installed_cmtconfig_list) + agis_cmtconfig_list)
-        return list(cmtconfig_list)
+        return list(agis_cmtconfig_list)
 
     def _get_cmtconfig_from_cvmfs(self, cache):
         release = cache.split('-')[-1]

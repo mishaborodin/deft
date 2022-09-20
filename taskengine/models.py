@@ -860,16 +860,6 @@ class GlobalShare(models.Model):
         db_name = 'panda_adcr'
         db_table = '"ATLAS_PANDA"."GLOBAL_SHARES"'
 
-class InstalledSW(models.Model):
-    site_id = models.CharField(max_length=60, db_column='SITEID', primary_key=True)
-    cloud = models.CharField(max_length=10, db_column='CLOUD', null=True)
-    release = models.CharField(max_length=10, db_column='RELEASE', null=True)
-    cache = models.CharField(max_length=40, db_column='CACHE', null=True)
-    cmtconfig = models.CharField(max_length=40, db_column='CMTCONFIG', null=True)
-
-    class Meta:
-        db_name = 'deft_adcr'
-        db_table = '"ATLAS_PANDAMETA"."INSTALLEDSW"'
 
 
 class AuthUser(models.Model):

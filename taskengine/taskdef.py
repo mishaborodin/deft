@@ -4168,7 +4168,7 @@ class TaskDefinition(object):
             if 'number_of_events_per_input_file' not in list(task_proto_dict.keys()) and \
                     'number_of_gb_per_job' not in list(task_proto_dict.keys()) and \
                     'tgt_max_output_for_ng' not in list(task_proto_dict.keys()):
-                if 'number_of_files_per_job' not in list(task_proto_dict.keys()):
+                if 'number_of_files_per_job' not in list(task_proto_dict.keys()) and not project_mode.onSiteMerging:
                     task_proto_dict.update({'number_of_files_per_job': 1})
 
             if 'number_of_gb_per_job' in list(task_proto_dict.keys()) or 'tgt_max_output_for_ng' in list(
@@ -4270,7 +4270,7 @@ class TaskDefinition(object):
                             raise OutputNameMaxLengthException(output_dataset_name)
 
                 if step.request.request_type.lower() == 'MC'.lower():
-                    if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21:
+                    if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21 and not project_mode.onSiteMerging:
                         self._check_task_number_of_jobs(task, number_of_events, step)
 
                 self._check_task_unmerged_input(task, step, prod_step)

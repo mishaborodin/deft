@@ -109,5 +109,6 @@
   "noLoopingCheck": "{{no_looping_check}}",
   "taskBrokerOnMaster": "{{task_broker_on_master}}",
   "releasePerLB": "{{release_per_LB}}",
-  "onSiteMerging": "{{on_site_merging}}"
+  "onSiteMerging": "{{on_site_merging}}",
+  "fullChain": "'{{full_chain}}'"
 }

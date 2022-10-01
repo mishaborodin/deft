@@ -3967,6 +3967,9 @@ class TaskDefinition(object):
                 else:
                     task_proto_dict.update({'es_convertible': None})
 
+            if project_mode.onSiteMerging is not None:
+                project_mode.esMerging = True
+
             if project_mode.esMerging is not None:
                 if project_mode.esMerging:
                     es_merging_tag_name = ctag_name
@@ -4075,6 +4078,9 @@ class TaskDefinition(object):
 
             if project_mode.inputPreStaging is not None:
                 task_proto_dict.update({'input_pre_staging': project_mode.inputPreStaging or None})
+
+            if project_mode.fullChain is not None:
+                task_proto_dict.update({'full_chain': project_mode.fullChain or None})
 
             if project_mode.nocvmfs is not None:
                 task_proto_dict.update({'multi_step_exec': {'containerOptions': {'execArgs': '--nocvmfs'}}})

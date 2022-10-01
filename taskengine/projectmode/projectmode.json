@@ -530,5 +530,9 @@
   "onSiteMerging": {
     "type": "bool",
     "description": ""
+  },
+  "fullChain": {
+    "type": "str",
+    "description": ""
   }
 }

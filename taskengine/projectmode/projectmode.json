@@ -534,5 +534,9 @@
   "fullChain": {
     "type": "str",
     "description": ""
+  },
+  "nEventsPerOutputFile": {
+    "type": "int",
+    "description": ""
   }
 }

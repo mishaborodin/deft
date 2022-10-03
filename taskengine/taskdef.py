@@ -3996,6 +3996,9 @@ class TaskDefinition(object):
             if project_mode.nJumboJobs is not None:
                 task_proto_dict['number_of_jumbo_jobs'] = project_mode.nJumboJobs
 
+            if project_mode.nEventsPerOutputFile is not None:
+                task_proto_dict['number_of_events_per_output_file'] = project_mode.nEventsPerOutputFile
+
             if project_mode.nEventsPerWorker:
                 task_proto_dict['number_of_events_per_worker'] = project_mode.nEventsPerWorker
 

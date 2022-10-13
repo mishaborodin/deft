@@ -1821,6 +1821,8 @@ class TaskDefinition(object):
         events_per_pileup_file = self.rucio_client.get_number_events(mc_pileup_overlay['files'][0])
         pileup_files_per_job = nevents_per_job // events_per_pileup_file
         files_required = math.ceil(number_of_jobs) * pileup_files_per_job
+        if files_required > len(mc_pileup_overlay['files']):
+            raise Exception(f'Not enough overlay files: requested {files_required} available {len(mc_pileup_overlay["files"])}')
         if (len(used_files) + files_required) > len(mc_pileup_overlay['files']):
             files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=[])
         else:

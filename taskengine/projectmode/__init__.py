@@ -103,7 +103,7 @@ class ProjectMode(object):
             if '=' not in option:
                 raise Exception('The project_mode option \"{0}\" has invalid format. '.format(option) +
                                 'Expected format is \"optionName=optionValue\"')
-            project_mode_dict.update({option.split('=')[0].lower(): option.split('=')[1]})
+            project_mode_dict.update({option.split('=')[0].lower(): option[option.find('=')+1:]})
         return project_mode_dict
 
     def _is_cmtconfig_exist(self, cache, cmtconfig):

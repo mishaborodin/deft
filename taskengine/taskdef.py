@@ -3517,7 +3517,7 @@ class TaskDefinition(object):
                             continue
                     elif re.match('^(--)?athenaMPMergeTargetSize', name, re.IGNORECASE):
                         param_dict.update({'separator': ' '})
-                    elif re.match('^(--)?(steering|triggerConfig)', name, re.IGNORECASE):
+                    elif re.match('^(--)?(steering|triggerConfig|CA)', name, re.IGNORECASE):
                         if ' ' in param_value:
                             param_dict.update({'separator': ' '})
 

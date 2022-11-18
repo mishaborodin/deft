@@ -1294,6 +1294,13 @@ class TaskDefinition(object):
         project_mode.disableReassign = True
         return cloud_dict['hashtag']
 
+    def set_jedi_full_chain(self, task_config, parent_task_id, project_mode):
+        if not project_mode.fullChain and parent_task_id:
+            parent_task  = ProductionTask.objects.get(id=parent_task_id)
+            ttask = TTask.objects.get(id=parent_task_id)
+            if parent_task.hashtag_exists(TaskDefConstants.JEDI_FULL_CHAIN) or ttask._get_task_params().get('fullChain')=='capable':
+                task_config['full_chain'] = 'capable'
+
 
     def _check_task_unmerged_input(self, task, step, prod_step):
         # skip EI tasks
@@ -2900,9 +2907,12 @@ class TaskDefinition(object):
                                 trf_params.remove(trf_param)
             full_chain_hashtag = None
             if project_mode.site is None:
+
                 task_full_chain = self._task_full_chain(step, parent_task_id, project_mode)
                 if task_full_chain:
                     full_chain_hashtag = self._set_task_full_chain(task_config, project_mode, task_full_chain)
+                else:
+                    self.set_jedi_full_chain(task_config, parent_task_id, project_mode)
             for name in trf_params:
                 if re.match(r'^(--)?runNumber$', name, re.IGNORECASE):
                     run_number = input_data_dict['number']
@@ -3840,6 +3850,10 @@ class TaskDefinition(object):
             if 'onlyTagsForFC' in list(task_config.keys()):
                 if task_config['onlyTagsForFC']:
                     task_proto_dict.update({'only_tags_for_fc': task_config['onlyTagsForFC']})
+
+            if 'full_chain' in list(task_config.keys()):
+                if task_config['full_chain']:
+                    task_proto_dict.update({'full_chain': task_config['full_chain']})
 
             if 'maxFailure' in list(task_config.keys()):
                 max_failure = int(task_config['maxFailure'])

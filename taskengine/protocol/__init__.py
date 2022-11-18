@@ -558,3 +558,5 @@ class TaskDefConstants(object, metaclass=Constants):
         'nucleus': 'GOOGLE',
         'token': 'dst:GOOGLE_EU'
     }}
+
+    JEDI_FULL_CHAIN = 'JEDIFullChain'

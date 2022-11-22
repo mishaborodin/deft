@@ -3984,10 +3984,17 @@ class TaskDefinition(object):
                     task_proto_dict.update({'es_convertible': None})
 
             if project_mode.onSiteMerging is not None:
-                project_mode.esMerging = True
+                es_merging_tag_name = ctag_name
+                es_merging_trf_name = 'HITSMerge_tf.py'
+                task_proto_dict['es_merge_spec'] = {}
+                task_proto_dict['es_merge_spec']['transPath'] = es_merging_trf_name
+                task_proto_dict['es_merge_spec']['jobParameters'] = \
+                    '--AMITag {0} --DBRelease=current '.format(
+                        es_merging_tag_name) + \
+                    '--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}'
 
             if project_mode.esMerging is not None:
-                if project_mode.esMerging:
+                if project_mode.esMerging and not project_mode.onSiteMerging:
                     es_merging_tag_name = ctag_name
                     es_merging_trf_name = 'HITSMerge_tf.py'
                     task_proto_dict['es_merge_spec'] = {}

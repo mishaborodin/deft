@@ -108,6 +108,8 @@ class ProjectMode(object):
 
     def _is_cmtconfig_exist(self, cache, cmtconfig):
         agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
+        if not agis_cmtconfig_list:
+            agis_cmtconfig_list = self._get_cmtconfig_from_cvmfs(cache)
         return cmtconfig in agis_cmtconfig_list
 
     def _get_cmtconfig_list(self, cache):

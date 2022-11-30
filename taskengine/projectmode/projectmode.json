@@ -195,6 +195,10 @@
     "type": "int",
     "description": ""
   },
+  "maxEventsPerJob": {
+    "type": "int",
+    "description": ""
+  },
   "nEsConsumers": {
     "type": "int",
     "description": ""

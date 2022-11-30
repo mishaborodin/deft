@@ -501,6 +501,7 @@ class TaskDefConstants(object, metaclass=Constants):
     DEFAULT_MAX_FILES_PER_JOB = Constant(20)
     DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK = Constant(50000)
     DEFAULT_MEMORY = Constant(2000)
+    DEFAULT_MAX_EVENTS_PER_GRANULE_JOB = Constant(10000)
     DEFAULT_MEMORY_BASE = Constant(0)
     DEFAULT_SCOUT_SUCCESS_RATE = Constant(5)
     NO_ES_MIN_NUMBER_OF_EVENTS = Constant(50000)

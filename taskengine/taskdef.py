@@ -3956,6 +3956,11 @@ class TaskDefinition(object):
 
             if project_mode.minGranularity is not None:
                 task_proto_dict.update({'min_granularity': project_mode.minGranularity})
+                if project_mode.maxEventsPerJob is None:
+                    task_proto_dict.update({'max_events_per_job': TaskDefConstants.DEFAULT_MAX_EVENTS_PER_GRANULE_JOB})
+
+            if project_mode.maxEventsPerJob is not None:
+                task_proto_dict.update({'max_events_per_job': project_mode.maxEventsPerJob})
 
             if project_mode.respectSplitRule is not None:
                 task_proto_dict.update({'respect_split_rule': project_mode.respectSplitRule or None})

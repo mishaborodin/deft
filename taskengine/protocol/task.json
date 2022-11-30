@@ -81,6 +81,7 @@
   "ioIntensity": "{{io_intensity}}",
   "ioIntensityUnit": "'{{io_intensity_unit}}'",
   "minGranularity": "{{min_granularity}}",
+  "maxEventsPerJob": "{{max_events_per_job}}",
   "respectSplitRule": "{{respect_split_rule}}",
   "esFraction": "{{es_fraction}}",
   "esConvertible": "{{es_convertible}}",

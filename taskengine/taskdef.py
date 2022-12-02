@@ -798,6 +798,7 @@ class TaskDefinition(object):
             if result:
                 old_version = old_version.replace(result.groupdict()['tid'], '')
             version_list.extend(old_version.split('_'))
+        version_list = [version for version in version_list if ('part' not in version_list) and ('all' not in version_list)]
         version_list.append(ctag_name)
         version_list = self._check_tag_folding(version_list,trf_name)
         version = '_'.join(version_list)
@@ -814,6 +815,7 @@ class TaskDefinition(object):
             if result:
                 old_version = old_version.replace(result.groupdict()['tid'], '')
             version_list.extend(old_version.split('_'))
+        version_list = [version for version in version_list if ('part' not in version_list) and ('all' not in version_list)]
         version_list.append(ctag_name)
         version_list = self._check_tag_folding(version_list,trf_name)
         version = '_'.join(version_list)

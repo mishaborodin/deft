@@ -112,5 +112,6 @@
   "releasePerLB": "{{release_per_LB}}",
   "onSiteMerging": "{{on_site_merging}}",
   "fullChain": "'{{full_chain}}'",
-  "nEventsPerOutputFile": "{{number_of_events_per_output_file}}"
+  "nEventsPerOutputFile": "{{number_of_events_per_output_file}}",
+  "orderInputBy": "'{{order_input_by}}'"
 }

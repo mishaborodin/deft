@@ -4115,6 +4115,9 @@ class TaskDefinition(object):
             if project_mode.fullChain is not None:
                 task_proto_dict.update({'full_chain': project_mode.fullChain or None})
 
+            if project_mode.orderInputBy is not None:
+                task_proto_dict.update({'order_input_by': project_mode.orderInputBy or None})
+
             if project_mode.nocvmfs is not None:
                 task_proto_dict.update({'multi_step_exec': {'containerOptions': {'execArgs': '--nocvmfs'}}})
 

@@ -4711,7 +4711,7 @@ class TaskDefinition(object):
                 if task_config_changed:
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('project_mode',))
                     project_mode = ProjectMode(step)
-            if len(list(campaigns.keys())) > 1:
+            if len(list(campaigns.keys())) >= 1:
                 if not project_mode.forceSplitInput:
                     task_config = ProjectMode.get_task_config(step)
                     task_config['project_mode'] = 'forceSplitInput=yes;{0}'.format(task_config.get('project_mode', ''))

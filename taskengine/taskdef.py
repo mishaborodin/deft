@@ -411,7 +411,9 @@ class TaskDefinition(object):
         if evgen_input_container:
             result = self.rucio_client.get_datasets_and_containers(evgen_input_container,
                                                                    datasets_contained_only=True)
-            if 'EVNT' in result['containers'][0]:
+            if 'EVNT' in evgen_input_container and len(result['containers']) == 0:
+                raise Exception('EVNT input should be container')
+            if 'EVNT' in evgen_input_container:
                 params.update({'inputEVNTFile': result['containers']})
                 params.update({'isEvntToEvnt': True})
 
@@ -4092,7 +4094,7 @@ class TaskDefinition(object):
             truncate_output_formats = project_mode.truncateOutputFormats
 
             if project_mode.useZipToPin is not None:
-                task_proto_dict.update({'use_zip_to_pin': project_mode.useZipToPin or None})
+                task_proto_dict.update({'use_zip_to_pin': project_mode.useZipToPin})
 
             if project_mode.noLoopingCheck is not None:
                 task_proto_dict.update({'no_looping_check': project_mode.noLoopingCheck or None})

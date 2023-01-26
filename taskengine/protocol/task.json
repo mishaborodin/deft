@@ -113,5 +113,6 @@
   "onSiteMerging": "{{on_site_merging}}",
   "fullChain": "'{{full_chain}}'",
   "nEventsPerOutputFile": "{{number_of_events_per_output_file}}",
-  "orderInputBy": "'{{order_input_by}}'"
+  "orderInputBy": "'{{order_input_by}}'",
+  "intermediateTask": "{{intermediate_task}}"
 }

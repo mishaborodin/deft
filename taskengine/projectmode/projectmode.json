@@ -546,5 +546,9 @@
   "nEventsPerOutputFile": {
     "type": "int",
     "description": ""
+  },
+    "intermediateTask": {
+    "type": "bool",
+    "description": ""
   }
 }

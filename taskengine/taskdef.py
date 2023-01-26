@@ -3541,11 +3541,32 @@ class TaskDefinition(object):
 
             if not job_parameters:
                 raise Exception("List of task parameters is empty")
-
             no_output = True
             input_types_defined = list()
             output_types_defined = list()
             output_types_defined.append('log')
+            # filter doubled input parameters
+            current_job_parameters = list()
+            for job_param in job_parameters:
+                if re.match(r'^(--)?input.*File', job_param['value'], re.IGNORECASE):
+                    result = re.match(r'^(--)?input(?P<intype>.*)File', job_param['value'], re.IGNORECASE)
+                    if not result:
+                        current_job_parameters.append(job_param)
+                        continue
+                    in_type = result.groupdict()['intype']
+                    parameter_used = False
+                    for index,current_job_param in enumerate(current_job_parameters):
+                        if current_job_param.get('param_type','')=='input' and 'dataset' in current_job_param and\
+                                current_job_param['dataset'] == job_param.get('dataset',''):
+                            parameter_used = True
+                            if in_type.lower() in [x.lower() for x in current_job_param['dataset'].split('.')]:
+                                current_job_parameters[index] = job_param
+                            break
+                    if not parameter_used:
+                        current_job_parameters.append(job_param)
+                else:
+                    current_job_parameters.append(job_param)
+            job_parameters = current_job_parameters
             for job_param in job_parameters:
                 if index_consistent_param_list:
                     name = job_param.get('value', '').split('=')[0].replace('--', '')
@@ -4001,6 +4022,9 @@ class TaskDefinition(object):
                     '--AMITag {0} --DBRelease=current '.format(
                         es_merging_tag_name) + \
                     '--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}'
+
+            if project_mode.intermediateTask is not None:
+                task_proto_dict.update({'intermediate_task': project_mode.intermediateTask})
 
             if project_mode.esMerging is not None:
                 if project_mode.esMerging and not project_mode.onSiteMerging:

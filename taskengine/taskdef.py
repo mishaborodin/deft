@@ -221,6 +221,18 @@ def minHigherDivisor(value, n):
     return n
 
 # noinspection PyBroadException, PyUnresolvedReferences
+def is_optimal_first_event(step: StepExecution) -> bool:
+    """
+    Check if the first event is optimal for the given step.
+    :param step: StepExecution object.
+    :return: True if the first event is optimal, False otherwise.
+    """
+    if ProjectMode(step).optimalFirstEvent or (step.request.campaign.replace('MC', '').isdigit() and
+                                               int(step.request.campaign.replace('MC', '')) >= 21):
+        return True
+    return False
+
+
 class TaskDefinition(object):
     def __init__(self, evgen_csv_encoding='utf-8'):
         self.evgen_csv_encoding = evgen_csv_encoding
@@ -733,14 +745,21 @@ class TaskDefinition(object):
             task_params = json.loads(jedi_task.jedi_task_param)
             old_offset = 0
             old_offset_is_not_found = True
+            is_optimal = False
             for param in task_params['jobParameters']:
                 if 'dataset' in list(param.keys()) and param['dataset'] == 'seq_number':
                     old_offset = param['offset']
                     old_offset_is_not_found = False
                     break
+            for param in task_params['jobParameters']:
+                if 'firstEvent=${SEQNUMBER' in param.get('value',''):
+                    is_optimal = True
             if ('nFiles' not in task_params) or ('nFilesPerJob' not in task_params) or old_offset_is_not_found:
                 raise Exception("Something wrong with optimal first event settings")
-            max_previous_offset = max(max_previous_offset,old_offset + math.ceil(int(task_params['nFiles'])/int(task_params['nFilesPerJob'])))
+            if is_optimal:
+                max_previous_offset = max(max_previous_offset,old_offset + math.ceil(int(task_params['nFiles'])/int(task_params['nFilesPerJob'])))
+            else:
+                max_previous_offset = max(max_previous_offset,old_offset + int(task_params['nFiles']))
         return max_previous_offset
 
 
@@ -1435,7 +1454,9 @@ class TaskDefinition(object):
         if not primary_input:
             logger.info("Task Id = %d, No primary input. Checking of input is skipped" % task_id)
             return
-
+        check_optimal_events_violation = False
+        if prod_step.lower() == 'evgen'.lower():
+            check_optimal_events_violation = 'SEQNUMBER' not in self._get_job_parameter('firstEvent', task['jobParameters'])['value']
         if prod_step.lower() == 'merge'.lower():
             dsn = primary_input['dataset']
             tag_name = step.step_template.ctag
@@ -1603,7 +1624,9 @@ class TaskDefinition(object):
 
             if 'use_real_nevents' in list(task_existing.keys()):
                 raise Exception('Extensions are not allowed if useRealNumEvents is specified')
-
+            if check_optimal_events_violation:
+                if 'SEQNUMBER' in self._get_job_parameter('firstEvent', task_existing['jobParameters'])['value']:
+                    raise Exception(f'None optimal first event extensions are not allowed, previous task: {task_id}')
             previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']
             previous_dsn_no_scope = previous_dsn.split(':')[-1]
             if '_sub' in previous_dsn_no_scope:
@@ -2510,6 +2533,8 @@ class TaskDefinition(object):
                                 input_types.append('TXT')
                             logger.error('parse_data_name failed: {0} (input_name={1})'.format(ex, input_name))
                 if len(input_types) == 1 and 'TXT' in input_types:
+                    if is_optimal_first_event(step):
+                        task_config.update({'optimalFirstEvent': True})
                     min_events = int(input_params.get('nEventsPerJob', 0)) or int(task_config.get('nEventsPerJob', 0))
                     if min_events:
                         if not project_mode.nEventsPerInputFile and not (project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent')):

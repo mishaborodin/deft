@@ -1869,12 +1869,23 @@ class TaskDefinition(object):
                 self.rucio_client.register_files_in_dataset(mc_pileup_overlay['input_dataset_name'],files)
 
     def _find_overlay_input_dataset(self, param_value, dsid):
+        def ami_tags_reduction(postfix):
+            new_postfix = []
+            first_letter = ''
+            for token in postfix.split('_'):
+                if token[0] != first_letter:
+                    new_postfix.append(token)
+                first_letter = token[0]
+            return '_'.join(new_postfix)
+
         if param_value[-1] == '/':
             param_value = param_value[:-1]
         files_list = self.rucio_client.list_files_with_scope_in_dataset(param_value, True)
         name_base = param_value
         if '_tid' in name_base:
             name_base = name_base.split('_tid')[0]
+        if len(name_base.split('.')[-1]) > (50 - len('_sub1234_run123456')):
+            name_base = '.'.join(name_base.split('.')[:-1]+[ami_tags_reduction(name_base.split('.')[-1])])
         previous_datasets = self.rucio_client.list_datasets('{base}_sub*_rnd{dsid}'.format(base=name_base,dsid=dsid))
         version = 1
         versions = []
@@ -5362,7 +5373,6 @@ class TaskDefinition(object):
                                     parent_step = StepExecution.objects.get(id=step.step_parent_id)
                                     if step.input_events < parent_step.slice.input_events:
                                         raise InputEventsForChildStepException()
-
                             except NotEnoughEvents:
                                 raise Exception(get_exception_string())
                             except UniformDataException as ex:

@@ -206,6 +206,6 @@ class ProjectMode(object):
                                 logger.error(f'{self.cache} is not registered in CRIC')
                                 cmtconfig_list = self._get_cmtconfig_from_cvmfs(self.cache)
                                 if len(cmtconfig_list) != 1 :
-                                    raise Exception(f'{self.cache} is not registered in CRIC')
+                                        raise Exception(f'{self.cache} is not registered in CRIC and {cmtconfig_list} found in CVMFS')
                                 else:
                                     setattr(self, 'cmtconfig', cmtconfig_list[0])

@@ -3485,6 +3485,8 @@ class TaskDefinition(object):
                         job_parameters.append(arch_param)
                     elif re.match(r'^(--)?outputYODAFile$', name, re.IGNORECASE):
                         proto_key = TaskParamName.YODA_OUTPUT
+                    elif re.match(r'^(--)?outputDRAW.*File$', name, re.IGNORECASE) and project_mode.rawOutputFiles:
+                        proto_key = TaskParamName.RAW_OUTPUT
                     output_param = self.protocol.render_param(proto_key, param_dict)
                     if project_mode.spacetoken is not None:
                         output_param['token'] = project_mode.spacetoken

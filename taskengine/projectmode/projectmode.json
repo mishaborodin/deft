@@ -550,5 +550,9 @@
     "intermediateTask": {
     "type": "bool",
     "description": ""
+  },
+  "rawOutputFiles": {
+    "type": "bool",
+    "description": ""
   }
 }

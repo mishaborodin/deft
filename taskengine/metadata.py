@@ -656,7 +656,7 @@ class AMIClient(object):
 
     def ami_sw_tag_by_cache(self, cache):
         query = \
-            "SELECT * WHERE `SWRELEASE` = '{0}'".format(cache)
+            "SELECT * WHERE LOWER(`SWRELEASE`) = LOWER('{0}')".format(cache)
 
         return self._post_command('SearchQuery',
                                   catalog='Container:production',

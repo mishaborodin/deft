@@ -2979,8 +2979,9 @@ class TaskDefinition(object):
                 elif re.match(r'^(--)?DBRelease$', name, re.IGNORECASE):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
-                        project_mode.ipConnectivity = 'http'
-                        continue
+                        if (project_mode.containerName is None) and ('container_name' not in list(task_config.keys())):
+                            project_mode.ipConnectivity = 'http'
+                            continue
                     if not re.match(r'^\d+(\.\d+)*$', param_value):
                         if param_value.lower() == 'latest'.lower():
                             param_dict = {'name': name, 'dataset': self._get_latest_db_release()}

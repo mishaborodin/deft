@@ -510,7 +510,7 @@ class AMIClient(object):
                                      'AODtoDPD',
                                      'sim', 'a2r', 'ESDtoDPD', 'r2e', 'a2d', 'HITtoRDO', 'RAWtoESD', 'default',
                                      'EVNTtoHITS', 'h2r', 'SPGenerator', 'first', 'BSRDOtoRAW', 'b2r', 'OverlayBS',
-                                     'RDOFTKCreator', 'AODFTKCreator']
+                                     'RDOFTKCreator', 'AODFTKCreator', 'RDOtoRDOTrigger']
                 sub_steps = default_sub_steps
 
         return trf_params, sub_steps

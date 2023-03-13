@@ -739,16 +739,16 @@ class TaskDefinition(object):
     def _find_grl_dataset_input_name(self, input_dataset_name, filtered_files):
         if input_dataset_name.endswith('RAW'):
             input_dataset_name = input_dataset_name + '.'
-        previous_datasets = self.rucio_client.list_datasets('{base}_sub*_grl'.format(base=input_dataset_name))
+        previous_datasets = self.rucio_client.list_datasets('{base}_sub*_flt'.format(base=input_dataset_name))
         versions = [0]
         for dataset in previous_datasets:
-            versions.append(int(dataset[dataset.find('_sub') + len('_sub'):dataset.find('_grl')]))
+            versions.append(int(dataset[dataset.find('_sub') + len('_sub'):dataset.find('_flt')]))
             if len(filtered_files) == self.rucio_client.get_number_files(dataset):
                 file_to_check = self.rucio_client.list_files_in_dataset(dataset)
                 if not [x for x in filtered_files if x['name'] not in file_to_check]:
                     return dataset, False
         version = max(versions) + 1
-        return '{base}_sub{version:04d}_grl'.format(base=input_dataset_name,version=version), True
+        return '{base}_sub{version:04d}_flt'.format(base=input_dataset_name,version=version), True
 
     def _find_optimal_evnt_offset(self, task_name):
         previous_task_list = ProductionTask.objects.filter(~Q(status__in=['failed', 'broken', 'aborted', 'obsolete', 'toabort']),
@@ -1452,7 +1452,7 @@ class TaskDefinition(object):
 
     @staticmethod
     def translate_sub_dataset(dataset):
-        if '_grl' in dataset:
+        if '_flt' in dataset:
             base_dataset =  dataset.split('_sub')[0]
             if base_dataset.endswith('.'):
                 return base_dataset[:-1]

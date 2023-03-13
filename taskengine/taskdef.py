@@ -708,6 +708,20 @@ class TaskDefinition(object):
         logger.info("GRL files filtered for dataset %s with %d files from %d" % (dataset,  len(filtered_files), len(files_in_dataset)))
         return filtered_files, len(filtered_files) == len(files_in_dataset)
 
+    def _filter_input_dataset_by_FLD(self, dataset, filter_dataset):
+        files_in_dataset = self.rucio_client.list_file_long(dataset)
+        files_in_filter_dataset_names = [x['name'] for x in self.rucio_client.list_file_long(filter_dataset)]
+        filtered_files = []
+        for input_file in files_in_dataset:
+            if input_file['name'] in files_in_filter_dataset_names:
+                filtered_files.append(input_file)
+        logger.info(f"List files filtered for dataset {dataset} from {filter_dataset} with {len(filtered_files)} files from {len(files_in_dataset)}" )
+        if not filtered_files:
+            raise GRLInputException(f'No files are found in the dataset {dataset} from {filter_dataset}')
+        return filtered_files, len(filtered_files) == len(files_in_dataset)
+
+
+
     def _register_input_GRL_dataset(self, grl_dataset_name, filtered_files, task_id):
         logger.info("GRL input dataset %s with %d files is registered for a task %d" % (
         grl_dataset_name, len(filtered_files), task_id))
@@ -4392,12 +4406,16 @@ class TaskDefinition(object):
                 set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay'] and not self.template_type:
                     self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task)
-                if project_mode.GRL:
-                    grl_file = self._find_grl_xml_file(input_data_name.split(':')[0].split('.')[0], project_mode.GRL)
-                    grl_range = self._get_GRL_from_xml(grl_file)
+                if project_mode.GRL or project_mode.FLD:
                     primary_input = self._get_primary_input(task['jobParameters'])
                     primary_input_dataset = primary_input['dataset']
-                    filtered_files, whole_dataset = self._filter_input_dataset_by_GRL(primary_input_dataset, grl_range)
+                    if project_mode.GRL:
+                        grl_file = self._find_grl_xml_file(input_data_name.split(':')[0].split('.')[0], project_mode.GRL)
+                        grl_range = self._get_GRL_from_xml(grl_file)
+
+                        filtered_files, whole_dataset = self._filter_input_dataset_by_GRL(primary_input_dataset, grl_range)
+                    elif project_mode.FLD:
+                        filtered_files, whole_dataset = self._filter_input_dataset_by_FLD(primary_input_dataset, project_mode.FLD)
                     if not whole_dataset:
                         new_input_name, new_dataset = self._find_grl_dataset_input_name(primary_input_dataset, filtered_files)
                         if new_dataset:

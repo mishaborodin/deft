@@ -2995,7 +2995,7 @@ class TaskDefinition(object):
                     if not param_value or str(param_value).lower() == 'none':
                         if (project_mode.containerName is None) and ('container_name' not in list(task_config.keys())):
                             project_mode.ipConnectivity = 'http'
-                            continue
+                        continue
                     if not re.match(r'^\d+(\.\d+)*$', param_value):
                         if param_value.lower() == 'latest'.lower():
                             param_dict = {'name': name, 'dataset': self._get_latest_db_release()}

@@ -1295,9 +1295,8 @@ class TaskDefinition(object):
                                                       ctag=step.step_template.ctag,
                                                       primary_input__endswith='_tid{0}_00'.format(next_task_id))
             for prod_task in task_list:
+
                 if prod_task.status in ['failed', 'broken', 'aborted', 'obsolete', 'toabort']:
-                    continue
-                if '.merge.' not in prod_task.name:
                     continue
                 requested_output_types = step.step_template.output_formats.split('.')
                 previous_output_types = prod_task.output_formats

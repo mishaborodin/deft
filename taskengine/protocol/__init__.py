@@ -542,7 +542,7 @@ class TaskDefConstants(object, metaclass=Constants):
     DEFAULT_TASK_COMMON_OFFSET_HASHTAG_FORMAT = Constant('_tco_{0}')
 
     DEFAULT_SC_HASHTAGS = {
-        'MC16a': ['MC16:MC16a', 'MC15:MC15.*', 'None', '.*MC15.*'],
+        'MC16a': ['MC16:MC16a', 'MC15:MC15.*', '.*MC15.*'],
         'MC16b': ['MC16:MC16b'],
         'MC16c': ['MC16:MC16c'],
         'MC16d': ['MC16:MC16d'],

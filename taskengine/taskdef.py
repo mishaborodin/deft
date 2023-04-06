@@ -4758,7 +4758,7 @@ class TaskDefinition(object):
             ctag = self._get_ami_tag_cached(step.step_template.ctag)
             prod_step = self._get_prod_step(step.step_template.ctag, ctag)
             project_mode = ProjectMode(step)
-
+            is_none_campaign = False
             prod_steps = list()
             campaigns = dict()
 
@@ -4778,6 +4778,9 @@ class TaskDefinition(object):
                         if campaign not in list(campaigns.keys()):
                             campaigns[campaign] = list()
                         campaigns[campaign].append(name)
+                    else:
+                        if ('val' not in name) and (name.startswith('mc')) and (name[:4] > 'mc15'):
+                            is_none_campaign = True
                 except Exception as ex:
                     raise Exception(
                         'Processing of sub-campaign/campaign or production step failed: {0}'.format(str(ex)))
@@ -4800,6 +4803,8 @@ class TaskDefinition(object):
                     ProjectMode.set_task_config(step, task_config, keys_to_save=('project_mode',))
                     project_mode = ProjectMode(step)
                 if project_mode.runOnlyCampaign:
+                    if is_none_campaign:
+                        raise Exception('some of dataset has no sub-campaign/campaign, please contact MC coordinators')
                     requested_campaigns = list()
                     for value in project_mode.runOnlyCampaign.split(','):
                         for e in list(TaskDefConstants.DEFAULT_SC_HASHTAGS.keys()):
@@ -4819,6 +4824,9 @@ class TaskDefinition(object):
                     requested_campaign = requested_campaign.replace('MC20','MC16')
                     if (requested_campaign.lower().startswith('MC16'.lower()) ) and \
                             step.request.request_type.lower() == 'MC'.lower():
+                        if is_none_campaign:
+                            raise Exception(
+                                'some of dataset has no sub-campaign/campaign, please contact MC coordinators')
                         requested_datasets = list()
                         if requested_campaign in list(campaigns.keys()):
                             requested_datasets.extend(campaigns[requested_campaign])

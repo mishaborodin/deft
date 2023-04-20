@@ -1868,7 +1868,10 @@ class TaskDefinition(object):
         events_per_pileup_file = self.rucio_client.get_number_events(mc_pileup_overlay['files'][0])
         pileup_files_per_job = nevents_per_job // events_per_pileup_file
         if pileup_files_per_job == 0:
-            raise Exception(f'Mismatch events in pileup and events per job: events per job {nevents_per_job} - pileup {events_per_pileup_file}')
+            if mc_pileup_overlay.get('event_ratio',1) > 1:
+                pileup_files_per_job = 1
+            else:
+                raise Exception(f'Mismatch events in pileup and events per job: events per job {nevents_per_job} - pileup {events_per_pileup_file}')
         files_required = math.ceil(number_of_jobs) * pileup_files_per_job
         if files_required > len(mc_pileup_overlay['files']):
             raise Exception(f'Not enough overlay files: requested {files_required} available {len(mc_pileup_overlay["files"])}')
@@ -3226,6 +3229,8 @@ class TaskDefinition(object):
                             event_ratio = project_mode.eventRatio \
                                 if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
                             param_dict.update({'event_ratio': event_ratio})
+                            if event_ratio > 1:
+                                mc_pileup_overlay['event_ratio'] = event_ratio
                         second_input_param = \
                             self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS_RND, param_dict)
                         second_input_param['ratio'] = 1

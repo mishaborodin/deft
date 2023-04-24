@@ -1868,7 +1868,7 @@ class TaskDefinition(object):
         events_per_pileup_file = self.rucio_client.get_number_events(mc_pileup_overlay['files'][0])
         pileup_files_per_job = nevents_per_job // events_per_pileup_file
         if pileup_files_per_job == 0:
-            if mc_pileup_overlay.get('event_ratio',1) > 1:
+            if (mc_pileup_overlay.get('event_ratio',1) > 1)  or (task.get('nEventsPerInputFile', 0) == events_per_pileup_file):
                 pileup_files_per_job = 1
             else:
                 raise Exception(f'Mismatch events in pileup and events per job: events per job {nevents_per_job} - pileup {events_per_pileup_file}')

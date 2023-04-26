@@ -3229,7 +3229,7 @@ class TaskDefinition(object):
                             event_ratio = project_mode.eventRatio \
                                 if '.' in str(project_mode.eventRatio) else int(project_mode.eventRatio)
                             param_dict.update({'event_ratio': event_ratio})
-                            if event_ratio > 1:
+                            if type(event_ratio) is int and event_ratio > 1:
                                 mc_pileup_overlay['event_ratio'] = event_ratio
                         second_input_param = \
                             self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS_RND, param_dict)
@@ -3506,7 +3506,7 @@ class TaskDefinition(object):
                         job_parameters.append(arch_param)
                     elif re.match(r'^(--)?outputYODAFile$', name, re.IGNORECASE):
                         proto_key = TaskParamName.YODA_OUTPUT
-                    elif re.match(r'^(--)?outputDRAW.*File$', name, re.IGNORECASE) and project_mode.rawOutputFiles:
+                    elif re.match(r'^(--)?outputDRAW.*File$', name, re.IGNORECASE):
                         proto_key = TaskParamName.RAW_OUTPUT
                     output_param = self.protocol.render_param(proto_key, param_dict)
                     if project_mode.spacetoken is not None:

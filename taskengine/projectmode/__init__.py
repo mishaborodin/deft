@@ -109,7 +109,10 @@ class ProjectMode(object):
     def _is_cmtconfig_exist(self, cache, cmtconfig):
         agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
         if not agis_cmtconfig_list:
-            agis_cmtconfig_list = self._get_cmtconfig_from_cvmfs(cache)
+            try:
+                agis_cmtconfig_list = self._get_cmtconfig_from_cvmfs(cache)
+            except:
+                agis_cmtconfig_list = []
         return cmtconfig in agis_cmtconfig_list
 
     def _get_cmtconfig_list(self, cache):
@@ -124,6 +127,10 @@ class ProjectMode(object):
         return cmt_config_from_cvmfs
 
     def set_cmtconfig(self):
+
+        if self.use_nightly_release and (not self.cmtconfig or not self.skipCMTConfigCheck):
+            raise Exception('cmtconfig parameter and skipCMTConfigCheck must be specified in project_mode when nightly release is used')
+
         if not self.container_name and 'container_name' in self.task_config:
             self.container_name = self.task_config['container_name']
         if self.cmtconfig and self.cache and not self.skipCMTConfigCheck:
@@ -154,8 +161,7 @@ class ProjectMode(object):
                     'Cache \"{0}\" is not found in the container \"{1}\" '.format(
                         self.cache, self.container_name))
 
-        if not self.cmtconfig and self.use_nightly_release:
-            raise Exception('cmtconfig parameter must be specified in project_mode when nightly release is used')
+
 
         if not self.cmtconfig:
             setattr(self, 'cmtconfig', TaskDefConstants.DEFAULT_PROJECT_MODE['cmtconfig'])

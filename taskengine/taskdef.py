@@ -1799,7 +1799,7 @@ class TaskDefinition(object):
 
     def  _set_pre_stage(self, step, task_proto_dict, project_mode):
         # set staging if input is only on Tape
-        if not project_mode.noprestage and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC']:
+        if not project_mode.noprestage and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC','THLT']:
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
                 sa = StepAction()
@@ -2534,10 +2534,13 @@ class TaskDefinition(object):
 
                     task_config['nFiles'] = int(number_of_events * input_params['nFilesPerJob'] / max_events_forced)
                     if project_mode.optimalFirstEvent or task_config.get('optimalFirstEvent'):
-                       nEventsOptimal = minHigherDivisor(int(max_events_forced) // (int(input_params['nFilesPerJob'])-1) ,int(max_events_forced))
-                       project_mode.nEventsPerInputFile = nEventsOptimal
-                       input_params['nEventsPerInputFile'] = nEventsOptimal
-                       task_config['nEventsPerInputFile'] = nEventsOptimal
+                        if int(input_params['nFilesPerJob']) == 1:
+                            nEventsOptimal = max_events_forced
+                        else:
+                            nEventsOptimal = minHigherDivisor(int(max_events_forced) // (int(input_params['nFilesPerJob'])-1) ,int(max_events_forced))
+                        project_mode.nEventsPerInputFile = nEventsOptimal
+                        input_params['nEventsPerInputFile'] = nEventsOptimal
+                        task_config['nEventsPerInputFile'] = nEventsOptimal
                     else:
                         project_mode.nEventsPerInputFile = max_events_forced
                         input_params['nEventsPerInputFile'] = max_events_forced

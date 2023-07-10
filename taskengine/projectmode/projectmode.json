@@ -558,5 +558,9 @@
   "rawOutputFiles": {
     "type": "bool",
     "description": ""
+  },
+  "iointensity": {
+    "type": "int",
+    "description": ""
   }
 }

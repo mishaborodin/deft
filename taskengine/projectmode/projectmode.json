@@ -562,5 +562,9 @@
   "iointensity": {
     "type": "int",
     "description": ""
+  },
+  "skipTRFParamCheck": {
+    "type": "bool",
+    "description": ""
   }
 }

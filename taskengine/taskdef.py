@@ -243,6 +243,7 @@ class TaskDefinition(object):
         self.agis_client = AGISClient()
         self.template_type = None
         self.template_build = None
+        self._checked_ami_tags = []
 
     @staticmethod
     def _get_usergroup(step):
@@ -1948,6 +1949,7 @@ class TaskDefinition(object):
         trf_release = ctag['SWReleaseCache'].split('_')[1]
         #trf_params = self.ami_client.get_trf_params(trf_cache, trf_release, trf_name, force_ami=True)
         trf_params, _ = self._get_ami_transform_param_cached(trf_cache, trf_release, trf_name, force_ami=True)
+
         # proto_fix
         if trf_name.lower() == 'HLTHistMerge_tf.py'.lower():
             if '--inputHISTFile' not in trf_params:
@@ -2267,7 +2269,13 @@ class TaskDefinition(object):
 
             if not trf_params:
                 raise Exception("AMI: list of transformation parameters is empty")
-
+            if not project_mode.skipTRFParamCheck:
+                if ctag_name not in self._checked_ami_tags:
+                    try:
+                        if self.ami_client.check_trf_params_in_ami_tag(ctag_name, trf_params):
+                            self._checked_ami_tags.append(ctag_name)
+                    except Exception as ex:
+                        logger.exception(str(ex))
             skip_evgen_check = project_mode.skipEvgenCheck or False
             use_real_nevents = project_mode.useRealNumEvents
 

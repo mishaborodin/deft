@@ -360,6 +360,17 @@ class AMIClient(object):
 
         return ami_tag
 
+    def check_trf_params_in_ami_tag(self, tag_name, trf_params):
+        ami_tag_params = []
+        try:
+            ami_tag_params = list(list(json.loads(self._ami_get_tag_new(tag_name)[0]['dict'])['transformation']['args'].keys()))
+        except Exception as ex:
+            logger.error('Error getting ami tags params: {0}'.format(str(ex)))
+        cleaned_trf_params = [x.replace('--', '') for x in trf_params]
+        for trf_param in ami_tag_params:
+            if trf_param not in cleaned_trf_params:
+                raise Exception('The parameter \"{0}\" is not found in the trf for the AMI tag \"{1}\"'.format(trf_param, tag_name))
+        return True
     @staticmethod
     def _read_trf_params(fp):
         trf_params = list()

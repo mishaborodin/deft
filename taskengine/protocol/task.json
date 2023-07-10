@@ -114,7 +114,5 @@
   "fullChain": "'{{full_chain}}'",
   "nEventsPerOutputFile": "{{number_of_events_per_output_file}}",
   "orderInputBy": "'{{order_input_by}}'",
-  "intermediateTask": "{{intermediate_task}}",
-  "iointensity": "{{iointensity}}",
-  "iointensityunit": "'{{iointensityunit}}'"
+  "intermediateTask": "{{intermediate_task}}"
 }

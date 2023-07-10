@@ -3975,8 +3975,8 @@ class TaskDefinition(object):
                 task_proto_dict.update({'cpu_time_unit': project_mode.cpuTimeUnit})
 
             if project_mode.iointensity is not None:
-                task_proto_dict.update({'iointensity': project_mode.iointensity})
-                task_proto_dict.update({'iointensityunit': 'kBPerS'})
+                task_proto_dict.update({'io_intensity': project_mode.iointensity})
+                task_proto_dict.update({'io_intensity_unit': 'kBPerS'})
 
             if project_mode.gshare is not None:
                 all_gshares = GlobalShare.objects.all().values_list('name',flat=True)

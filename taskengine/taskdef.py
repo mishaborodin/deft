@@ -1835,6 +1835,7 @@ class TaskDefinition(object):
         if ('site' in task_proto_dict) and (',' not in task_proto_dict['site']) and \
                 ('BOINC' not in task_proto_dict['site']) and ('container_name' not in task_proto_dict):
             containers = self.agis_client.list_site_sw_containers(task_proto_dict['site'])
+            architecture = task_proto_dict['architecture'].split('#')[0]
             if containers:
                 sw_containers = []
                 sw_tags = self.ami_client.ami_sw_tag_by_cache('_'.join([task_proto_dict['cache'],task_proto_dict['release_base']]))
@@ -1846,7 +1847,7 @@ class TaskDefinition(object):
                                                   'cmtconfig': sw_tag['IMAGEARCH'] + '-' + sw_tag[
                                                      'IMAGEPLATFORM'] + '-' + sw_tag['IMAGECOMPILER']})
                 for sw_container in sw_containers:
-                    if (sw_container['cmtconfig'] == task_proto_dict['architecture']) and (sw_container['name'] in containers):
+                    if (sw_container['cmtconfig'] == architecture) and (sw_container['name'] in containers):
                         task_proto_dict.update(
                             {'container_name': sw_container['name']})
                         return

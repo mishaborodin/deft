@@ -134,16 +134,17 @@ class ProjectMode(object):
         if not self.container_name and 'container_name' in self.task_config:
             self.container_name = self.task_config['container_name']
         if self.cmtconfig and self.cache and not self.skipCMTConfigCheck:
+            architecture = self.cmtconfig.split('#')[0]
             if self.container_name:
                 ami_client = AMIClient()
                 if ami_client.ami_container_exists(self.container_name):
                     ami_cmtconfig = ami_client.ami_cmtconfig_by_image_name(self.container_name)
-                    if self.cmtconfig != ami_cmtconfig:
+                    if architecture != ami_cmtconfig:
                         raise Exception(
                             'cmtconfig \"{0}\" specified by the user does not correspond one in the container \"{1}\" '.format(
                                 self.cmtconfig, ami_cmtconfig))
             else:
-                if not self._is_cmtconfig_exist(self.cache, self.cmtconfig):
+                if not self._is_cmtconfig_exist(self.cache, architecture):
                     available_cmtconfig_list = self._get_cmtconfig_list(self.cache)
                     raise Exception(
                         'cmtconfig \"{0}\" specified by user is not exist in cache \"{1}\" (available: \"{2}\")'.format(

@@ -4398,7 +4398,7 @@ class TaskDefinition(object):
                 task_elements.append({task_id: task})
 
             if not len(task_elements):
-                raise Exception("List of tasks is empty")
+                raise Exception("Input container doesn't exist or empty")
 
             for task_element in task_elements:
                 task_id = list(task_element.keys())[0]

@@ -1,6 +1,7 @@
 __author__ = 'Dmitry Golubkov'
 
 import glob
+import os
 import re
 import json
 import subprocess
@@ -244,6 +245,7 @@ class TaskDefinition(object):
         self.template_type = None
         self.template_build = None
         self._checked_ami_tags = []
+        self._verified_evgen_releases = set()
 
     @staticmethod
     def _get_usergroup(step):
@@ -2272,11 +2274,8 @@ class TaskDefinition(object):
                 raise Exception("AMI: list of transformation parameters is empty")
             if not project_mode.skipTRFParamCheck:
                 if ctag_name not in self._checked_ami_tags:
-                    try:
-                        if self.ami_client.check_trf_params_in_ami_tag(ctag_name, trf_params):
-                            self._checked_ami_tags.append(ctag_name)
-                    except Exception as ex:
-                        logger.exception(str(ex))
+                    if self.ami_client.check_trf_params_in_ami_tag(ctag_name, trf_params):
+                        self._checked_ami_tags.append(ctag_name)
             skip_evgen_check = project_mode.skipEvgenCheck or False
             use_real_nevents = project_mode.useRealNumEvents
 
@@ -2707,9 +2706,11 @@ class TaskDefinition(object):
                     else:
                         if 'TXT' in output_types:
                             output_types.remove('TXT')
+                if trf_release.startswith("23") and  LooseVersion(trf_release) >= LooseVersion('23.6'):
+                    if not self._check_evgen_hepmc(trf_cache, trf_release, step.request.campaign):
+                        logger.warning(f"HEPMC check for {trf_cache} {trf_release} {step.request.campaign} failed")
 
             skip_scout_jobs = None
-
             try:
                 try:
                     oe = OpenEnded.objects.get(request__id=step.request.id)
@@ -5572,3 +5573,33 @@ class TaskDefinition(object):
             ready_request_list.append(request)
         requests = ready_request_list[:1]
         self._define_tasks_for_requests(requests, jira_client, restart)
+
+    def _check_evgen_hepmc(self, trf_cache, trf_release, campaign):
+        if (trf_cache+trf_release+campaign) in self._verified_evgen_releases:
+            return True
+        trf_release_base = '.'.join(trf_release.split('.')[0:2])
+        release_path = f'/cvmfs/atlas.cern.ch/repo/sw/software/{trf_release_base}/{trf_cache}/{trf_release}/InstallArea/'
+        if not os.path.exists(release_path):
+            return False
+        dir_name = os.listdir(release_path)[0]
+        file_path = os.path.join(release_path, dir_name, 'env_setup.sh')
+        hepmc_version_pattern = 'HEPMCVER='
+        if campaign.lower() in ['mc16','mc20']:
+            expected_version = '2'
+        elif  campaign.lower() in ['mc21','mc23']:
+            expected_version = '3'
+        else:
+            return False
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                for line in f:
+                    if re.search(hepmc_version_pattern, line):
+                        version = line.split('HEPMCVER=')[1][0]
+                        if version == expected_version:
+                            self._verified_evgen_releases.add(trf_cache+trf_release+campaign)
+                            return True
+                        else:
+                            raise Exception(f'HEPMC version {version} is not expected for {campaign}')
+
+        return False
+

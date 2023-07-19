@@ -1465,6 +1465,8 @@ class TaskDefinition(object):
                           primary_input_offset=0, prod_step=None, reuse_input=None, evgen_params=None,
                           task_common_offset=None):
         project_mode = ProjectMode(step)
+        if (prod_step.lower() == 'evgen'.lower()) and number_of_events > TaskDefConstants.DEFAULT_MAX_EVENTS_EVGEN_TASK:
+            raise MaxEventsPerTaskLimitExceededException(number_of_events)
 
         primary_input = self._get_primary_input(task['jobParameters'])
         if not primary_input:
@@ -1562,8 +1564,7 @@ class TaskDefinition(object):
                 number_of_jobs = \
                     math.ceil(primary_input_events_from_rucio / int(task_config['nEventsPerJob']))
 
-        if (prod_step.lower() == 'evgen'.lower()) and number_of_events > TaskDefConstants.DEFAULT_MAX_EVENTS_EVGEN_TASK:
-            raise MaxEventsPerTaskLimitExceededException(number_of_events)
+
 
         if number_of_jobs > TaskDefConstants.DEFAULT_MAX_NUMBER_OF_JOBS_PER_TASK:
             raise MaxJobsPerTaskLimitExceededException(number_of_jobs)
@@ -1754,6 +1755,9 @@ class TaskDefinition(object):
                 if 'dataset' in list(param.keys()) and param['dataset'] == 'seq_number':
                     param['offset'] = number_of_input_files_used
             return
+        if ((number_input_files_requested + number_of_input_files_used) > primary_input_total_files and
+            ((number_input_files_requested + number_of_input_files_used-primary_input_total_files)/primary_input_total_files)<0.01):
+            number_input_files_requested = primary_input_total_files - number_of_input_files_used
 
         if (number_input_files_requested + number_of_input_files_used) > primary_input_total_files \
                 or number_input_files_requested < 0:

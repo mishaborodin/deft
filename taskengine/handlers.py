@@ -432,3 +432,13 @@ class TaskActionHandler(object):
                                         status=last_request.status)
         self._save_rs_with_current_time(request_status)
         return {'reqID': int(last_request.id)}
+
+    def force_request(self, request_id):
+        try:
+            from taskengine.taskdef import TaskDefinition
+            td = TaskDefinition()
+            td.force_process_requests([request_id])
+            return {'error': ''}
+        except Exception as e:
+            return {'error': str(e)}
+

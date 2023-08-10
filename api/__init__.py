@@ -213,6 +213,11 @@ class ApiServer(object, metaclass=Singleton):
                 steps_list = body['steps_list']
                 handler_status = handler.create_slice_tier0(slice_dict, steps_list)
                 request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
+            elif request.action == request.ACTION_FORCE_REQUEST:
+                body = json.loads(request.body)
+                request_id = body['request_id']
+                handler_status = handler.force_request(request_id)
+                request.set_status(request.STATUS_RESULT_SUCCESS, data_dict=handler_status)
             elif request.action == request.ACTION_CLEAN_TASK_CARRIAGES:
                 body = json.loads(request.body)
                 task_id = body['task_id']

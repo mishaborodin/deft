@@ -28,6 +28,7 @@ class Request(models.Model):
     ACTION_INCREASE_ATTEMPT_NUMBER = 'increase_attempt_number'
     ACTION_ABORT_UNFINISHED_JOBS = 'abort_unfinished_jobs'
     ACTION_CREATE_SLICE_TIER0 = 'create_slice_tier0'
+    ACTION_FORCE_REQUEST = 'force_request'
     ACTION_OBSOLETE_TASK = 'obsolete_task'
     ACTION_CLEAN_TASK_CARRIAGES = 'clean_task_carriages'
     ACTION_KILL_JOB = 'kill_job'
@@ -78,7 +79,8 @@ class Request(models.Model):
         (ACTION_SET_TTCR, 'Set TTC Requested (TTCR) time offset'),
         (ACTION_SET_TTCJ, 'Set TTC JEDI (TTCJ) timestamp'),
         (ACTION_REASSIGN_TASK_TO_SHARE, 'Reassign task to a new share'),
-        (ACTION_RELOAD_INPUT, 'Reload input')
+        (ACTION_RELOAD_INPUT, 'Reload input'),
+        (ACTION_FORCE_REQUEST, 'Force request')
     )
 
     STATUS_RESULT_SUCCESS = 'success'

@@ -566,5 +566,9 @@
   "skipTRFParamCheck": {
     "type": "bool",
     "description": ""
+  },
+  "allowEmptyInput": {
+    "type": "bool",
+    "description": ""
   }
 }

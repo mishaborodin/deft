@@ -4217,6 +4217,9 @@ class TaskDefinition(object):
 
             if project_mode.inputPreStaging is not None:
                 task_proto_dict.update({'input_pre_staging': project_mode.inputPreStaging or None})
+                
+            if project_mode.allowEmptyInput is not None:
+                task_proto_dict.update({'allow_empty_input': project_mode.allowEmptyInput or None})
 
             if project_mode.fullChain is not None:
                 task_proto_dict.update({'full_chain': project_mode.fullChain or None})

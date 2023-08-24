@@ -58,6 +58,7 @@ class ProjectMode(object):
             self.project_mode_dict.update({option_names[key]: option_type(option_value)})
 
         self.set_cmtconfig()
+        self.set_cmtconfig_options()
         self.project_mode_dict['cmtconfig'] = self.cmtconfig
 
     def __getattr__(self, item):
@@ -125,6 +126,20 @@ class ProjectMode(object):
         path = TaskDefConstants.DEAFULT_SW_RELEASE_PATH.format(release=release,project=project,release_base=".".join(release.split(".")[:2]))
         cmt_config_from_cvmfs = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
         return cmt_config_from_cvmfs
+
+
+    def set_cmtconfig_options(self):
+        if self.cache:
+            if self.cmtconfig and '#' not in self.cmtconfig:
+               if self.cmtconfig.startswith('aarch64'):
+                   self.cmtconfig = f'{self.cmtconfig}#aarch64'
+               else:
+                    release = self.cache.split('-')[-1]
+                    version_parts = release.split('.')
+                    version = int(version_parts[0]) * 10000 + int(version_parts[1]) * 100 + int(version_parts[2])
+                    if version >= 240010:
+                        self.cmtconfig = f'{self.cmtconfig}#x86_64-*-v2'
+
 
     def set_cmtconfig(self):
 

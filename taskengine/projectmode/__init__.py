@@ -134,11 +134,14 @@ class ProjectMode(object):
                if self.cmtconfig.startswith('aarch64'):
                    self.cmtconfig = f'{self.cmtconfig}#aarch64'
                else:
+                   try:
                     release = self.cache.split('-')[-1]
                     version_parts = release.split('.')
                     version = int(version_parts[0]) * 10000 + int(version_parts[1]) * 100 + int(version_parts[2])
                     if version >= 240010:
                         self.cmtconfig = f'{self.cmtconfig}#x86_64-*-v2'
+                   except:
+                       pass
 
 
     def set_cmtconfig(self):

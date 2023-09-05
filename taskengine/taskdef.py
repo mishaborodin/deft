@@ -4853,7 +4853,7 @@ class TaskDefinition(object):
                 else:
                     requested_campaign = str(step.request.subcampaign)
                     requested_campaign = requested_campaign.replace('MC20','MC16')
-                    if (requested_campaign.lower().startswith('MC16'.lower()) ) and \
+                    if (requested_campaign.lower().startswith('MC16'.lower()) or  requested_campaign.lower().startswith('MC23'.lower())) and \
                             step.request.request_type.lower() == 'MC'.lower():
                         if is_none_campaign:
                             raise Exception(

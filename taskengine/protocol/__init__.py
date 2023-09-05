@@ -546,7 +546,13 @@ class TaskDefConstants(object, metaclass=Constants):
         'MC16b': ['MC16:MC16b'],
         'MC16c': ['MC16:MC16c'],
         'MC16d': ['MC16:MC16d'],
-        'MC16e': ['MC16:MC16e']
+        'MC16e': ['MC16:MC16e'],
+        'MC23a': ['MC23:MC23a'],
+        'MC23b': ['MC23:MC23b'],
+        'MC23c': ['MC23:MC23c'],
+        'MC23d': ['MC23:MC23d'],
+        'MC23e': ['MC23:MC23e'],
+
     }
 
     DEFAULT_KILL_JOB_CODE = Constant(9)

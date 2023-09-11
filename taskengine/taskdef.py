@@ -2710,7 +2710,7 @@ class TaskDefinition(object):
                     else:
                         if 'TXT' in output_types:
                             output_types.remove('TXT')
-                if trf_release.startswith("23") and  LooseVersion(trf_release) >= LooseVersion('23.6'):
+                if  LooseVersion(trf_release) >= LooseVersion('22.0'):
                     if not self._check_evgen_hepmc(trf_cache, trf_release, step.request.campaign):
                         logger.warning(f"HEPMC check for {trf_cache} {trf_release} {step.request.campaign} failed")
 

@@ -570,5 +570,9 @@
   "allowEmptyInput": {
     "type": "bool",
     "description": ""
+  },
+  "skipHEPMCCheck": {
+    "type": "bool",
+    "description": ""
   }
 }

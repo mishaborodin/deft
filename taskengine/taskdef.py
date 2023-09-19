@@ -2711,7 +2711,7 @@ class TaskDefinition(object):
                         if 'TXT' in output_types:
                             output_types.remove('TXT')
                 if  LooseVersion(trf_release) >= LooseVersion('22.0'):
-                    if not self._check_evgen_hepmc(trf_cache, trf_release, step.request.campaign):
+                    if not project_mode.skipHEPMCCheck and not self._check_evgen_hepmc(trf_cache, trf_release, step.request.campaign):
                         logger.warning(f"HEPMC check for {trf_cache} {trf_release} {step.request.campaign} failed")
 
             skip_scout_jobs = None
@@ -5606,7 +5606,7 @@ class TaskDefinition(object):
                             self._verified_evgen_releases.add(trf_cache+trf_release+campaign)
                             return True
                         else:
-                            raise Exception(f'HEPMC version {version} is not expected for {campaign}')
+                            raise Exception(f'HEPMC version {version} is not expected for {campaign}. Use skipHEPMCCheck to skip this check')
 
         return False
 

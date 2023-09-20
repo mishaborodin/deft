@@ -4276,7 +4276,7 @@ class TaskDefinition(object):
                     io_intensity = 2000
             elif prod_step.lower() == 'deriv'.lower():
                 if step.request.provenance.lower() == 'GP'.lower():
-                    if trf_name.lower() == 'Reco_tf.py'.lower():
+                    if (trf_name.lower() == 'Reco_tf.py'.lower()) or (trf_name.lower() == 'Derivation_tf.py'.lower()):
                         io_intensity = 500
                 if re.match('^AP_(?!SOFT|REPR|UPG|THLT|VALI).*$', usergroup, re.IGNORECASE):
                     if trf_name.lower() == 'Reco_tf.py'.lower():

@@ -5216,9 +5216,11 @@ class TaskDefinition(object):
         return result_list, another_chain_step
 
     @staticmethod
-    def _get_request_status(request, summary_log, locked_time, current_status):
+    def _get_request_status(request, summary_log, locked_time, current_status, keep_approved = False):
         if current_status in ['test']:
             return 'test'
+        if keep_approved:
+            return 'approved'
         statuses = TRequestStatus.objects.filter(request=request).order_by('-timestamp')
         if statuses[0].timestamp > locked_time and statuses[0].status == 'approved' and current_status == 'approved':
             return 'approved'
@@ -5286,6 +5288,7 @@ class TaskDefinition(object):
         self.template_type = template_type
         if self.template_type:
             self.template_results = {}
+        keep_approved = False
         for request in requests:
             try:
                 logger.info("Processing request %d" % request.id)
@@ -5421,6 +5424,9 @@ class TaskDefinition(object):
                                 parent_step = StepExecution.objects.get(id=step.step_parent_id)
                                 if parent_step.status.lower() == self.protocol.STEP_STATUS[StepStatus.APPROVED].lower():
                                     use_parent_output = True
+                                    if parent_step.request.status.lower() == \
+                                            self.protocol.REQUEST_STATUS[RequestStatus.APPROVED].lower():
+                                        keep_approved = True
                                 elif parent_step.status.lower() == \
                                         self.protocol.STEP_STATUS[StepStatus.NOTCHECKED].lower():
                                     raise Exception("Parent step is '{0}'".format(parent_step.status))
@@ -5512,7 +5518,7 @@ class TaskDefinition(object):
                                     pass
                             continue
 
-                request.status = self._get_request_status(request, summary_log, self.lock_request_time, request.status)
+                request.status = self._get_request_status(request, summary_log, self.lock_request_time, request.status, keep_approved)
                 if not exception:
                     slices_with_error = list(SliceError.objects.filter(request=request, is_active=True))
                     for slice_error in slices_with_error:

@@ -5425,7 +5425,8 @@ class TaskDefinition(object):
                                 if parent_step.status.lower() == self.protocol.STEP_STATUS[StepStatus.APPROVED].lower():
                                     use_parent_output = True
                                     if parent_step.request.status.lower() == \
-                                            self.protocol.REQUEST_STATUS[RequestStatus.APPROVED].lower():
+                                            self.protocol.REQUEST_STATUS[RequestStatus.APPROVED].lower()\
+                                            and parent_step.request != step.request:
                                         keep_approved = True
                                 elif parent_step.status.lower() == \
                                         self.protocol.STEP_STATUS[StepStatus.NOTCHECKED].lower():

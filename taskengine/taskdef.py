@@ -3829,7 +3829,7 @@ class TaskDefinition(object):
                     memory = 1750
                     base_memory = 2000
 
-            if trf_name in ['AODMerge_tf.py', 'DAODMerge_tf.py', 'Archive_tf.py', 'ESDMerge_tf.py']:
+            if trf_name in ['AODMerge_tf.py', 'DAODMerge_tf.py', 'Archive_tf.py', 'ESDMerge_tf.py', 'RDOMerge_tf.py']:
                 task_proto_dict.update({'out_disk_count': 1000})
                 task_proto_dict.update({'out_disk_unit': 'kB'})
 

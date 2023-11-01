@@ -2899,6 +2899,8 @@ class TaskDefinition(object):
                 primary_input_offset = project_mode.primaryInputOffset
             if project_mode.randomSeedOffset is not None:
                 random_seed_offset = project_mode.randomSeedOffset
+                if step.request.phys_group in ['VALI']:
+                    skip_check_input = True
 
             random_seed_proto_key = TaskParamName.RANDOM_SEED
             if step.request.request_type.lower() == 'MC'.lower():

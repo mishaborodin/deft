@@ -574,5 +574,9 @@
   "skipHEPMCCheck": {
     "type": "bool",
     "description": ""
+  },
+  "skipShortOutput": {
+    "type": "bool",
+    "description": ""
   }
 }

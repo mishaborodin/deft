@@ -4149,6 +4149,9 @@ class TaskDefinition(object):
             if project_mode.skipShortInput is not None:
                 task_proto_dict.update({'skip_short_input': project_mode.skipShortInput or None})
 
+            if project_mode.skipShortOutput is not None:
+                task_proto_dict.update({'skip_short_output': project_mode.skipShortOutput or None})
+
             if project_mode.registerEsFiles is not None:
                 task_proto_dict.update({'register_es_files': project_mode.registerEsFiles or None})
 

@@ -2166,7 +2166,7 @@ class TaskDefinition(object):
             task_config = ProjectMode.get_task_config(step)
             memory = TaskDefConstants.DEFAULT_MEMORY
             base_memory = TaskDefConstants.DEFAULT_MEMORY_BASE
-
+            follow_hashtags = []
             trf_name = ctag['transformation']
 
             trf_options = {}
@@ -2625,6 +2625,11 @@ class TaskDefinition(object):
                 param_name = 'inputLogsFile'
                 if param_name not in ignore_trf_params:
                     ignore_trf_params.append(param_name)
+                if step.request.campaign.lower() == 'MC23'.lower():
+                    if not project_mode.skipShortOutput:
+                        project_mode.skipShortOutput = True
+                        project_mode.respectSplitRule = True
+                        follow_hashtags.append('skipShortOutputVerification')
             elif trf_name.lower() == 'BSOverlayFilter_tf.py'.lower():
                 overlay_production = True
                 for key in list(input_params.keys()):
@@ -4493,6 +4498,12 @@ class TaskDefinition(object):
                     try:
                         created_task = ProductionTask.objects.get(id=task_id)
                         created_task.set_hashtag(full_chain_hashtag)
+                    except Exception as e:
+                        logger.error('Problem with hashtag registration {0}'.format(str(e)))
+                for hashtag in follow_hashtags:
+                    try:
+                        created_task = ProductionTask.objects.get(id=task_id)
+                        created_task.set_hashtag(hashtag)
                     except Exception as e:
                         logger.error('Problem with hashtag registration {0}'.format(str(e)))
                 parent_task_id = task_id

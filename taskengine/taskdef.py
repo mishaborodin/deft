@@ -4875,8 +4875,10 @@ class TaskDefinition(object):
                             raise Exception(
                                 'some of dataset has no sub-campaign/campaign, please contact MC coordinators')
                         requested_datasets = list()
-                        if requested_campaign in list(campaigns.keys()):
-                            requested_datasets.extend(campaigns[requested_campaign])
+                        for campaign in list(campaigns.keys()):
+                            if campaign in TaskDefConstants.CAMPAIGNS_INTERCHANGEABLE[requested_campaign]:
+                                requested_datasets.extend(campaigns[campaign])
+
                         if len(requested_datasets) > 0:
                             result['datasets'] = requested_datasets
                         else:

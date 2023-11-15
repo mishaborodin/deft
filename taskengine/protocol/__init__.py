@@ -555,6 +555,18 @@ class TaskDefConstants(object, metaclass=Constants):
 
     }
 
+    CAMPAIGNS_INTERCHANGEABLE = {
+        'MC16a': ['MC16a'],
+        'MC16b': ['MC16b'],
+        'MC16c': ['MC16c'],
+        'MC16d': ['MC16d', 'MC16c'],
+        'MC16e': ['MC16e'],
+        'MC23a': ['MC23a'],
+        'MC23b': ['MC23b'],
+        'MC23c': ['MC23c'],
+        'MC23d': ['MC23d', 'MC23c'],
+        'MC23e': ['MC23e'],
+    }
     DEFAULT_KILL_JOB_CODE = Constant(9)
 
     ERRORS_TO_REPEAT = ['http status code: 503',

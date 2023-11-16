@@ -1755,7 +1755,7 @@ class TaskDefinition(object):
                 if 'dataset' in list(param.keys()) and param['dataset'] == 'seq_number':
                     param['offset'] = number_of_input_files_used
             return
-        if primary_input_total_files == 0:
+        if ((number_input_files_requested + number_of_input_files_used) > primary_input_total_files) and primary_input_total_files == 0:
             raise Exception("Input container doesn't exist or empty")
         if ((number_input_files_requested + number_of_input_files_used) > primary_input_total_files and
             ((number_input_files_requested + number_of_input_files_used-primary_input_total_files)/primary_input_total_files)<0.01):

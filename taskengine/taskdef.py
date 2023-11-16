@@ -4958,10 +4958,10 @@ class TaskDefinition(object):
                 logger.info("Step = %d, container %s is empty or nEventsPerInputFile is missing, skipping the step" %
                             (step.id, input_data_name))
                 return splitting_dict
-
             number_events_processed, previous_existed_tasks = self._get_number_events_processed(step, result['datasets'])
             logger.info("Step = %d, number_events_processed = %d" % (step.id, number_events_processed))
-
+            if project_mode.randomSeedOffset is not None and step.request.phys_group in ['VALI']:
+                number_events_processed, previous_existed_tasks = 0, []
             if step.input_events > 0:
                 number_events_requested = int(step.input_events)
             else:

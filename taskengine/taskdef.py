@@ -2631,7 +2631,6 @@ class TaskDefinition(object):
                     if not project_mode.skipShortOutput:
                         project_mode.skipShortOutput = True
                         project_mode.respectSplitRule = True
-                        follow_hashtags.append('skipShortOutputVerification')
             elif trf_name.lower() == 'BSOverlayFilter_tf.py'.lower():
                 overlay_production = True
                 for key in list(input_params.keys()):
@@ -3809,8 +3808,12 @@ class TaskDefinition(object):
                     task_proto_dict.update({'cpu_time': 3000})
                     task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
                     if core_count > 1:
-                        memory = 500
-                        base_memory = 1000
+                        if [x for x in job_parameters if 'multithreaded' in x.get('value','')]:
+                            memory = 150
+                            base_memory = 2200
+                        else:
+                            memory = 500
+                            base_memory = 1000
                 elif prod_step.lower() == 'recon'.lower() or is_pile_task:
                     if core_count > 1:
                         memory = 1750

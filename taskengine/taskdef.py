@@ -4693,6 +4693,10 @@ class TaskDefinition(object):
         for dataset_name in datasets:
             events_per_file = self.get_events_per_input_file(step, dataset_name, use_real_events=use_real_events)
             number_events_in_dataset = events_per_file * self.rucio_client.get_number_files(dataset_name)
+            if use_real_events:
+                number_events_in_rucio_dataset = self.rucio_client.get_number_events(dataset_name)
+                if number_events_in_rucio_dataset > 0:
+                    number_events_in_dataset = min(number_events_in_dataset, number_events_in_rucio_dataset)
             number_events += number_events_in_dataset
         return number_events
 

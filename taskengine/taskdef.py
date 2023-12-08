@@ -4289,6 +4289,8 @@ class TaskDefinition(object):
                     io_intensity = 2000
                 elif trf_name.lower() == 'DAODMerge_tf.py'.lower():
                     io_intensity = 2000
+                elif trf_name.lower() == 'RDOMerge_tf.py'.lower():
+                    io_intensity = 4000
             elif prod_step.lower() == 'deriv'.lower():
                 if step.request.provenance.lower() == 'GP'.lower():
                     if (trf_name.lower() == 'Reco_tf.py'.lower()) or (trf_name.lower() == 'Derivation_tf.py'.lower()):

@@ -2686,6 +2686,8 @@ class TaskDefinition(object):
                 task_proto_id = TaskDefConstants.TEMPLATE_TASK_ID # replace
 
             if 'EVNT' in output_types and prod_step.lower() == 'evgen'.lower():
+                if input_data_name.split('.py')[0].lower().endswith('lhe'):
+                    raise Exception("The JO is LHE. The output EVNT is not allowed")
                 use_evnt_txt = False
                 if 'Ph' in input_data_name or 'Powheg' in input_data_name:
                     if (trf_cache == 'AtlasProduction' and LooseVersion(trf_release) >= LooseVersion('19.2.4.11')) or \
@@ -3870,6 +3872,18 @@ class TaskDefinition(object):
                     if site_name not in available_sites:
                         raise UnknownSiteException(site_name)
                 task_proto_dict.update({'site': site_value})
+            if project_mode.excludedSites is not None:
+                site_value = project_mode.excludedSites
+                specified_sites = list()
+                if ',' in site_value:
+                    specified_sites.extend(site_value.split(','))
+                else:
+                    specified_sites.append(site_value)
+                available_sites = self.agis_client.get_sites()
+                for site_name in specified_sites:
+                    if site_name not in available_sites:
+                        raise UnknownSiteException(site_name)
+                task_proto_dict.update({'excludedSites': site_value})
 
             if project_mode.disableReassign is not None:
                 task_proto_dict.update({'disable_reassign': project_mode.disableReassign or None})

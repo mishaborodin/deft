@@ -3860,6 +3860,8 @@ class TaskDefinition(object):
                 task_proto_dict.update({'base_ram_count': project_mode.baseRamCount})
             if project_mode.baseWalltime is not None:
                 task_proto_dict.update({'base_wall_time': project_mode.baseWalltime})
+            if project_mode.maxCoreCount is not None:
+                task_proto_dict.update({'max_core_count': project_mode.maxCoreCount})
             if project_mode.site is not None:
                 site_value = project_mode.site
                 specified_sites = list()

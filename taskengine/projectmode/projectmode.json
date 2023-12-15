@@ -582,5 +582,9 @@
   "skipShortOutput": {
     "type": "bool",
     "description": ""
+  },
+  "maxCoreCount": {
+    "type": "int",
+    "description": ""
   }
 }

@@ -117,5 +117,6 @@
   "orderInputBy": "'{{order_input_by}}'",
   "intermediateTask": "{{intermediate_task}}",
   "allowEmptyInput": "{{allow_empty_input}}",
-  "skipShortOutput": "{{skip_short_output}}"
+  "skipShortOutput": "{{skip_short_output}}",
+  "maxCoreCount": "{{max_core_count}}"
 }

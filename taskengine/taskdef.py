@@ -4377,12 +4377,12 @@ class TaskDefinition(object):
                     "The task is rejected - pile tasks required  Events per Input file or useRealNumEvents to be set"
                 )
 
-            if prod_step.lower() == 'simul'.lower()and (not use_real_nevents) and (not ('number_of_events_per_input_file' in list(task_proto_dict.keys()))):
+            if (prod_step.lower() == 'simul'.lower()and (not use_real_nevents) and (not ('number_of_events_per_input_file' in list(task_proto_dict.keys()))) and
+                    not project_mode.noInputSimul):
                 raise TaskConfigurationException(
                     "The task is rejected - simul tasks required  Events per Input file or useRealNumEvents to be set"
                 )
             self._define_merge_params(step, task_proto_dict, train_production)
-
 
             if not project_mode.skipCMTConfigCheck:
                 self._check_site_container(task_proto_dict)
@@ -4454,7 +4454,7 @@ class TaskDefinition(object):
                             raise OutputNameMaxLengthException(output_dataset_name)
 
                 if step.request.request_type.lower() == 'MC'.lower():
-                    if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21 and not project_mode.onSiteMerging:
+                    if prod_step.lower() == 'simul'.lower() and int(trf_release.split('.')[0]) >= 21 and not project_mode.onSiteMerging and not project_mode.noInputSimul:
                         self._check_task_number_of_jobs(task, number_of_events, step)
 
                 self._check_task_unmerged_input(task, step, prod_step)

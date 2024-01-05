@@ -586,5 +586,9 @@
   "maxCoreCount": {
     "type": "int",
     "description": ""
+  },
+  "noInputSimul": {
+    "type": "bool",
+    "description": ""
   }
 }

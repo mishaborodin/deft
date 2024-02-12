@@ -1,3 +1,5 @@
+import re
+
 from taskengine.metadata import AMIClient
 
 __author__ = 'Dmitry Golubkov'
@@ -56,7 +58,10 @@ class ProjectMode(object):
                     raise InvalidProjectModeOptionValue(option_names[key], option_value)
             setattr(self, option_names[key], option_type(option_value))
             self.project_mode_dict.update({option_names[key]: option_type(option_value)})
-
+        self._cmt_config_list = []
+        self._multiple_cmtconfig = False
+        if self.cmtconfig and (',' in self.cmtconfig or '|' in self.cmtconfig):
+            self._multiple_cmtconfig = True
         self.set_cmtconfig()
         self.set_cmtconfig_options()
         self.project_mode_dict['cmtconfig'] = self.cmtconfig
@@ -114,7 +119,10 @@ class ProjectMode(object):
                 agis_cmtconfig_list = self._get_cmtconfig_from_cvmfs(cache)
             except:
                 agis_cmtconfig_list = []
-        return cmtconfig in agis_cmtconfig_list
+        for agis_cmtconfig in agis_cmtconfig_list:
+            if re.search(f'^{cmtconfig}$', agis_cmtconfig):
+                return True
+        return False
 
     def _get_cmtconfig_list(self, cache):
         agis_cmtconfig_list = self.agis_client.get_cmtconfig(cache)
@@ -128,20 +136,65 @@ class ProjectMode(object):
         return cmt_config_from_cvmfs
 
 
+    def cmt_config_addon(self, cmt_config):
+        addon = None
+        if cmt_config.startswith('aarch64'):
+            addon = 'aarch64'
+        else:
+            try:
+                release = self.cache.split('-')[-1]
+                version_parts = release.split('.')
+                version = int(version_parts[0]) * 10000 + int(version_parts[1]) * 100 + int(version_parts[2])
+                if version >= 230010:
+                    addon = 'x86_64-*-v2'
+            except:
+                pass
+        return addon
+
     def set_cmtconfig_options(self):
-        if self.cache:
+        if self.cache and  not self.skipCMTConfigCheck:
             if self.cmtconfig and '#' not in self.cmtconfig:
-               if self.cmtconfig.startswith('aarch64'):
-                   self.cmtconfig = f'{self.cmtconfig}#aarch64'
-               else:
-                   try:
-                    release = self.cache.split('-')[-1]
-                    version_parts = release.split('.')
-                    version = int(version_parts[0]) * 10000 + int(version_parts[1]) * 100 + int(version_parts[2])
-                    if version >= 230010:
-                        self.cmtconfig = f'{self.cmtconfig}#x86_64-*-v2'
-                   except:
-                       pass
+                if self._cmt_config_list:
+                    addons = []
+                    for cmt_config in self._cmt_config_list:
+                        addon = self.cmt_config_addon(cmt_config)
+                        if addon:
+                            addons.append(addon)
+                    if len(addons) > 0:
+                        self.cmtconfig = f'{self.cmtconfig}#({"|".join(addons)})'
+                elif not self._multiple_cmtconfig:
+                    addon = self.cmt_config_addon(self.cmtconfig)
+                    if addon:
+                        self.cmtconfig = f'{self.cmtconfig}#{addon}'
+
+
+    def set_multiple_cmtconfig(self):
+        if ',' in self.cmtconfig:
+            if '#' in self.cmtconfig:
+                raise Exception('cmtconfig \"{0}\" specified by the user is not valid'.format(self.cmtconfig))
+            self._cmt_config_list = self.cmtconfig.split(',')
+            tokens = [token.split('-') for token in self._cmt_config_list]
+            if len(list(set([len(token) for token in tokens]))) > 1:
+                raise Exception('cmtconfig \"{0}\" specified by the user is not valid'.format(self.cmtconfig))
+            new_cmtconfig_base_tokens = []
+            for token_number in range(len(tokens[0])):
+                if len(list(set([token[token_number] for token in tokens]))) > 1:
+                    new_cmtconfig_base_tokens.append(f"({'|'.join([token[token_number] for token in tokens])})")
+                else:
+                    new_cmtconfig_base_tokens.append(tokens[0][token_number])
+            new_cmtconfig_base = '-'.join(new_cmtconfig_base_tokens)
+            setattr(self, 'cmtconfig', new_cmtconfig_base)
+        if self.cache and not self.skipCMTConfigCheck:
+            architecture = self.cmtconfig.split('#')[0]
+            if self.container_name:
+                    raise Exception('cmtconfig \"{0}\" specified by the user is not supported for containers'.format(
+                        self.cmtconfig))
+            else:
+                if not self._is_cmtconfig_exist(self.cache, architecture):
+                    available_cmtconfig_list = self._get_cmtconfig_list(self.cache)
+                    raise Exception(
+                        'cmtconfig \"{0}\" specified by user is not exist in cache \"{1}\" (available: \"{2}\")'.format(
+                            self.cmtconfig, self.cache, str(', '.join(available_cmtconfig_list))))
 
 
     def set_cmtconfig(self):
@@ -151,6 +204,9 @@ class ProjectMode(object):
 
         if not self.container_name and 'container_name' in self.task_config:
             self.container_name = self.task_config['container_name']
+
+        if self._multiple_cmtconfig:
+            return self.set_multiple_cmtconfig()
         if self.cmtconfig and self.cache and not self.skipCMTConfigCheck:
             architecture = self.cmtconfig.split('#')[0]
             if self.container_name:
@@ -205,6 +261,10 @@ class ProjectMode(object):
                                 setattr(self, 'cmtconfig', cmtconfig_list[1])
                                 return
                             else:
+                                # if len(cmtconfig_list) == 2 and len(set([cmtconfig.split('-')[0] for cmtconfig in cmtconfig_list])) == 2:
+                                #     self._cmt_config_list = cmtconfig_list
+                                #     setattr(self, 'cmtconfig',f"({'|'.join(cmtconfig_list)})")
+                                #     return
                                 value = str(','.join(cmtconfig_list))
                                 raise Exception(
                                     'cmtconfig is not specified but more than one cmtconfig is available ({0}).'.format(
@@ -231,6 +291,11 @@ class ProjectMode(object):
                                 logger.error(f'{self.cache} is not registered in CRIC')
                                 cmtconfig_list = self._get_cmtconfig_from_cvmfs(self.cache)
                                 if len(cmtconfig_list) != 1 :
-                                        raise Exception(f'{self.cache} is not registered in CRIC and {cmtconfig_list} found in CVMFS')
+                                    # if len(cmtconfig_list) == 2 and len(
+                                    #         set([cmtconfig.split('-')[0] for cmtconfig in cmtconfig_list])) == 2:
+                                    #     self._cmt_config_list = cmtconfig_list
+                                    #     setattr(self, 'cmtconfig', f"({'|'.join(cmtconfig_list)})")
+                                    #     return
+                                    raise Exception(f'{self.cache} is not registered in CRIC and {cmtconfig_list} found in CVMFS')
                                 else:
                                     setattr(self, 'cmtconfig', cmtconfig_list[0])

@@ -2170,7 +2170,8 @@ class TaskDefinition(object):
             base_memory = TaskDefConstants.DEFAULT_MEMORY_BASE
             follow_hashtags = []
             trf_name = ctag['transformation']
-
+            if ctag.get('status', '') == 'invalid':
+                raise Exception("The tag {0} is invalid".format(ctag_name))
             trf_options = {}
             for key in list(Protocol.TRF_OPTIONS.keys()):
                 if re.match(key, trf_name, re.IGNORECASE):

@@ -1115,14 +1115,14 @@ class TaskDefinition(object):
         result = re.match(r'^.+_tid(?P<tid>\d+)_00$', dataset_name)
         if result:
             parent_task = ProductionTask.objects.get(id=int(result.groupdict()['tid']))
+            if parent_task.status in ['done']:
+                return parent_task.total_events
+            if ('evgen' in parent_task.name) and (parent_task.step.input_events > 0):
+                return parent_task.step.input_events
             if parent_task.number_of_files and parent_task.events_per_job:
                 return parent_task.number_of_files * parent_task.events_per_file
             if '_tid' in parent_task.primary_input:
                 return  self._extract_chain_input_from_datasets(parent_task.primary_input)
-            if parent_task.status in ['done', 'finished']:
-                return parent_task.total_events
-            if ('evgen' in parent_task.name) and (parent_task.step.input_events > 0):
-                return parent_task.step.input_events
         return -1
 
 

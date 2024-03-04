@@ -518,7 +518,7 @@ class AMIClient(object):
                     trf_transform.lower().endswith('Merge_tf.py'.lower())):
                 default_sub_steps = ['AODtoRED', 'FTKRecoRDOtoESD', 'all', 'n2n', 'AODtoHIST', 'DQHistogramMerge',
                                      'NTUPtoRED', 'SPSim', 'AODtoTAG', 'AtlasG4Tf', 'ESDtoAOD', 'e2d', 'e2a',
-                                     'AODtoDPD',
+                                     'AODtoDPD','RAWtoALL',
                                      'sim', 'a2r', 'ESDtoDPD', 'r2e', 'a2d', 'HITtoRDO', 'RAWtoESD', 'default',
                                      'EVNTtoHITS', 'h2r', 'SPGenerator', 'first', 'BSRDOtoRAW', 'b2r', 'OverlayBS',
                                      'RDOFTKCreator', 'AODFTKCreator', 'RDOtoRDOTrigger', 'Overlay']

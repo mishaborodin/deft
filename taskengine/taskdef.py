@@ -1812,18 +1812,22 @@ class TaskDefinition(object):
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
                 sa = StepAction()
-                sa.action = StepAction.STAGING_ACTION
+                task_config = ProjectMode.get_task_config(step)
+                if task_config.get('PDA', '')  == 'preStageWithTaskArchive':
+                    sa.action = StepAction.STAGING_ARCHIVE_ACTION
+                else:
+                    sa.action = StepAction.STAGING_ACTION
                 sa.request = step.request
                 sa.step = step.id
                 sa.attempt = 0
                 sa.create_time = timezone.now()
                 sa.execution_time = timezone.now() + datetime.timedelta(minutes=2)
                 sa.status = 'active'
-                if not StepAction.objects.filter(step=int(step.id), action=StepAction.STAGING_ACTION,
+                if not StepAction.objects.filter(step=int(step.id), action=sa.action,
                                                  status__in=['active', 'executing', 'verify']).exists():
                     sa.save()
                 else:
-                    old_step_action = StepAction.objects.get(step=int(step.id), action=StepAction.STAGING_ACTION,
+                    old_step_action = StepAction.objects.get(step=int(step.id), action=sa.action,
                                                              status__in=['active', 'executing', 'verify'])
                     if old_step_action.status == 'verify':
                         old_step_action.status = 'active'
@@ -4351,7 +4355,8 @@ class TaskDefinition(object):
                     "--AMITag s2049 --DBRelease=current --autoConfiguration=everything " \
                     "--outputHitsFile=${OUTPUT0} --inputHitsFile=@inputFor_${OUTPUT0}" + name_postfix
 
-            if 'number_of_events_per_input_file' not in list(task_proto_dict.keys()) and \
+            if not use_real_nevents and \
+                    'number_of_events_per_input_file' not in list(task_proto_dict.keys()) and \
                     'number_of_gb_per_job' not in list(task_proto_dict.keys()) and \
                     'tgt_max_output_for_ng' not in list(task_proto_dict.keys()):
                 if 'number_of_files_per_job' not in list(task_proto_dict.keys()) and not project_mode.onSiteMerging:

@@ -505,6 +505,7 @@ class TTask(models.Model):
 class StepAction(models.Model):
 
     STAGING_ACTION = 5
+    STAGING_ARCHIVE_ACTION = 8
 
     id = models.DecimalField(decimal_places=0, max_digits=12, db_column='STEP_ACTION_ID', primary_key=True)
     request = models.ForeignKey(TRequest,  db_column='PR_ID', on_delete=CASCADE)

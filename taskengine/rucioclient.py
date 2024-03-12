@@ -327,9 +327,19 @@ class RucioClient(object):
             self.__tape_rse = [x['rse'] for x in self.list_rses('rse_type=TAPE')]
         if not full_replicas:
             return False
+        scope, dataset = self.extract_scope(dsn)
+        rules = list(self.client.list_did_rules(scope, dataset))
+        rules_expression = []
+        staging_rule = None
+        for rule in rules:
+            if rule['account'] == 'prodsys' and rule['activity'] == 'Staging':
+                staging_rule = rule
+            else:
+                rules_expression.append(rule['rse_expression'])
         for replica in full_replicas:
             if replica not in self.__tape_rse:
-                return False
+                if replica in rules_expression:
+                    return False
         return [x for x in full_replicas if x in self.__tape_rse]
 
     def list_rses(self, filter=''):

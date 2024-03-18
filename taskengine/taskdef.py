@@ -807,6 +807,14 @@ class TaskDefinition(object):
         else:
             return ''
 
+    def _fold_single_tag_style(self, version_list):
+        new_version = []
+        first_letter = ''
+        for token in version_list:
+            if token[0] != first_letter and not (token[0] == 's' and first_letter == 'a'):
+                new_version.append(token)
+            first_letter = token[0]
+        return new_version
     def _check_tag_folding(self, version_list, trf_name):
         if trf_name.lower() == 'ReSim_tf.py'.lower():
             # Fold tags for ReSim case. remove old sim and sim merge tag
@@ -825,7 +833,12 @@ class TaskDefinition(object):
             if version_list[-1] not in new_version_list:
                 new_version_list.append(version_list[-1])
             return new_version_list
+        elif trf_name.lower() == 'NTUPMerge_tf.py'.lower() and sum([len(x) for x in version_list]) > 45:
+            folded_versions = self._fold_single_tag_style(version_list[:-1])
+            return folded_versions + version_list[-1:]
         return version_list
+
+
 
     def _construct_taskname(self, input_data_name, project, prod_step, ctag_name, trf_name):
         input_data_dict = self.parse_data_name(input_data_name)

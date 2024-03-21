@@ -4481,6 +4481,7 @@ class TaskDefinition(object):
                 self._check_task_merged_input(task, step, prod_step)
                 # self._check_task_cache_version_consistency(task, step, trf_release)
                 self._check_task_blacklisted_input(task, project_mode)
+                self._check_campaign_subcampaign(step)
                 if not skip_check_input:
                     self._check_task_input(task, task_id, number_of_events, task_config, parent_task_id,
                                            input_data_name, step, primary_input_offset, prod_step,
@@ -5681,4 +5682,9 @@ class TaskDefinition(object):
                             raise Exception(f'HEPMC version {version} is not expected for {campaign}. Use skipHEPMCCheck to skip this check')
 
         return False
+
+    def _check_campaign_subcampaign(self, step: StepExecution):
+        if '/' in step.request.campaign or '/' in step.request.subcampaign:
+            raise Exception('Campaign and subcampaign should not contain "/"')
+        return True
 

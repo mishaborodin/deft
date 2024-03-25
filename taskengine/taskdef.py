@@ -1516,8 +1516,13 @@ class TaskDefinition(object):
         lost_files_exception = None
 
         try:
+            primary_input_dataset = primary_input['dataset'].split(':')[-1]
             prod_dataset = ProductionDataset.objects.filter(
-                name__endswith=primary_input['dataset'].split(':')[-1]).first()
+                name=primary_input_dataset).first()
+            if not prod_dataset:
+                primary_input_dataset = f"{primary_input_dataset.split('.')[0]}:{primary_input_dataset}"
+                prod_dataset = ProductionDataset.objects.filter(
+                    name=primary_input_dataset).first()
             if prod_dataset:
                 prod_task = ProductionTask.objects.filter(id=prod_dataset.task_id).first()
                 if prod_task:

@@ -13,7 +13,7 @@ from tastypie.serializers import Serializer
 from tastypie.utils import trailing_slash
 from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
-from django.conf.urls import url
+# from django.conf.urls import url
 from django.db.models import Q, ObjectDoesNotExist
 from api.models import Request
 from taskengine.models import Task, TRequestProxy, TStepProxy, StepExecution
@@ -136,29 +136,29 @@ class RequestResource(ModelResource):
 
     def prepend_urls(self):
         return [
-            url(r'^(?P<resource_name>{0})/actions{1}$'.format(self._meta.resource_name,
-                                                              trailing_slash()),
-                self.wrap_view('get_action_list'),
-                name="list of actions"),
-
-            url(r'^(?P<resource_name>{0})/action/(?P<action_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
-                                                                                        trailing_slash()),
-                self.wrap_view('perform_action'),
-                name='perform action'),
-
-            url(r'^(?P<resource_name>{0})/tag/(?P<tag_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
-                                                                                  trailing_slash()),
-                self.wrap_view('view_tag'),
-                name='view configuration tag'),
-
-            url(r'^(?P<resource_name>{0})/project_mode/((?P<step_id>\w[\w/-]*){1}|)$'.format(self._meta.resource_name,
-                                                                                             trailing_slash()),
-                self.wrap_view('check_project_mode'),
-                name='check project_mode of given step'),
-            url(r'^(?P<resource_name>{0})/tags/(?P<trf_name>\w[\w\./-]*)/(?P<trf_release>\d[\d\./-]*){1}'.format(
-                self._meta.resource_name, trailing_slash()),
-                self.wrap_view('list_tags'),
-                name='list configuration tags'),
+            # url(r'^(?P<resource_name>{0})/actions{1}$'.format(self._meta.resource_name,
+            #                                                   trailing_slash()),
+            #     self.wrap_view('get_action_list'),
+            #     name="list of actions"),
+            #
+            # url(r'^(?P<resource_name>{0})/action/(?P<action_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
+            #                                                                             trailing_slash()),
+            #     self.wrap_view('perform_action'),
+            #     name='perform action'),
+            #
+            # url(r'^(?P<resource_name>{0})/tag/(?P<tag_name>\w[\w/-]*){1}$'.format(self._meta.resource_name,
+            #                                                                       trailing_slash()),
+            #     self.wrap_view('view_tag'),
+            #     name='view configuration tag'),
+            #
+            # url(r'^(?P<resource_name>{0})/project_mode/((?P<step_id>\w[\w/-]*){1}|)$'.format(self._meta.resource_name,
+            #                                                                                  trailing_slash()),
+            #     self.wrap_view('check_project_mode'),
+            #     name='check project_mode of given step'),
+            # url(r'^(?P<resource_name>{0})/tags/(?P<trf_name>\w[\w\./-]*)/(?P<trf_release>\d[\d\./-]*){1}'.format(
+            #     self._meta.resource_name, trailing_slash()),
+            #     self.wrap_view('list_tags'),
+            #     name='list configuration tags'),
         ]
 
     def get_action_list(self, request, **kwargs):

@@ -12,7 +12,7 @@ from requests.exceptions import ConnectionError
 from string import Template
 from deftcore.log import Logger
 from deftcore.settings import AMI_API_V2_BASE_URL, AMI_API_V2_BASE_URL_REPLICA, \
-    VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH
+    VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH, CA_CERTIFICATES
 from django.core.exceptions import ObjectDoesNotExist
 from taskengine.models import TTrfConfig, TProject, TDataFormat, PhysicsContainer, \
     ProductionTask, ProductionTag, StepExecution, StepTemplate
@@ -53,7 +53,7 @@ class AMIClient(object):
             logger.exception('AMI initialization failed: {0}'.format(str(ex)))
 
     def _acquire_token(self, use_replica=False):
-        self._verify_server_cert = False
+        self._verify_server_cert = CA_CERTIFICATES
 
         current_base_url = self._default_base_url
         response = None
@@ -66,7 +66,7 @@ class AMIClient(object):
                 use_replica = True
         if use_replica or (response is not None and response.status_code != requests.codes.ok):
             logger.warning('Access token acquisition error try to reconnect')
-            self._verify_server_cert = False
+            self._verify_server_cert = CA_CERTIFICATES
             current_base_url = self._default_base_url_replica
             response = requests.get('{0}token/certificate'.format(current_base_url), cert=self._cert,
                                     verify=self._verify_server_cert)

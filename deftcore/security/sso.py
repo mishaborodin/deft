@@ -5,7 +5,6 @@ import os.path
 import io
 import re
 import urllib.parse
-import pycurl
 import html.parser
 import base64
 import getpass
@@ -31,7 +30,8 @@ class SSOCookies(object):
             if not os.path.isfile(pem_cert_key_path):
                 raise Exception('SSOCookies: key file {0} is not found'.format(pem_cert_key_path))
 
-        self.curl = pycurl.Curl()
+        # self.curl = pycurl.Curl()
+        self.curl = {}
         self.curl.setopt(self.curl.COOKIEFILE, '')
 
         if krb:

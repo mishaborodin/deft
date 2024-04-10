@@ -5,6 +5,7 @@ import subprocess
 from OpenSSL.crypto import load_certificate, FILETYPE_PEM
 from deftcore.settings import VOMS_CERT_FILE_PATH, VOMS_KEY_FILE_PATH, X509_PROXY_PATH
 from deftcore.log import Logger
+from datetime import datetime, timedelta
 
 logger = Logger.get()
 
@@ -58,7 +59,11 @@ class VOMSClient(object):
                 cert_pem = proxy_file.read()
                 proxy_file.close()
                 x509 = load_certificate(FILETYPE_PEM, cert_pem)
-                return not x509.has_expired()
+                if x509.has_expired():
+                    return False
+                time_left = datetime.strptime(x509.get_notAfter().decode().rstrip('Z'), '%Y%m%d%H%M%S')
+                time_diff = time_left - datetime.utcnow()
+                return time_diff.total_seconds() > 3600
             except Exception as ex:
                 logger.warning('_is_proxy_valid failed: {0}'.format(ex))
                 return False

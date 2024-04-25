@@ -4059,6 +4059,8 @@ class TaskDefinition(object):
 
             if project_mode.goal is not None:
                 task_proto_dict.update({'goal': project_mode.goal})
+                if str(project_mode.goal) == '100':
+                    task_proto_dict.update({'use_exhausted': True})
 
             if project_mode.skipFilesUsedBy:
                 task_proto_dict.update({'skip_files_used_by': project_mode.skipFilesUsedBy})
@@ -5670,9 +5672,9 @@ class TaskDefinition(object):
         file_path = os.path.join(release_path, dir_name, 'env_setup.sh')
         hepmc_version_pattern = 'HEPMCVER='
         if campaign.lower() in ['mc16','mc20']:
-            expected_version = '2'
+            expected_versions = ['2' , '3']
         elif  campaign.lower() in ['mc21','mc23']:
-            expected_version = '3'
+            expected_versions = ['3']
         else:
             return False
         if os.path.exists(file_path):
@@ -5680,7 +5682,7 @@ class TaskDefinition(object):
                 for line in f:
                     if re.search(hepmc_version_pattern, line):
                         version = line.split('HEPMCVER=')[1][0]
-                        if version == expected_version:
+                        if version in expected_versions:
                             self._verified_evgen_releases.add(trf_cache+trf_release+campaign)
                             return True
                         else:

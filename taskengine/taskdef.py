@@ -4,6 +4,7 @@ import glob
 import os
 import re
 import json
+import sre_parse
 import subprocess
 import csv
 import io
@@ -2263,7 +2264,7 @@ class TaskDefinition(object):
             skip_prod_step_check = project_mode.skipProdStepCheck or False
 
             if 'merge'.lower() in step.step_template.step.lower() and 'merge' not in prod_step.lower():
-                if not skip_prod_step_check:
+                if step.request.request_type in ['MC'] and not skip_prod_step_check:
                     raise Exception('productionStep in the tag ({0}) differs from the step name in the request ({1})'
                                     .format(prod_step, step.step_template.step))
 

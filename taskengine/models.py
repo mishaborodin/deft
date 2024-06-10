@@ -281,9 +281,7 @@ class ProductionTask(models.Model):
         cursor = None
         try:
             cursor = connections[self._meta.db_name].cursor()
-            cursor.execute(
-                'select TASKID,HT_ID from {0} where HT_ID={1} and TASKID={2}'.format(
-                    HashTagToTask._meta.db_table, hashtag_id, task_id))
+            cursor.execute(f'select TASKID,HT_ID from {HashTagToTask._meta.db_table} where HT_ID=%s and TASKID=%s', [hashtag_id, task_id])
             result = cursor.fetchall()
             if result:
                 exists = True
@@ -298,9 +296,7 @@ class ProductionTask(models.Model):
         cursor = None
         try:
             cursor = connections[self._meta.db_name].cursor()
-            cursor.execute(
-                'insert into {0} (HT_ID,TASKID) values ({1},{2})'.format(
-                    HashTagToTask._meta.db_table, hashtag_id, task_id))
+            cursor.execute(f"insert into {HashTagToTask._meta.db_table} (HT_ID,TASKID) values(%s, %s)",(hashtag_id,task_id))
         finally:
             if cursor:
                 cursor.close()
@@ -309,7 +305,7 @@ class ProductionTask(models.Model):
         cursor = None
         try:
             cursor = connections[self._meta.db_name].cursor()
-            cursor.execute('select HT_ID from {0} where TASKID={1}'.format(HashTagToTask._meta.db_table, task_id))
+            cursor.execute(f"SELECT HT_ID from {HashTagToTask._meta.db_table} WHERE TASKID=%s",[task_id])
             hashtags_id = cursor.fetchall()
         finally:
             if cursor:
@@ -323,10 +319,7 @@ class ProductionTask(models.Model):
         cursor = None
         try:
             cursor = connections[ProductionTask._meta.db_name].cursor()
-            cursor.execute('select TASKID from {0} where HT_ID={1} order by TASKID desc'.format(
-                HashTagToTask._meta.db_table,
-                hashtag_id)
-            )
+            cursor.execute(f"SELECT TASKID from {HashTagToTask._meta.db_table} WHERE HT_ID=%s", [hashtag_id])
             tasks = cursor.fetchall()
         finally:
             if cursor:
@@ -337,8 +330,7 @@ class ProductionTask(models.Model):
         cursor = None
         try:
             cursor = connections[self._meta.db_name].cursor()
-            cursor.execute(
-                "select TO_CHAR({0}) from {1} where TASKID={2}".format(field_name, self._meta.db_table, task_id))
+            cursor.execute(f"select TO_CHAR({field_name}) from {self._meta.db_table} where TASKID=%s",[task_id])
             rows = cursor.fetchall()
             return rows[0][0]
         finally:

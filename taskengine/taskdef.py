@@ -3330,6 +3330,7 @@ class TaskDefinition(object):
                     for param_index, param_value in enumerate(param_input_list):
                         if param_value[-1] != '/' and ('_tid' not in param_value):
                             param_value = '%s/' % param_value
+                        param_value = param_value.strip()
                         postfix = ''
                         if param_index == 0:
                             postfix_index = ''

@@ -590,5 +590,9 @@
   "noInputSimul": {
     "type": "bool",
     "description": ""
+  },
+  "nChunksToWait": {
+    "type": "int",
+    "description": ""
   }
 }

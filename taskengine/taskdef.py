@@ -3302,6 +3302,8 @@ class TaskDefinition(object):
                         second_input_param = \
                             self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
                         if project_mode.npileup:
+                            if 'inputRDO_BKGFile' in name:
+                                raise Exception('Npileup is not supported for inputRDO_BKGFile')
                             n_pileup = project_mode.npileup \
                                 if '.' in str(project_mode.npileup) else int(project_mode.npileup)
                             second_input_param['ratio']= n_pileup

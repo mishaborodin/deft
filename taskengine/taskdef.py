@@ -3299,8 +3299,12 @@ class TaskDefinition(object):
                             param_dict.update({'event_ratio': event_ratio})
 
                         n_pileup = None
-                        second_input_param = \
-                            self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
+                        if not project_mode.useRandomBkg:
+                            second_input_param = \
+                                self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS, param_dict)
+                        else:
+                            second_input_param = \
+                                self.protocol.render_param(TaskParamName.SECONDARY_INPUT_ZERO_BIAS_BS_RND, param_dict)
                         if project_mode.npileup:
                             if 'inputRDO_BKGFile' in name:
                                 raise Exception('Npileup is not supported for inputRDO_BKGFile')

@@ -594,5 +594,9 @@
   "nChunksToWait": {
     "type": "int",
     "description": ""
+  },
+  "useRandomBkg": {
+    "type": "bool",
+    "description": ""
   }
 }

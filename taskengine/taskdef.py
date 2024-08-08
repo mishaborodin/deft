@@ -2745,6 +2745,10 @@ class TaskDefinition(object):
                 if  LooseVersion(trf_release) >= LooseVersion('22.0'):
                     if not project_mode.skipHEPMCCheck and not self._check_evgen_hepmc(trf_cache, trf_release, step.request.campaign):
                         logger.warning(f"HEPMC check for {trf_cache} {trf_release} {step.request.campaign} failed")
+                # if  LooseVersion(trf_release) >= LooseVersion('22.0'):
+                #     if self.is_madgraph(input_data_name) and not project_mode.coreCount:
+                #         project_mode.coreCount  = 8
+
 
             skip_scout_jobs = None
             try:
@@ -3834,6 +3838,9 @@ class TaskDefinition(object):
                 core_count = project_mode.coreCount
                 task_proto_dict.update({'number_of_cpu_cores': core_count})
 
+            if step.request.request_type.lower() == 'MC'.lower() and step.request.phys_group.lower() == 'HION'.lower():
+                if prod_step.lower() == 'recon'.lower() and project_mode.coreCount is None:
+                    raise Exception('Core count is not defined for HION recon task. Please set coreCount in project mode')
             # https://twiki.cern.ch/twiki/bin/view/AtlasComputing/ProdSys#Default_cpuTime_cpu_TimeUnit_tab
             # https://twiki.cern.ch/twiki/bin/view/AtlasComputing/ProdSys#Default_base_RamCount_ramCount_r
             if step.request.request_type.lower() == 'MC'.lower():
@@ -5704,4 +5711,9 @@ class TaskDefinition(object):
         if '/' in step.request.campaign or '/' in step.request.subcampaign:
             raise Exception('Campaign and subcampaign should not contain "/"')
         return True
+
+    def is_madgraph(self, input_data_name: str) -> bool:
+        if 'amcpy' in input_data_name.lower() or 'mgpy' in input_data_name.lower():
+            return True
+        return False
 

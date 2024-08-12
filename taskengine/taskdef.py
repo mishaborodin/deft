@@ -5049,7 +5049,9 @@ class TaskDefinition(object):
                 else:
                     raise NotEnoughEvents(previous_existed_tasks)
             if (step.input_events <= 0) and (step.request.request_type.lower() in ['GROUP'.lower()]):
-                processed_datasets = self._get_processed_datasets(step, result['datasets'])
+                processed_datasets = []
+                if number_events_processed > 0:
+                    processed_datasets = self._get_processed_datasets(step, result['datasets'])
                 for dataset_name in result['datasets']:
                     if dataset_name.split(':')[-1] not in processed_datasets:
                         events_per_file = self.get_events_per_input_file(step, dataset_name,

@@ -1682,7 +1682,7 @@ class TaskDefinition(object):
 
             if current_dsn_no_scope != previous_dsn_no_scope:
                 continue
-            if project_mode.checkOutputDeleted:
+            if project_mode.checkOutputDeleted and prod_task_existing.status in ['done', 'finished']:
                 previous_output_status_dict = \
                     self.task_reg.check_task_output(task_id, requested_output_types)
                 dataset_still_exists = False
@@ -4657,7 +4657,7 @@ class TaskDefinition(object):
                 if previous_dsn_no_scope not in requested_datasets_no_scope:
                     continue
 
-            if project_mode.checkOutputDeleted:
+            if project_mode.checkOutputDeleted and ps2_task.status in ['done', 'finished']:
                 requested_output_types = step.step_template.output_formats.split('.')
                 previous_output_status_dict = \
                     self.task_reg.check_task_output(ps2_task.id, requested_output_types)
@@ -4689,6 +4689,7 @@ class TaskDefinition(object):
         processed_datasets = []
         input_data_name = self.get_step_input_data_name(step)
         split_slice = ProjectMode.get_task_config(step).get('split_slice')
+        check_output_deleted = ProjectMode.get_task_config(step).get('checkOutputDeleted')
 
         if split_slice:
             ps2_task_list = \
@@ -4721,6 +4722,19 @@ class TaskDefinition(object):
                 processed_output_types = [e for e in requested_output_types if e in previous_output_types]
                 if not processed_output_types:
                     continue
+                if check_output_deleted and ps2_task.status in ['done', 'finished']:
+                    previous_output_status_dict = self.task_reg.check_task_output(ps2_task.id, processed_output_types)
+                    previous_output_exists = False
+                    for requested_output_type in processed_output_types:
+                        if requested_output_type not in list(previous_output_status_dict.keys()):
+                            continue
+                        if previous_output_status_dict[requested_output_type]:
+                            previous_output_exists = True
+                            break
+                        else:
+                            logger.info('Output {0} of task {1} is deleted'.format(requested_output_type, ps2_task.id))
+                    if not previous_output_exists:
+                        continue
             jedi_task_existing = TTask.objects.get(id=ps2_task.id)
             task_existing = json.loads(jedi_task_existing.jedi_task_param)
             previous_dsn = self._get_primary_input(task_existing['jobParameters'])['dataset']

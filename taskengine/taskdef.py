@@ -4082,7 +4082,12 @@ class TaskDefinition(object):
             if project_mode.skipFilesUsedBy:
                 task_proto_dict.update({'skip_files_used_by': project_mode.skipFilesUsedBy})
                 skip_check_input = True
-
+            if project_mode.patchRepro:
+                if project_mode.patchRepro == 'wait':
+                    raise Exception('Task is waiting patch to be produced')
+                task_proto_dict.update({'skip_files_used_by': project_mode.patchRepro})
+                skip_check_input = True
+                follow_hashtags.append(TaskDefConstants.REPRO_PATCH_HASHTAG)
             if project_mode.noThrottle is not None:
                 task_proto_dict.update({'no_throttle': project_mode.noThrottle or None})
 
@@ -4227,6 +4232,9 @@ class TaskDefinition(object):
             if project_mode.transUsesPrefix:
                 task_proto_dict.update({'trans_uses_prefix': project_mode.transUsesPrefix})
 
+            if step.request.request_type.lower() == 'MC'.lower() and use_real_nevents and 'nEventsPerJob' in list(task_config.keys()):
+                task_proto_dict.update({'no_wait_parent': False})
+
             if project_mode.noWaitParent is not None:
                 task_proto_dict.update({'no_wait_parent': project_mode.noWaitParent or None})
 
@@ -4320,6 +4328,7 @@ class TaskDefinition(object):
                             task_proto_dict.update({'use_exhausted': True})
                             task_proto_dict.update({'goal': str(100.0)})
                             task_proto_dict.update({'fail_when_goal_unreached': True})
+
             if not evgen_params:
                 self._check_number_of_events(step, project_mode)
 
@@ -4988,7 +4997,10 @@ class TaskDefinition(object):
                     (prod_step.lower() == 'evgen'.lower() or prod_step.lower() == 'simul'.lower()
                      or force_merge_container):
                 return splitting_dict
-
+            if project_mode.patchRepro:
+                if project_mode.patchRepro == 'wait':
+                    raise Exception('Task is waiting patched repro')
+                project_mode.skipFilesUsedBy = int(project_mode.patchRepro)
             if project_mode.skipFilesUsedBy:
                 job_params = self.task_reg.get_task_parameter(project_mode.skipFilesUsedBy, 'jobParameters')
                 primary_input = self._get_primary_input(job_params)

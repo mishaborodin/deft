@@ -588,3 +588,5 @@ class TaskDefConstants(object, metaclass=Constants):
     }}
 
     JEDI_FULL_CHAIN = 'JEDIFullChain'
+
+    REPRO_PATCH_HASHTAG = 'ReproPatch'

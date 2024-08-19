@@ -598,5 +598,9 @@
   "useRandomBkg": {
     "type": "bool",
     "description": ""
+  },
+  "patchRepro": {
+    "type": "str",
+    "description": ""
   }
 }

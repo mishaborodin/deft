@@ -1827,7 +1827,7 @@ class TaskDefinition(object):
 
     def  _set_pre_stage(self, step, task_proto_dict, project_mode):
         # set staging if input is only on Tape
-        if not project_mode.noprestage and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC','HLT']:
+        if not project_mode.noprestage and not project_mode.patchRepro and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC','HLT']:
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
                 sa = StepAction()

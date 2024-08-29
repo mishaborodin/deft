@@ -72,6 +72,7 @@ class TaskParamName(Enum):
     INPUT = auto()
     INPUT_DIRECT_IO = auto()
     OUTPUT = auto()
+    ORDERED_OUTPUT = auto()
     RAW_OUTPUT = auto()
     TXT_OUTPUT = auto()
     SECONDARY_INPUT_MINBIAS = auto()
@@ -189,6 +190,14 @@ class Protocol(object):
             "token": "ATLASDATADISK",
             "type": "template",
             "value": "{{name}}={{data_type}}.{{task_id|stringformat:\".08d\"}}._${SN}.pool.root"
+        }""",
+        TaskParamName.ORDERED_OUTPUT: """{
+        "dataset": "{{dataset}}",
+        "offset": 0,
+        "param_type": "output",
+        "token": "ATLASDATADISK",
+        "type": "template",
+        "value": "{{name}}={{data_type}}.{{task_id|stringformat:\".08d\"}}${MIDDLENAME}.pool.root"
         }""",
         TaskParamName.RAW_OUTPUT: """{
         "dataset": "{{dataset}}",

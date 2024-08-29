@@ -119,5 +119,7 @@
   "allowEmptyInput": "{{allow_empty_input}}",
   "skipShortOutput": "{{skip_short_output}}",
   "maxCoreCount": "{{max_core_count}}",
-  "nChunksToWait": "{{number_of_chunks_to_wait}}"
+  "nChunksToWait": "{{number_of_chunks_to_wait}}",
+  "addNthFieldToLFN": "{{add_nth_field_to_lfn}}",
+  "useFileAsSourceLFN": "{{use_file_as_source_lfn}}"
 }

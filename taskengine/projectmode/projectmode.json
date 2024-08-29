@@ -602,5 +602,9 @@
   "patchRepro": {
     "type": "str",
     "description": ""
+  },
+  "orderedOutput": {
+    "type": "bool",
+    "description": ""
   }
 }

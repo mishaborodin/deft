@@ -3552,6 +3552,8 @@ class TaskDefinition(object):
                                   'task_id': task_proto_id}
                     param_dict.update(trf_options)
                     proto_key = TaskParamName.OUTPUT
+                    if project_mode.orderedOutput:
+                        proto_key = TaskParamName.ORDERED_OUTPUT
                     if train_production and output_data_type.split('_')[0] == 'DAOD':
                         proto_key = TaskParamName.TRAIN_OUTPUT
                     elif re.match(r'^(--)?outputTXT_EVENTIDFile$', name, re.IGNORECASE):
@@ -4111,6 +4113,10 @@ class TaskDefinition(object):
 
             if project_mode.nMaxFilesPerJob:
                 task_proto_dict.update({'number_of_max_files_per_job': project_mode.nMaxFilesPerJob})
+
+            if project_mode.orderedOutput:
+                task_proto_dict.update({'add_nth_field_to_lfn': 3})
+                task_proto_dict.update({'use_file_as_source_lfn': True})
 
             ttcr_timestamp = None
 

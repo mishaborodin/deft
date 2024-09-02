@@ -80,6 +80,7 @@ class TaskParamName(Enum):
     SECONDARY_INPUT_ZERO_BIAS_BS = auto()
     SECONDARY_INPUT_ZERO_BIAS_BS_RND = auto()
     LOG = auto()
+    ORDERED_LOG = auto()
     JOB_NUMBER = auto()
     FILTER_FILE = auto()
     TRAIN_DAOD_FILE = auto()
@@ -197,7 +198,7 @@ class Protocol(object):
         "param_type": "output",
         "token": "ATLASDATADISK",
         "type": "template",
-        "value": "{{name}}={{data_type}}.{{task_id|stringformat:\".08d\"}}${MIDDLENAME}.pool.root"
+        "value": "{{name}}={{data_type}}.{{task_id|stringformat:\".08d\"}}${MIDDLENAME}._${SN}.pool.root"
         }""",
         TaskParamName.RAW_OUTPUT: """{
         "dataset": "{{dataset}}",
@@ -302,6 +303,14 @@ class Protocol(object):
             "type": "template",
             "value": "log.{{task_id|stringformat:\".08d\"}}._${SN}.job.log.tgz"
         }""",
+        TaskParamName.ORDERED_LOG: """{
+        "dataset": "{{dataset}}",
+        "offset": 0,
+        "param_type": "log",
+        "token": "ATLASDATADISK",
+        "type": "template",
+        "value": "log.{{task_id|stringformat:\".08d\"}}${MIDDLENAME}._${SN}.job.log.tgz"
+    }""",
         TaskParamName.JOB_NUMBER: """{
             "param_type": "number",
             "type": "template",

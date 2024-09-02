@@ -3731,7 +3731,10 @@ class TaskDefinition(object):
 
             log_param_dict = {'dataset': output_params['outputlogFile'][0], 'task_id': task_proto_id}
             log_param_dict.update(trf_options)
-            log_param = self.protocol.render_param(TaskParamName.LOG, log_param_dict)
+            if project_mode.orderedOutput:
+                log_param = self.protocol.render_param(TaskParamName.ORDERED_LOG, log_param_dict)
+            else:
+                log_param = self.protocol.render_param(TaskParamName.LOG, log_param_dict)
             if is_not_transient_output:
                 log_param['transient'] = not is_not_transient_output
             if leave_log:

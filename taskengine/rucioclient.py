@@ -1,9 +1,13 @@
 __author__ = 'Dmitry Golubkov'
 
+import datetime
 import os
 import re
 import math
 import random
+
+from django.utils import timezone
+
 from deftcore.log import Logger
 from deftcore.settings import RUCIO_ACCOUNT_NAME, X509_PROXY_PATH
 from rucio.client import Client
@@ -245,12 +249,18 @@ class RucioClient(object):
             return False
 
     def is_dsn_exists_with_rule_or_replica(self, dsn):
+        DELITION_PERIOD_HOURS = 24
+
         scope, dataset = self.extract_scope(dsn)
         dataset_exists = self.is_dsn_exist(dsn)
         if not dataset_exists:
             return False
         if not list(self.client.list_dataset_replicas(scope, dataset)) and not(list(self.client.list_did_rules(scope, dataset))):
             return False
+        if self.get_metadata_attribute(dsn, 'expired_at'):
+            if ((self.get_metadata_attribute(dsn, 'expired_at') - timezone.now().replace(tzinfo=None)) <
+                    datetime.timedelta(hours=DELITION_PERIOD_HOURS)):
+                return False
         return True
 
 

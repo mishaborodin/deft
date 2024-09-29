@@ -476,7 +476,7 @@
     "description": ""
   },
   "randomMCOverlay": {
-    "type": "bool",
+    "type": "str",
     "description": ""
   },
   "rivet": {

@@ -10,6 +10,8 @@ import io
 import ast
 import datetime
 import copy
+import random
+
 import math
 from copy import deepcopy
 
@@ -1888,7 +1890,7 @@ class TaskDefinition(object):
         k, m = divmod(len(input_list), n)
         return (input_list[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
 
-    def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id, task):
+    def _register_mc_overlay_dataset(self, mc_pileup_overlay, number_of_jobs, task_id, task, split_by_dataset=False):
 
         used_files = set()
         nevents_per_job = task.get('nEventsPerJob')
@@ -1907,10 +1909,26 @@ class TaskDefinition(object):
         files_required = math.ceil(number_of_jobs) * pileup_files_per_job
         if files_required > len(mc_pileup_overlay['files']):
             raise Exception(f'Not enough overlay files: requested {files_required} available {len(mc_pileup_overlay["files"])}')
-        if (len(used_files) + files_required) > len(mc_pileup_overlay['files']):
-            files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=[])
-        else:
-            files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=list(used_files))
+        files_to_store = []
+        if split_by_dataset:
+            files_per_datset = mc_pileup_overlay['files_per_dataset']
+        #     list of keys in random order
+            keys = list(files_per_datset.keys())
+            random.shuffle(keys)
+            files_to_store = []
+            for key in keys:
+                dataset_files = files_per_datset[key]
+                not_used_files = set(dataset_files) - used_files
+                if len(not_used_files) > files_required:
+                    files_to_store = self.rucio_client.choose_random_files(list(not_used_files),files_required,random_seed=None,previously_used=[])
+                    break
+            if not files_to_store:
+                split_by_dataset = False
+        if not split_by_dataset:
+            if (len(used_files) + files_required) > len(mc_pileup_overlay['files']):
+                files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=[])
+            else:
+                files_to_store = self.rucio_client.choose_random_files(mc_pileup_overlay['files'],files_required,random_seed=None,previously_used=list(used_files))
         logger.info("MC overlay dataset %s with %d files is registered for a task %d" % (mc_pileup_overlay['input_dataset_name'], len(files_to_store),task_id))
         files_list = list(self.split_list(files_to_store,len(files_to_store)//100+1))
         self.rucio_client.register_dataset(mc_pileup_overlay['input_dataset_name'],files_list[0],meta={'task_id':task_id})
@@ -1918,7 +1936,7 @@ class TaskDefinition(object):
             if files:
                 self.rucio_client.register_files_in_dataset(mc_pileup_overlay['input_dataset_name'],files)
 
-    def _find_overlay_input_dataset(self, param_value, dsid):
+    def _find_overlay_input_dataset(self, param_value, dsid, split_by_dataset=False):
         def ami_tags_reduction(postfix):
             new_postfix = []
             first_letter = ''
@@ -1930,7 +1948,17 @@ class TaskDefinition(object):
 
         if param_value[-1] == '/':
             param_value = param_value[:-1]
-        files_list = self.rucio_client.list_files_with_scope_in_dataset(param_value, True)
+        files_per_dataset = {}
+        if not split_by_dataset:
+            files_list = self.rucio_client.list_files_with_scope_in_dataset(param_value, True)
+            files_per_dataset = {param_value: files_list}
+        else:
+            datasets = self.rucio_client.list_datasets_in_container(param_value)
+            files_list = []
+            for dataset in datasets:
+                current_dataset_files = self.rucio_client.list_files_with_scope_in_dataset(dataset, True)
+                files_per_dataset[dataset] = current_dataset_files
+                files_list.extend(current_dataset_files)
         name_base = param_value
         if '_tid' in name_base:
             name_base = name_base.split('_tid')[0]
@@ -1944,7 +1972,7 @@ class TaskDefinition(object):
         if versions:
             version = max(versions) + 1
         input_dataset_name = '{base}_sub{version:04d}_rnd{dsid}'.format(base=name_base,dsid=dsid,version=version)
-        return {'files':files_list, 'datasets':previous_datasets,'version': version,'input_dataset_name':input_dataset_name}
+        return {'files':files_list, 'datasets':previous_datasets,'version': version,'input_dataset_name':input_dataset_name, 'files_per_dataset':files_per_dataset}
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
         task_config = ProjectMode.get_task_config(step)
@@ -3274,9 +3302,13 @@ class TaskDefinition(object):
                     param_value = self._get_parameter_value(name, ctag)
                     if not param_value or str(param_value).lower() == 'none':
                         continue
-                    if project_mode.randomMCOverlay:
+                    if project_mode.randomMCOverlay and project_mode.randomMCOverlay != 'no':
                         mc_pileup_overlay['is_overlay'] = True
-                        mc_pileup_overlay.update(self._find_overlay_input_dataset(param_value,input_data_dict['number']))
+                        if project_mode.randomMCOverlay == 'single':
+                            mc_pileup_overlay.update(
+                                self._find_overlay_input_dataset(param_value, input_data_dict['number'], True))
+                        else:
+                            mc_pileup_overlay.update(self._find_overlay_input_dataset(param_value,input_data_dict['number']))
                         param_dict = {'name': name, 'dataset': mc_pileup_overlay['input_dataset_name']}
                         param_dict.update(trf_options)
                         if project_mode.eventRatio:
@@ -4530,7 +4562,8 @@ class TaskDefinition(object):
                                            task_common_offset=task_common_offset)
                 set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay'] and not self.template_type:
-                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task)
+                    split_by_datasets = project_mode.randomMCOverlay == 'single'
+                    self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task, split_by_datasets)
                 if project_mode.GRL or project_mode.FLD:
                     primary_input = self._get_primary_input(task['jobParameters'])
                     primary_input_dataset = primary_input['dataset']

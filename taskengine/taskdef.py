@@ -5747,6 +5747,9 @@ class TaskDefinition(object):
                 if (not no_wait) and (not is_fast):
                     logger.info("Request %d is skipped, approved at %s" % (request.id, last_access_timestamp))
                     continue
+            if request.phys_group != 'VALI' and TRequest.objects.filter(locked=True, phys_group=request.phys_group, request_type=request.request_type).count()>1:
+                logger.info("Request %d is skipped, another request is in progress" % request.id)
+                continue
             ready_request_list.append(request)
         requests = ready_request_list[:1]
         self._define_tasks_for_requests(requests, jira_client, restart)

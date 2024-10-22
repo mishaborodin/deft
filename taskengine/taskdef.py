@@ -1972,6 +1972,19 @@ class TaskDefinition(object):
         if versions:
             version = max(versions) + 1
         input_dataset_name = '{base}_sub{version:04d}_rnd{dsid}'.format(base=name_base,dsid=dsid,version=version)
+        from rucio.common.exception import RucioException
+        if version == 1:
+            for i in range(10):
+                try:
+                    self.rucio_client.register_dataset(input_dataset_name)
+                    break
+                except RucioException as ex:
+                    version += 1
+                    input_dataset_name = '{base}_sub{version:04d}_rnd{dsid}'.format(base=name_base,dsid=dsid,version=version)
+
+            version += 1
+            input_dataset_name = '{base}_sub{version:04d}_rnd{dsid}'.format(base=name_base, dsid=dsid, version=version)
+
         return {'files':files_list, 'datasets':previous_datasets,'version': version,'input_dataset_name':input_dataset_name, 'files_per_dataset':files_per_dataset}
 
     def _define_merge_params(self, step, task_proto_dict, train_production=False):
@@ -4118,6 +4131,9 @@ class TaskDefinition(object):
             if project_mode.skipFilesUsedBy:
                 task_proto_dict.update({'skip_files_used_by': project_mode.skipFilesUsedBy})
                 skip_check_input = True
+
+            if project_mode.taskRecreation:
+                skip_check_input = True
             if project_mode.patchRepro:
                 if project_mode.patchRepro == 'wait':
                     raise Exception('Task is waiting patch to be produced')
@@ -4555,12 +4571,13 @@ class TaskDefinition(object):
                 # self._check_task_cache_version_consistency(task, step, trf_release)
                 self._check_task_blacklisted_input(task, project_mode)
                 self._check_campaign_subcampaign(step)
+                set_mc_reprocessing_hashtag = False
                 if not skip_check_input:
                     self._check_task_input(task, task_id, number_of_events, task_config, parent_task_id,
                                            input_data_name, step, primary_input_offset, prod_step,
                                            reuse_input=reuse_input, evgen_params=evgen_params,
                                            task_common_offset=task_common_offset)
-                set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
+                    set_mc_reprocessing_hashtag = self._check_task_recreated(task, step)
                 if mc_pileup_overlay['is_overlay'] and not self.template_type:
                     split_by_datasets = project_mode.randomMCOverlay == 'single'
                     self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task, split_by_datasets)

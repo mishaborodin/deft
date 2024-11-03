@@ -21,7 +21,8 @@ from django.template import Context, Template
 from django.utils import timezone
 from distutils.version import LooseVersion
 from taskengine.models import StepExecution, TRequest, InputRequestList, TRequestStatus, ProductionTask, TTask, \
-    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, GlobalShare, SliceError, TaskTemplate
+    TTaskRequest, JEDIDataset, OpenEnded, ProductionDataset, HashTag, TConfig, StepAction, HashTagToRequest, \
+    GlobalShare, SliceError, TaskTemplate, JEDIDatasetContent
 from taskengine.protocol import Protocol, StepStatus, TaskParamName, TaskDefConstants, RequestStatus, TaskStatus
 from taskengine.taskreg import TaskRegistration
 from taskengine.metadata import AMIClient
@@ -725,7 +726,25 @@ class TaskDefinition(object):
             raise GRLInputException(f'No files are found in the dataset {dataset} from {filter_dataset}')
         return filtered_files, len(filtered_files) == len(files_in_dataset)
 
-
+    def _filter_input_dataset_by_previous_task(self, dataset: str, previous_task_id: int):
+        files_in_dataset = self.rucio_client.list_file_long(dataset)
+        if JEDIDataset.objects.filter(task_id=int(previous_task_id), dataset_name=dataset).exists():
+            jedi_dataset = JEDIDataset.objects.get(task_id=int(previous_task_id), dataset_name=dataset)
+        else:
+            if ':' in dataset:
+                dataset = dataset.split(':')[-1]
+            else:
+                dataset = dataset.split('.')[0] + ':' + dataset
+            jedi_dataset = JEDIDataset.objects.get(task_id=previous_task_id, dataset_name=dataset)
+        files_in_filter_dataset_names = [x.filename for x in JEDIDatasetContent.objects.filter(task_id=previous_task_id, dataset_id=jedi_dataset.dataset_id, status='finished')]
+        filtered_files = []
+        for input_file in files_in_dataset:
+            if input_file['name'] in files_in_filter_dataset_names:
+                filtered_files.append(input_file)
+        logger.info(f"List files filtered for dataset {dataset} from {previous_task_id} with {len(filtered_files)} files from {len(files_in_dataset)}" )
+        if not filtered_files:
+            raise GRLInputException(f'No files are found in the dataset {dataset} from {previous_task_id}')
+        return filtered_files, len(filtered_files) == len(files_in_dataset)
 
     def _register_input_GRL_dataset(self, grl_dataset_name, filtered_files, task_id):
         logger.info("GRL input dataset %s with %d files is registered for a task %d" % (
@@ -1828,8 +1847,11 @@ class TaskDefinition(object):
 
     def  _set_pre_stage(self, step, task_proto_dict, project_mode):
         # set staging if input is only on Tape
-        if not project_mode.noprestage and not project_mode.patchRepro and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC','HLT']:
+        if (not project_mode.noprestage and not project_mode.patchRepro and not project_mode.repeatDoneTaskInput
+                and step.request.request_type in ['REPROCESSING', 'GROUP', 'MC','HLT']):
             primary_input = self._get_primary_input(task_proto_dict['job_params'])['dataset']
+            if 'sub' in primary_input:
+                return
             if self.rucio_client.is_dsn_exist(primary_input) and self.rucio_client.only_tape_replica(primary_input):
                 sa = StepAction()
                 task_config = ProjectMode.get_task_config(step)
@@ -4581,9 +4603,11 @@ class TaskDefinition(object):
                 if mc_pileup_overlay['is_overlay'] and not self.template_type:
                     split_by_datasets = project_mode.randomMCOverlay == 'single'
                     self._register_mc_overlay_dataset(mc_pileup_overlay, self._get_total_number_of_jobs(task, number_of_events), task_id, task, split_by_datasets)
-                if project_mode.GRL or project_mode.FLD:
+                if project_mode.GRL or project_mode.FLD or project_mode.repeatDoneTaskInput:
                     primary_input = self._get_primary_input(task['jobParameters'])
                     primary_input_dataset = primary_input['dataset']
+                    filtered_files = []
+                    whole_dataset = False
                     if project_mode.GRL:
                         grl_file = self._find_grl_xml_file(input_data_name.split(':')[0].split('.')[0], project_mode.GRL)
                         grl_range = self._get_GRL_from_xml(grl_file)
@@ -4591,6 +4615,8 @@ class TaskDefinition(object):
                         filtered_files, whole_dataset = self._filter_input_dataset_by_GRL(primary_input_dataset, grl_range)
                     elif project_mode.FLD:
                         filtered_files, whole_dataset = self._filter_input_dataset_by_FLD(primary_input_dataset, project_mode.FLD)
+                    elif project_mode.repeatDoneTaskInput:
+                        filtered_files, whole_dataset = self._filter_input_dataset_by_previous_task(primary_input_dataset, project_mode.repeatDoneTaskInput)
                     if not whole_dataset:
                         new_input_name, new_dataset = self._find_grl_dataset_input_name(primary_input_dataset, filtered_files)
                         if new_dataset:

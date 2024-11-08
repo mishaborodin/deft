@@ -3916,15 +3916,17 @@ class TaskDefinition(object):
             # https://twiki.cern.ch/twiki/bin/view/AtlasComputing/ProdSys#Default_base_RamCount_ramCount_r
             if step.request.request_type.lower() == 'MC'.lower():
                 if prod_step.lower() == 'simul'.lower():
-                    task_proto_dict.update({'cpu_time': 3000})
-                    task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
+                    cpu_time = 3000
                     if core_count > 1:
                         if [x for x in job_parameters if 'multithreaded' in x.get('value','')]:
                             memory = 150
                             base_memory = 2200
+                            cpu_time = 1500
                         else:
                             memory = 500
                             base_memory = 1000
+                    task_proto_dict.update({'cpu_time': cpu_time})
+                    task_proto_dict.update({'cpu_time_unit': 'HS06sPerEvent'})
                 elif prod_step.lower() == 'recon'.lower() or is_pile_task:
                     if core_count > 1:
                         memory = 1750
